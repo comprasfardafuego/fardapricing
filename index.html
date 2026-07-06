@@ -104,6 +104,7 @@
   .save-status { font-size: 11px; color: var(--text-ter); margin-right: 12px; }
 </style>
 </head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <body>
 <div id="login-screen">
   <div class="login-box">
@@ -122,6 +123,7 @@
   <button class="tab-btn" data-tab="producciones" onclick="switchTab('producciones')">PRODUCCIONES</button>
   <button class="tab-btn" data-tab="rendimientos" onclick="switchTab('rendimientos')">RENDIMIENTOS</button>
   <button class="tab-btn" data-tab="insumos" onclick="switchTab('insumos')">INSUMOS</button>
+  <button class="tab-btn" data-tab="exportar" onclick="switchTab('exportar')">EXPORTAR</button>
 </div>
 <div class="main">
   <div id="platos-section" class="section active"></div>
@@ -129,6 +131,7 @@
   <div id="producciones-section" class="section"></div>
   <div id="rendimientos-section" class="section"></div>
   <div id="insumos-section" class="section"></div>
+  <div id="exportar-section" class="section"></div>
 </div>
 </div>
 
@@ -542,6 +545,7 @@ function switchTab(tabName) {
   else if (tabName === 'producciones') renderProducciones();
   else if (tabName === 'rendimientos') renderRendimientos();
   else if (tabName === 'insumos') renderInsumos();
+  else if (tabName === 'exportar') renderExportar();
 }
 
 // ──── PLATOS ─────────────────────────────────────────────────────────────────
@@ -1284,6 +1288,204 @@ window.startApp = function (state) {
   insumoDatalistHTML = null;
   renderPlatos();
 };
+
+// ──── EXPORTAR ───────────────────────────────────────────────────────────────
+function fmtMoney(n) {
+  if (n == null || isNaN(n)) return '';
+  return Math.round(n).toLocaleString('es-AR');
+}
+
+function renderExportar() {
+  let h = `<div class="header"><div class="title">Exportar Datos</div><div class="subtitle">Descargá toda la información de platos, recetas, producciones e insumos.</div></div>`;
+  h += `<div class="detail-panel" style="max-width:520px;">
+    <div class="detail-title" style="font-size:16px;margin-bottom:16px;">Elegí el formato</div>
+    <div style="display:flex;gap:12px;margin-bottom:8px;">
+      <button class="btn" style="flex:1;padding:14px;font-size:13px;" onclick="exportExcel()">📊 Descargar Excel (.xlsx)</button>
+      <button class="btn" style="flex:1;padding:14px;font-size:13px;" onclick="exportPDF()">📄 Descargar PDF</button>
+    </div>
+    <div style="font-size:12px;color:var(--text-sec);margin-top:16px;line-height:1.6;">
+      Incluye: Platos (costo/venta/food cost), Recetas completas con ingredientes y cantidades, Producciones internas, e Insumos (maestro de precios).
+    </div>
+  </div>`;
+  document.getElementById('exportar-section').innerHTML = h;
+}
+
+function buildExportData() {
+  const platos = [];
+  Object.keys(DATA.categorias).forEach(cat => {
+    (DATA.categorias[cat] || []).forEach(nombre => {
+      if (platosDeleted.includes(nombre)) return;
+      const p = getPlatoMeta ? getPlatoMeta(nombre) : null;
+      const meta = p || DATA.platos.find(x => x.nombre === nombre) || {};
+      platos.push({
+        categoria: cat,
+        nombre: nombre,
+        costo: meta.costo != null ? Math.round(meta.costo * 100) / 100 : '',
+        venta: meta.venta != null ? Math.round(meta.venta * 100) / 100 : '',
+        fc: meta.fc != null ? Math.round(meta.fc * 10000) / 100 : ''
+      });
+    });
+  });
+  platosExtra.forEach(nombre => {
+    if (platosDeleted.includes(nombre)) return;
+    if (platos.some(x => x.nombre === nombre)) return;
+    const meta = (getPlatoMeta ? getPlatoMeta(nombre) : null) || {};
+    platos.push({ categoria: 'EXTRA', nombre, costo: meta.costo || '', venta: meta.venta || '', fc: meta.fc ? Math.round(meta.fc*10000)/100 : '' });
+  });
+
+  const recetasRows = [];
+  platos.forEach(p => {
+    const ings = getPlatoIngredients(p.nombre) || [];
+    ings.forEach(ing => {
+      const cl = costoLineaIng(ing, p.nombre);
+      const isProd = getProdKey(ing.insumo) != null;
+      recetasRows.push({
+        plato: p.nombre,
+        insumo: ing.insumo,
+        tipo: isProd ? 'Producción' : 'Insumo',
+        unidad: ing.unidad || '',
+        cantidad: ing.cantidad != null ? ing.cantidad : '',
+        costo_linea: Math.round(cl * 100) / 100
+      });
+    });
+  });
+
+  const produccionesRows = [];
+  const prodNames = getAllProdNames();
+  prodNames.forEach(pn => {
+    const ings = getProdIngredients(pn) || [];
+    ings.forEach(ing => {
+      const cl = costoLineaIng(ing, pn);
+      const isProd = getProdKey(ing.insumo) != null;
+      produccionesRows.push({
+        produccion: pn,
+        insumo: ing.insumo,
+        tipo: isProd ? 'Producción' : 'Insumo',
+        unidad: ing.unidad || '',
+        cantidad: ing.cantidad != null ? ing.cantidad : '',
+        costo_linea: Math.round(cl * 100) / 100
+      });
+    });
+  });
+
+  const insumosRows = [];
+  const seenIns = new Set();
+  getAllInsumos().forEach(ins => {
+    if (seenIns.has(ins.nombre)) return;
+    if (prodMapCI[normName(ins.nombre)]) return;
+    seenIns.add(ins.nombre);
+    const ov = insumosPrices[ins.nombre] || { costo: ins.costo, iva: ins.iva, unidad: ins.unidad };
+    const ivaVal = (ov.iva || 0) * 100;
+    const finalVal = (ov.costo || 0) * (1 + ivaVal / 100);
+    insumosRows.push({
+      nombre: ins.nombre,
+      unidad: ov.unidad || ins.unidad,
+      costo_sin_iva: Math.round((ov.costo || 0) * 100) / 100,
+      iva_pct: ivaVal,
+      precio_final: Math.round(finalVal * 100) / 100
+    });
+  });
+
+  return { platos, recetasRows, produccionesRows, insumosRows };
+}
+
+function exportExcel() {
+  const { platos, recetasRows, produccionesRows, insumosRows } = buildExportData();
+  const wb = XLSX.utils.book_new();
+
+  const wsPlatos = XLSX.utils.json_to_sheet(platos.map(p => ({
+    'Categoría': p.categoria, 'Plato': p.nombre, 'Costo sin IVA': p.costo, 'Precio Venta': p.venta, 'Food Cost %': p.fc
+  })));
+  XLSX.utils.book_append_sheet(wb, wsPlatos, 'PLATOS');
+
+  const wsRecetas = XLSX.utils.json_to_sheet(recetasRows.map(r => ({
+    'Plato': r.plato, 'Insumo/Producción': r.insumo, 'Tipo': r.tipo, 'Unidad': r.unidad, 'Cantidad': r.cantidad, 'Costo Línea': r.costo_linea
+  })));
+  XLSX.utils.book_append_sheet(wb, wsRecetas, 'RECETAS');
+
+  const wsProd = XLSX.utils.json_to_sheet(produccionesRows.map(r => ({
+    'Producción': r.produccion, 'Insumo/Producción': r.insumo, 'Tipo': r.tipo, 'Unidad': r.unidad, 'Cantidad': r.cantidad, 'Costo Línea': r.costo_linea
+  })));
+  XLSX.utils.book_append_sheet(wb, wsProd, 'PRODUCCIONES');
+
+  const wsIns = XLSX.utils.json_to_sheet(insumosRows.map(r => ({
+    'Insumo': r.nombre, 'Unidad': r.unidad, 'Costo sin IVA': r.costo_sin_iva, 'IVA %': r.iva_pct, 'Precio Final c/IVA': r.precio_final
+  })));
+  XLSX.utils.book_append_sheet(wb, wsIns, 'INSUMOS');
+
+  const fecha = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `FARDA_Pricing_${fecha}.xlsx`);
+}
+
+function exportPDF() {
+  const { platos, recetasRows, produccionesRows, insumosRows } = buildExportData();
+  const w = window.open('', '_blank');
+  const fecha = new Date().toLocaleDateString('es-AR');
+
+  const platosByCat = {};
+  platos.forEach(p => { (platosByCat[p.categoria] = platosByCat[p.categoria] || []).push(p); });
+
+  const recetasByPlato = {};
+  recetasRows.forEach(r => { (recetasByPlato[r.plato] = recetasByPlato[r.plato] || []).push(r); });
+
+  const prodByName = {};
+  produccionesRows.forEach(r => { (prodByName[r.produccion] = prodByName[r.produccion] || []).push(r); });
+
+  let html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>FARDA - Export ${fecha}</title>
+  <style>
+    body { font-family: Arial, sans-serif; color:#222; padding:24px; font-size:12px; }
+    h1 { font-size:22px; margin-bottom:4px; }
+    .meta { color:#666; font-size:11px; margin-bottom:24px; }
+    h2 { font-size:16px; margin:28px 0 8px; border-bottom:2px solid #333; padding-bottom:4px; page-break-after:avoid; }
+    h3 { font-size:13px; margin:16px 0 6px; color:#444; page-break-after:avoid; }
+    table { width:100%; border-collapse:collapse; margin-bottom:12px; }
+    th, td { border:1px solid #ccc; padding:4px 8px; text-align:left; font-size:11px; }
+    th { background:#eee; }
+    .right { text-align:right; }
+    .block { page-break-inside:avoid; margin-bottom:10px; }
+    @media print { h2 { page-break-before:auto; } }
+  </style></head><body>
+  <h1>FARDA — Sistema de Pricing</h1>
+  <div class="meta">Exportado el ${fecha}</div>`;
+
+  html += `<h2>PLATOS</h2>`;
+  Object.keys(platosByCat).forEach(cat => {
+    html += `<h3>${cat}</h3><table><tr><th>Plato</th><th class="right">Costo s/IVA</th><th class="right">Venta</th><th class="right">Food Cost %</th></tr>`;
+    platosByCat[cat].forEach(p => {
+      html += `<tr><td>${p.nombre}</td><td class="right">${fmtMoney(p.costo)}</td><td class="right">${fmtMoney(p.venta)}</td><td class="right">${p.fc !== '' ? p.fc + '%' : ''}</td></tr>`;
+    });
+    html += `</table>`;
+  });
+
+  html += `<h2>RECETAS</h2>`;
+  Object.keys(recetasByPlato).forEach(plato => {
+    html += `<div class="block"><h3>${plato}</h3><table><tr><th>Insumo/Producción</th><th>Tipo</th><th>Unidad</th><th class="right">Cantidad</th><th class="right">Costo Línea</th></tr>`;
+    recetasByPlato[plato].forEach(r => {
+      html += `<tr><td>${r.insumo}</td><td>${r.tipo}</td><td>${r.unidad}</td><td class="right">${r.cantidad}</td><td class="right">$${fmtMoney(r.costo_linea)}</td></tr>`;
+    });
+    html += `</table></div>`;
+  });
+
+  html += `<h2>PRODUCCIONES</h2>`;
+  Object.keys(prodByName).forEach(pn => {
+    html += `<div class="block"><h3>${pn}</h3><table><tr><th>Insumo/Producción</th><th>Tipo</th><th>Unidad</th><th class="right">Cantidad</th><th class="right">Costo Línea</th></tr>`;
+    prodByName[pn].forEach(r => {
+      html += `<tr><td>${r.insumo}</td><td>${r.tipo}</td><td>${r.unidad}</td><td class="right">${r.cantidad}</td><td class="right">$${fmtMoney(r.costo_linea)}</td></tr>`;
+    });
+    html += `</table></div>`;
+  });
+
+  html += `<h2>INSUMOS</h2><table><tr><th>Insumo</th><th>Unidad</th><th class="right">Costo s/IVA</th><th class="right">IVA %</th><th class="right">Precio Final</th></tr>`;
+  insumosRows.forEach(r => {
+    html += `<tr><td>${r.nombre}</td><td>${r.unidad}</td><td class="right">$${fmtMoney(r.costo_sin_iva)}</td><td class="right">${r.iva_pct}%</td><td class="right">$${fmtMoney(r.precio_final)}</td></tr>`;
+  });
+  html += `</table>`;
+
+  html += `</body></html>`;
+  w.document.write(html);
+  w.document.close();
+  setTimeout(() => w.print(), 400);
+}
 </script>
 </body>
 </html>
