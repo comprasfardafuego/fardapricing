@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FARDA — Sistema de Pricing</title>
+<style>
+  :root { --bg: #0c0b0b; --bg-alt: #17140f; --border: #3a332a; --text-main: #eae6e0; --text-sec: #a8a09a; --text-ter: #7a7167; --teal: #b2a79a; --teal-dark: #665640; --amber: #e67e22; --red: #c0392b; --green: #27ae60; --warn-bg: #fff3cd; --warn-text: #856404; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); color: var(--text-main); min-height: 100vh; line-height: 1.6; }
+  .app { display: grid; grid-template-rows: 60px auto 1fr; height: 100vh; }
+  .topbar { background: var(--bg-alt); display: flex; align-items: center; justify-content: space-between; padding: 0 32px; border-bottom: 1px solid var(--border); }
+  .tabs { background: var(--bg-alt); display: flex; border-bottom: 1px solid var(--border); padding: 0 32px; }
+  .tab-btn { background: transparent; border: none; color: var(--text-sec); padding: 16px 20px; font-size: 13px; font-weight: 600; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.2s; white-space: nowrap; }
+  .tab-btn:hover { color: var(--text-main); border-bottom-color: var(--teal); }
+  .tab-btn.active { color: var(--teal); border-bottom-color: var(--teal); }
+  .main { overflow-y: auto; padding: 32px; }
+  .logo { font-size: 18px; font-weight: 700; letter-spacing: 2px; }
+  .section { display: none; }
+  .section.active { display: block; }
+  .header { margin-bottom: 24px; }
+  .title { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+  .subtitle { font-size: 13px; color: var(--text-sec); }
+  .crumbs { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 16px; flex-wrap: wrap; }
+  .crumb { cursor: pointer; color: var(--teal); }
+  .crumb:hover { text-decoration: underline; }
+  .crumb.active { color: var(--text-main); cursor: default; font-weight: 600; }
+  .crumb-sep { color: var(--text-ter); }
+  .back-btn { background: var(--bg-alt); border: 1px solid var(--border); color: var(--text-main); padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; margin-bottom: 20px; display: inline-flex; align-items: center; gap: 8px; }
+  .back-btn:hover { border-color: var(--teal); color: var(--teal); }
+  .table-container { background: var(--bg-alt); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 24px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-ter); padding: 12px 16px; text-align: left; background: var(--bg-alt); border-bottom: 1px solid var(--border); font-weight: 600; }
+  th.right { text-align: right; }
+  th.center { text-align: center; }
+  td { padding: 14px 16px; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover { background: rgba(255,255,255,0.02); }
+  .td-name { color: var(--teal); cursor: pointer; font-weight: 500; }
+  .td-name:hover { text-decoration: underline; }
+  .td-name.disabled { color: var(--text-sec); cursor: default; }
+  .td-name.disabled:hover { text-decoration: none; }
+  .td-num { text-align: right; font-variant-numeric: tabular-nums; color: var(--text-main); }
+  .td-center { text-align: center; }
+  .fc-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 700; }
+  .fc-ok { background: rgba(39,174,96,0.15); color: #2ecc71; }
+  .fc-warn { background: rgba(230,126,34,0.15); color: var(--amber); }
+  .fc-bad { background: rgba(192,57,43,0.15); color: var(--red); }
+  .fc-none { background: rgba(120,120,120,0.2); color: var(--text-sec); }
+  .sim-cell { display: flex; gap: 8px; align-items: center; }
+  .sim-input { background: var(--border); border: 1px solid var(--border); color: var(--text-main); padding: 6px 10px; border-radius: 4px; font-size: 12px; width: 110px; text-align: right; outline: none; }
+  .sim-input:focus { border-color: var(--teal); }
+  .sim-fc { font-size: 12px; font-weight: 700; min-width: 60px; text-align: right; }
+  .detail-panel { background: var(--bg-alt); border: 1px solid var(--border); border-radius: 8px; padding: 24px; margin-bottom: 20px; }
+  .detail-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; color: var(--text-main); }
+  .detail-meta { font-size: 12px; color: var(--text-sec); margin-bottom: 16px; }
+  .cost-summary { display: flex; gap: 24px; flex-wrap: wrap; padding: 16px; background: var(--bg); border-radius: 6px; margin-bottom: 20px; }
+  .cost-item-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-ter); margin-bottom: 4px; }
+  .cost-item-value { font-size: 20px; font-weight: 700; color: var(--text-main); }
+  .cost-item-value.teal { color: var(--teal); }
+  .ing-table { width: 100%; margin-top: 12px; }
+  .ing-table th { padding: 10px 14px; font-size: 10px; border-bottom: 1px solid var(--border); }
+  .ing-table td { padding: 10px 14px; font-size: 12px; border-bottom: 1px solid rgba(255,255,255,0.03); vertical-align: middle; }
+  .ing-name { color: var(--text-main); }
+  .ing-name.clickable { color: var(--teal); cursor: pointer; }
+  .ing-name.clickable:hover { text-decoration: underline; }
+  .ing-qty { text-align: right; color: var(--text-sec); }
+  .ing-cost { text-align: right; color: var(--text-main); font-weight: 500; }
+  .ing-prod-tag { display: inline-block; background: rgba(178,167,154,0.2); color: var(--teal); padding: 1px 6px; border-radius: 3px; font-size: 9px; margin-left: 6px; vertical-align: middle; }
+  .qty-bruta { font-size: 10px; color: var(--amber); display: block; }
+  .usable-price { font-size: 10px; color: var(--amber); display: block; margin-top: 2px; }
+  .rend-toggle { display: flex; align-items: center; gap: 6px; justify-content: center; }
+  .switch { position: relative; display: inline-block; width: 34px; height: 18px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border); transition: .2s; border-radius: 18px; }
+  .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 2px; bottom: 2px; background-color: var(--text-sec); transition: .2s; border-radius: 50%; }
+  input:checked + .slider { background-color: var(--teal); }
+  input:checked + .slider:before { transform: translateX(16px); background-color: white; }
+  .rend-input-inline { background: var(--border); border: 1px solid var(--border); color: var(--text-main); padding: 4px 6px; border-radius: 4px; font-size: 11px; width: 50px; text-align: right; outline: none; }
+  .rend-input-inline:focus { border-color: var(--teal); }
+  .rend-input-inline:disabled { opacity: 0.3; }
+  .cat-header { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--teal); margin: 24px 0 16px; display: flex; align-items: center; gap: 12px; }
+  .cat-header::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .btn { background: var(--teal); color: var(--bg); border: none; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: 700; cursor: pointer; outline: none; }
+  .btn:hover { opacity: 0.9; }
+  .iva-buttons { display: flex; gap: 8px; }
+  .iva-btn { background: transparent; border: 1px solid var(--border); color: var(--text-sec); padding: 5px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; transition: all 0.15s; }
+  .iva-btn:hover { border-color: var(--teal); color: var(--teal); }
+  .iva-btn.active { background: var(--teal); border-color: var(--teal); color: var(--bg); }
+  .ins-input { background: var(--border); border: 1px solid var(--border); color: var(--text-main); padding: 5px 8px; border-radius: 4px; font-size: 11px; width: 110px; text-align: right; outline: none; }
+  .ins-input:focus { border-color: var(--teal); }
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  #login-screen { display: flex; align-items: center; justify-content: center; height: 100vh; }
+  .login-box { background: var(--bg-alt); border: 1px solid var(--border); border-radius: 8px; padding: 32px; width: 300px; }
+  .login-box .logo { margin-bottom: 20px; text-align: center; color: var(--teal); }
+  .login-box input { width: 100%; background: var(--border); border: 1px solid var(--border); color: var(--text-main); padding: 10px 12px; border-radius: 4px; font-size: 13px; margin-bottom: 12px; outline: none; }
+  .login-box input:focus { border-color: var(--teal); }
+  .login-box .btn { width: 100%; padding: 10px; font-size: 13px; }
+  .login-error { color: var(--red); font-size: 12px; margin-bottom: 12px; min-height: 16px; }
+  .logout-btn { background: transparent; border: 1px solid var(--border); color: var(--text-sec); padding: 6px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+  .logout-btn:hover { border-color: var(--red); color: var(--red); }
+  .save-status { font-size: 11px; color: var(--text-ter); margin-right: 12px; }
+</style>
+</head>
+<body>
+<div id="login-screen">
+  <div class="login-box">
+    <div class="logo">FARDA</div>
+    <div class="login-error" id="login-error"></div>
+    <input type="email" id="login-email" placeholder="Email" autocomplete="username">
+    <input type="password" id="login-password" placeholder="Contraseña" autocomplete="current-password">
+    <button class="btn" onclick="window.__doLogin(document.getElementById('login-email').value, document.getElementById('login-password').value)">Ingresar</button>
+  </div>
+</div>
+<div class="app" style="display:none;">
+<div class="topbar"><div class="logo">FARDA</div><div><span class="save-status" id="save-status"></span><button class="logout-btn" onclick="window.__doLogout()">Cerrar sesión</button></div></div>
+<div class="tabs">
+  <button class="tab-btn active" data-tab="platos" onclick="switchTab('platos')">PLATOS</button>
+  <button class="tab-btn" data-tab="recetas" onclick="switchTab('recetas')">RECETAS</button>
+  <button class="tab-btn" data-tab="producciones" onclick="switchTab('producciones')">PRODUCCIONES</button>
+  <button class="tab-btn" data-tab="rendimientos" onclick="switchTab('rendimientos')">RENDIMIENTOS</button>
+  <button class="tab-btn" data-tab="insumos" onclick="switchTab('insumos')">INSUMOS</button>
+</div>
+<div class="main">
+  <div id="platos-section" class="section active"></div>
+  <div id="recetas-section" class="section"></div>
+  <div id="producciones-section" class="section"></div>
+  <div id="rendimientos-section" class="section"></div>
+  <div id="insumos-section" class="section"></div>
+</div>
+</div>
+
+<script type="module">
+  import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+  // La seguridad la dan las políticas de Row Level Security + el login,
+  // no el secreto de estos valores (la anon key está pensada para ser pública).
+  const SUPABASE_URL = "https://snwuddryxaehunxbyflp.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNud3VkZHJ5eGFlaHVueGJ5ZmxwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5MDU0ODMsImV4cCI6MjA5ODQ4MTQ4M30.8OO53huAHhFBcLe07aMiA7RWTZ2igQ8r2NfTTH7yFcM";
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // TODO: volver a poner en `true` cuando el login de Supabase esté andando
+  // (ver supabase_temp_disable_login.sql para revertir el acceso sin login).
+  const REQUIRE_LOGIN = false;
+
+  window.__doLogin = async function (email, password) {
+    const errEl = document.getElementById('login-error');
+    errEl.textContent = '';
+    if (!email || !password) { errEl.textContent = 'Completá email y contraseña.'; return; }
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) errEl.textContent = 'Usuario o contraseña incorrectos.';
+  };
+
+  window.__doLogout = function () { supabase.auth.signOut(); };
+
+  // Se pone en true solo si la carga inicial desde Supabase funcionó. Si es
+  // false, __saveState se niega a guardar — así una lectura fallida (ej. corte
+  // de red) nunca termina sobreescribiendo datos reales con un estado vacío.
+  let loadedOk = false;
+  // Timestamp de la versión que esta pestaña tiene cargada. Si otra pestaña/
+  // dispositivo guardó algo más nuevo mientras tanto, avisamos antes de pisarlo.
+  let loadedUpdatedAt = null;
+
+  window.__saveState = async function (state) {
+    const status = document.getElementById('save-status');
+    if (!loadedOk) {
+      console.error('Guardado bloqueado: la carga inicial de datos falló, recargá la página antes de editar.');
+      if (status) status.textContent = 'No guardado — recargá la página';
+      return;
+    }
+    const check = await supabase.from('pricing_state').select('updated_at').eq('id', 1).maybeSingle();
+    const remoteMs = check.data && check.data.updated_at ? new Date(check.data.updated_at).getTime() : null;
+    const loadedMs = loadedUpdatedAt ? new Date(loadedUpdatedAt).getTime() : null;
+    // Más de 1s de diferencia = lo guardó otra pestaña/dispositivo de verdad
+    // (no solo una diferencia de formato al ida-y-vuelta con la base).
+    if (loadedMs && remoteMs && Math.abs(remoteMs - loadedMs) > 1000) {
+      const seguir = confirm('Esta pestaña tiene datos desactualizados: alguien (u otra pestaña tuya) guardó cambios más nuevos en la nube. Si guardás ahora, los vas a pisar.\n\nCancelar y recargar la página es lo más seguro. ¿Guardar igual?');
+      if (!seguir) {
+        if (status) status.textContent = 'No guardado — recargá la página';
+        return;
+      }
+    }
+    if (status) status.textContent = 'Guardando…';
+    const { data: saved, error } = await supabase
+      .from('pricing_state')
+      .upsert({
+        id: 1,
+        insumos: state.insumos,
+        rendimientos: state.rendimientos,
+        recetas: state.recetas,
+        prod_rinde: state.prodRinde,
+        platos_extra: state.platosExtra,
+        producciones_extra: state.produccionesExtra,
+        receta_rendimientos: state.recetaRendimientos,
+        platos_deleted: state.platosDeleted,
+        producciones_deleted: state.produccionesDeleted,
+        insumos_extra: state.insumosExtra,
+        insumos_deleted: state.insumosDeleted,
+        updated_at: new Date().toISOString()
+      })
+      .select('updated_at')
+      .single();
+    if (error) {
+      console.error('No se pudo guardar en la nube', error);
+      if (status) status.textContent = 'Error al guardar';
+    } else {
+      // Guardamos el valor tal como lo devolvió la base (no el que generamos
+      // acá), para comparar siempre "manzanas con manzanas" la próxima vez.
+      loadedUpdatedAt = saved ? saved.updated_at : new Date().toISOString();
+      window.__saveDirty = false;
+      if (status) status.textContent = 'Guardado ✓';
+    }
+  };
+
+  window.addEventListener('beforeunload', function (e) {
+    if (window.__saveDirty) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+
+  document.getElementById('login-password').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') window.__doLogin(document.getElementById('login-email').value, document.getElementById('login-password').value);
+  });
+
+  function showLoadError() {
+    document.getElementById('login-screen').style.display = 'none';
+    document.querySelector('.app').style.display = 'none';
+    const el = document.createElement('div');
+    el.style.cssText = 'max-width:500px;margin:80px auto;padding:24px;background:var(--bg-alt);border:1px solid var(--red);border-radius:8px;color:var(--text-main);font-size:14px;line-height:1.6;';
+    el.innerHTML = '<b style="color:var(--red);">No se pudieron cargar los datos guardados.</b><br>No edites nada todavía — recargá la página (F5). Si el problema sigue, avisá antes de seguir usando la app, para no arriesgarte a perder datos guardados.';
+    document.body.appendChild(el);
+  }
+
+  async function loadAndStart() {
+    const res = await supabase.from('pricing_state').select('insumos, rendimientos, recetas, prod_rinde, platos_extra, producciones_extra, receta_rendimientos, platos_deleted, producciones_deleted, insumos_extra, insumos_deleted, updated_at').eq('id', 1).maybeSingle();
+    if (res.error) {
+      console.error('No se pudo leer de la nube', res.error);
+      loadedOk = false;
+      showLoadError();
+      return;
+    }
+    loadedOk = true;
+    const data = res.data || {};
+    loadedUpdatedAt = data.updated_at || null;
+    window.startApp({
+      insumos: data.insumos || {},
+      rendimientos: data.rendimientos || {},
+      recetas: data.recetas || {},
+      prodRinde: data.prod_rinde || {},
+      platosExtra: data.platos_extra || [],
+      produccionesExtra: data.producciones_extra || [],
+      recetaRendimientos: data.receta_rendimientos || {},
+      platosDeleted: data.platos_deleted || [],
+      produccionesDeleted: data.producciones_deleted || [],
+      insumosExtra: data.insumos_extra || [],
+      insumosDeleted: data.insumos_deleted || []
+    });
+  }
+
+  if (REQUIRE_LOGIN) {
+    supabase.auth.onAuthStateChange(async (_event, session) => {
+      const loginScreen = document.getElementById('login-screen');
+      const appEl = document.querySelector('.app');
+      if (session) {
+        loginScreen.style.display = 'none';
+        appEl.style.display = 'grid';
+        await loadAndStart();
+      } else {
+        loginScreen.style.display = 'flex';
+        appEl.style.display = 'none';
+      }
+    });
+  } else {
+    document.getElementById('login-screen').style.display = 'none';
+    document.querySelector('.app').style.display = 'grid';
+    loadAndStart();
+  }
+</script>
+
+<script>
+const DATA = {"platos": [{"nombre": "PANERA", "costo": 446.122125, "venta": null, "fc": null}, {"nombre": "MANTECA AHUMADA", "costo": 150.0, "venta": null, "fc": null}, {"nombre": "PLATO DE JAMON CRUDO DE TANDIL", "costo": 4600.0, "venta": 18500.0, "fc": 0.2486486486}, {"nombre": "PLATO DE JAMON CRUDO BELLOTA", "costo": 15895.89, "venta": 38500.0, "fc": 0.4128802597}, {"nombre": "PROVOLETA AL HORNO C/ AJIES", "costo": 4250.111667, "venta": 22000.0, "fc": 0.1931868939}, {"nombre": "CHORIZO", "costo": 1715.824113, "venta": 9000.0, "fc": 0.1906471237}, {"nombre": "MORCILLA", "costo": 1468.324113, "venta": 9000.0, "fc": 0.1631471237}, {"nombre": "MOLLEJAS", "costo": 27307.025, "venta": 47000.0, "fc": 0.5810005319}, {"nombre": "EMPANADA DE CARNE A LA LE\u00d1A", "costo": 1584.918, "venta": 5000.0, "fc": 0.3169836}, {"nombre": "EMPANADA DE HUMITA A LA LE\u00d1A", "costo": 894.6245, "venta": 4000.0, "fc": 0.223656125}, {"nombre": "LANGOSTINOS AL AJILLO", "costo": 15345.53433, "venta": 36500.0, "fc": 0.4204255982}, {"nombre": "BU\u00d1UELOS DE ACELGA AMARILLA", "costo": 1392.41306, "venta": 18000.0, "fc": 0.07735628111}, {"nombre": "ENSALADA CAESAR CON POLLO ASADO", "costo": 2078.469425, "venta": 32000.0, "fc": 0.06495216953}, {"nombre": "ENSALADA DE TRUCHA AHUMADA", "costo": 2479.362756, "venta": 37000.0, "fc": 0.06700980422}, {"nombre": "OJO DE BIFE", "costo": 13493.42411, "venta": 48000.0, "fc": 0.2811130024}, {"nombre": "BIFE DE CHORIZO", "costo": 13004.53522, "venta": 45000.0, "fc": 0.2889896716}, {"nombre": "BIFE DE LOMO", "costo": 10926.75745, "venta": 50000.0, "fc": 0.2185351489}, {"nombre": "BIFE DE CUADRIL", "costo": null, "venta": null, "fc": null}, {"nombre": "ENTRA\u00d1A", "costo": 20093.42411, "venta": 69000.0, "fc": 0.2912090451}, {"nombre": "ASADO BANDERITA", "costo": 18382.313, "venta": 55000.0, "fc": 0.3342238728}, {"nombre": "MATAMBRITO DE CERDO", "costo": 9652.416714, "venta": 39000.0, "fc": 0.2474978645}, {"nombre": "COSTILLA AHUMADA 8 HS.", "costo": null, "venta": 65000.0, "fc": null}, {"nombre": "POLLO ORGANICO ASADO", "costo": 9136.87, "venta": 35000.0, "fc": 0.2610534286}, {"nombre": "MILANESA DE BIFE", "costo": 6081.0, "venta": 39000.0, "fc": 0.1559230769}, {"nombre": "MILANESA DE BIFE NAPOLITANA", "costo": 6831.0, "venta": 42000.0, "fc": 0.1626428571}, {"nombre": "TRUCH\u00d3N ASADO", "costo": null, "venta": null, "fc": null}, {"nombre": "MORRONES ASADOS", "costo": 2560.0, "venta": 14000.0, "fc": 0.1828571429}, {"nombre": "RUCULA Y CHEDDAR INGLES", "costo": 1961.9, "venta": 17500.0, "fc": 0.1121085714}, {"nombre": "ENSALADA DE REMOLACHA", "costo": 1301.160667, "venta": 14500.0, "fc": 0.08973521839}, {"nombre": "HUMITA GRATINADA", "costo": 2232.28125, "venta": 18500.0, "fc": 0.1206638514}, {"nombre": "ESPINACAS A LA CREMA", "costo": 3748.8125, "venta": 14900.0, "fc": 0.2515981544}, {"nombre": "PAPAS FRITAS TRIPLE COCCI\u00d3N", "costo": 1337.96, "venta": 13500.0, "fc": 0.09910814815}, {"nombre": "PAPA ROSTI", "costo": 2212.3625, "venta": 16300.0, "fc": 0.1357277607}, {"nombre": "PURE DE PAPAS", "costo": 922.171, "venta": 9500.0, "fc": 0.09707063158}, {"nombre": "SETAS DE CARDO", "costo": null, "venta": null, "fc": null}, {"nombre": "PASTA SIMPLE", "costo": null, "venta": null, "fc": null}, {"nombre": "PASTA RELLENA DE ESPINACA", "costo": 5747.942176, "venta": 24900.0, "fc": 0.2308410512}, {"nombre": "GNOCCHIS ALLA ROMANA", "costo": 1607.041177, "venta": 24000.0, "fc": 0.06696004903}, {"nombre": "PANQUEQUE DE DULCE DE LECHE", "costo": 550.3197905, "venta": 9700.0, "fc": 0.05673399902}, {"nombre": "MOUSSE DE CHOCOLATE", "costo": null, "venta": null, "fc": null}, {"nombre": "TORTA VASCA DE PISTACHO", "costo": 6156.475, "venta": 19500.0, "fc": 0.3157166667}, {"nombre": "VIGILANTE CLASICO", "costo": 2554.791857, "venta": 12000.0, "fc": 0.2128993214}, {"nombre": "TIRAMISU", "costo": 4845.794038, "venta": 16500.0, "fc": 0.2936844871}, {"nombre": "ALFAJOR DE LIMON", "costo": 1050.415182, "venta": 9200.0, "fc": 0.1141755632}], "categorias": {"ENTRADAS": ["PANERA", "MANTECA AHUMADA", "PLATO DE JAMON CRUDO DE TANDIL", "PLATO DE JAMON CRUDO BELLOTA", "PROVOLETA AL HORNO C/ AJIES", "CHORIZO", "MORCILLA", "MOLLEJAS", "EMPANADA DE CARNE A LA LE\u00d1A", "EMPANADA DE HUMITA A LA LE\u00d1A", "LANGOSTINOS AL AJILLO", "BU\u00d1UELOS DE ACELGA AMARILLA", "ENSALADA CAESAR CON POLLO ASADO", "ENSALADA DE TRUCHA AHUMADA"], "PRINCIPALES": ["OJO DE BIFE", "BIFE DE CHORIZO", "BIFE DE LOMO", "BIFE DE CUADRIL", "ENTRA\u00d1A", "ASADO BANDERITA", "MATAMBRITO DE CERDO", "COSTILLA AHUMADA 8 HS.", "POLLO ORGANICO ASADO", "MILANESA DE BIFE", "MILANESA DE BIFE NAPOLITANA", "TRUCH\u00d3N ASADO"], "GUARNICIONES": ["MORRONES ASADOS", "RUCULA Y CHEDDAR INGLES", "ENSALADA DE REMOLACHA", "HUMITA GRATINADA", "ESPINACAS A LA CREMA", "PAPAS FRITAS TRIPLE COCCI\u00d3N", "PAPA ROSTI", "PURE DE PAPAS", "SETAS DE CARDO"], "PASTAS": ["PASTA SIMPLE", "PASTA RELLENA DE ESPINACA", "GNOCCHIS ALLA ROMANA"], "POSTRES": ["PANQUEQUE DE DULCE DE LECHE", "MOUSSE DE CHOCOLATE", "TORTA VASCA DE PISTACHO", "VIGILANTE CLASICO", "TIRAMISU", "ALFAJOR DE LIMON"]}, "plato_ingredients": {"PANERA": [{"insumo": "harina 000", "unidad": "KG", "cantidad": null, "costo": null}, {"insumo": "Alioli", "unidad": "", "cantidad": 0.05, "costo": null}], "PLATO DE JAMON CRUDO DE TANDIL": [{"insumo": "JAM\u00d3N CRUDO NACIONAL", "unidad": "KG", "cantidad": 0.12, "costo": 3600.0}, {"insumo": "LIBRITO DE GRASA", "unidad": "KG", "cantidad": 0.03, "costo": 295.89}], "PLATO DE JAMON CRUDO BELLOTA": [{"insumo": "JAM\u00d3N CRUDO IMPORTADO BELLOTA", "unidad": "KG", "cantidad": 0.12, "costo": 15600.0}, {"insumo": "LIBRITO DE GRASA", "unidad": "KG", "cantidad": 0.03, "costo": 295.89}], "MANTECA AHUMADA": [{"insumo": "MANTECA", "unidad": "KG", "cantidad": 1.0, "costo": 6000.0}], "ENSALADA CAESAR CON POLLO ASADO": [{"insumo": "LECHUGA MORADA", "unidad": "KG", "cantidad": 0.04, "costo": 116.0}, {"insumo": "LECHUGA VERDE", "unidad": "KG", "cantidad": 0.04, "costo": 116.0}, {"insumo": "ESCAROLA", "unidad": "KG", "cantidad": 0.04, "costo": 120.0}, {"insumo": "RUCULA", "unidad": "KG", "cantidad": 0.04, "costo": 130.0}, {"insumo": "ADEREZO CAESAR KILO", "unidad": "KG", "cantidad": 0.03, "costo": 503.404575}, {"insumo": "CROUTONS KILO", "unidad": "KG", "cantidad": 0.02, "costo": 13.7586}, {"insumo": "QUESO SBRINZ", "unidad": "KG", "cantidad": 0.01, "costo": 309.98}, {"insumo": "POLLO ASADO CAESAR KILO", "unidad": "KG", "cantidad": 0.07, "costo": 769.32625}], "ENSALADA DE TRUCHA AHUMADA": [{"insumo": "LECHUGA MORADA", "unidad": "KG", "cantidad": 0.04, "costo": 116.0}, {"insumo": "LECHUGA VERDE", "unidad": "KG", "cantidad": 0.04, "costo": 116.0}, {"insumo": "ESCAROLA", "unidad": "KG", "cantidad": 0.04, "costo": 120.0}, {"insumo": "RUCULA", "unidad": "KG", "cantidad": 0.04, "costo": 130.0}, {"insumo": "VINAGRETA DE MOSTAZA", "unidad": "KG", "cantidad": 0.03, "costo": 171.2775}, {"insumo": "TRUCHA CURADA AHUMADA", "unidad": "KG", "cantidad": 0.05, "costo": 1460.0}, {"insumo": "CEBOLLA ENCURTIDA KILO", "unidad": "KG", "cantidad": 0.015, "costo": 60.09155625}, {"insumo": "PRALINE DE AVELLANA KILO", "unidad": "KG", "cantidad": 0.015, "costo": 305.9937}], "PROVOLETA AL HORNO C/ AJIES": [{"insumo": "QUESO PROVOLETA", "unidad": "KG", "cantidad": 0.2, "costo": 4040.2}, {"insumo": "MORRONES ASADOS KILO", "unidad": "KG", "cantidad": 0.05, "costo": 209.9116667}], "OJO DE BIFE": [{"insumo": "OJO DE BIFE", "unidad": "KG", "cantidad": 0.4444444444, "costo": 13200.0}, {"insumo": "CHIMICHURRI DE HIERBAS LITRO", "unidad": "LT", "cantidad": 0.015, "costo": 135.8291129}, {"insumo": "SALSA CRIOLLA KILO", "unidad": "KG", "cantidad": 0.015, "costo": 94.995}, {"insumo": "ACEITE DE OLIVA", "unidad": "LT", "cantidad": 0.005, "costo": 60.95}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.002, "costo": 1.65}], "BIFE DE CHORIZO": [{"insumo": "BIFE DE CHORIZO", "unidad": "KG", "cantidad": 0.4444444444, "costo": 12711.11111}, {"insumo": "CHIMICHURRI DE HIERBAS LITRO", "unidad": "LT", "cantidad": 0.015, "costo": 135.8291129}, {"insumo": "SALSA CRIOLLA KILO", "unidad": "KG", "cantidad": 0.015, "costo": 94.995}, {"insumo": "ACEITE DE OLIVA", "unidad": "LT", "cantidad": 0.005, "costo": 60.95}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.002, "costo": 1.65}], "BIFE DE LOMO": [{"insumo": "LOMO DE VACA", "unidad": "KG", "cantidad": 0.3333333333, "costo": 10633.33333}, {"insumo": "CHIMICHURRI DE HIERBAS LITRO", "unidad": "LT", "cantidad": 0.015, "costo": 135.8291129}, {"insumo": "SALSA CRIOLLA KILO", "unidad": "KG", "cantidad": 0.015, "costo": 94.995}, {"insumo": "ACEITE DE OLIVA", "unidad": "LT", "cantidad": 0.005, "costo": 60.95}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.002, "costo": 1.65}], "ENTRA\u00d1A": [{"insumo": "ENTRA\u00d1A", "unidad": "KG", "cantidad": 0.6666666667, "costo": 19800.0}, {"insumo": "CHIMICHURRI DE HIERBAS LITRO", "unidad": "LT", "cantidad": 0.015, "costo": 135.8291129}, {"insumo": "SALSA CRIOLLA KILO", "unidad": "KG", "cantidad": 0.015, "costo": 94.995}, {"insumo": "ACEITE DE OLIVA", "unidad": "LT", "cantidad": 0.005, "costo": 60.95}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.002, "costo": 1.65}], "ASADO BANDERITA": [{"insumo": "ASADO BANDERITA", "unidad": "KG", "cantidad": 0.8888888889, "costo": 18088.88889}, {"insumo": "CHIMICHURRI DE HIERBAS LITRO", "unidad": "LT", "cantidad": 0.015, "costo": 135.8291129}, {"insumo": "SALSA CRIOLLA KILO", "unidad": "KG", "cantidad": 0.015, "costo": 94.995}, {"insumo": "ACEITE DE OLIVA", "unidad": "LT", "cantidad": 0.005, "costo": 60.95}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.002, "costo": 1.65}], "MATAMBRITO DE CERDO": [{"insumo": "MATAMBRE DE CERDO", "unidad": "KG", "cantidad": 0.8571428571, "costo": 9334.285714}, {"insumo": "MARINADA MATAMBRITO LITRO", "unidad": "LT", "cantidad": 0.2, "costo": 318.131}], "COSTILLA AHUMADA 8 HS.": [{"insumo": "VENTANA DE ASADO (COSTILLAR)", "unidad": "KG", "cantidad": 4.0, "costo": 118800.0}, {"insumo": "PIMENTON", "unidad": "KG", "cantidad": 0.02, "costo": 141.52}, {"insumo": "COMINO", "unidad": "KG", "cantidad": 0.01, "costo": 60.0}, {"insumo": "NUEZ MOSCADA", "unidad": "KG", "cantidad": 0.005, "costo": 100.0}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.016, "costo": 13.2}, {"insumo": "PIMIENTA NEGRA", "unidad": "KG", "cantidad": 0.008, "costo": 144.0}, {"insumo": "ACEITE DE OLIVA", "unidad": "LT", "cantidad": 0.02, "costo": 243.8}, {"insumo": "MOSTAZA DIJON", "unidad": "KG", "cantidad": 0.02, "costo": 440.0}, {"insumo": "CHIMICHURRI DE HIERBAS LITRO", "unidad": "LT", "cantidad": 0.075, "costo": 679.1455645}, {"insumo": "SALSA CRIOLLA KILO", "unidad": "KG", "cantidad": 0.075, "costo": 474.975}], "POLLO ORGANICO ASADO": [{"insumo": "PATAMUSLO POLLO", "unidad": "KG", "cantidad": 1.6, "costo": 8464.0}, {"insumo": "MANTECA", "unidad": "KG", "cantidad": 0.1, "costo": 600.0}, {"insumo": "TOMILLO", "unidad": "KG", "cantidad": 0.001, "costo": 3.79}, {"insumo": "AJO", "unidad": "KG", "cantidad": 0.001, "costo": 11.5}, {"insumo": "LIMON", "unidad": "KG", "cantidad": 0.009, "costo": 20.7}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.003, "costo": 2.475}, {"insumo": "PIMIENTA NEGRA", "unidad": "KG", "cantidad": 0.002, "costo": 36.0}], "MILANESA DE BIFE": [{"insumo": "BIFE DE CHORIZO", "unidad": "KG", "cantidad": 0.2, "costo": 5720.0}, {"insumo": "HUEVADA PARA MILANESA", "unidad": "KG", "cantidad": 0.03, "costo": 121.89}, {"insumo": "PANKO", "unidad": "KG", "cantidad": 0.04, "costo": 240.0}], "MILANESA DE BIFE NAPOLITANA": [{"insumo": "BIFE DE CHORIZO", "unidad": "KG", "cantidad": 0.2, "costo": 5720.0}, {"insumo": "HUEVADA PARA MILANESA", "unidad": "KG", "cantidad": 0.03, "costo": 121.89}, {"insumo": "PANKO", "unidad": "KG", "cantidad": 0.04, "costo": 240.0}, {"insumo": "POMODORO KILO", "unidad": "KG", "cantidad": 0.03, "costo": 222.8925}, {"insumo": "QUESO MOZZARELLA", "unidad": "KG", "cantidad": 0.03, "costo": 244.2}, {"insumo": "QUESO SBRINZ", "unidad": "KG", "cantidad": 0.01, "costo": 309.98}], "TRUCH\u00d3N ASADO": [{"insumo": "TRUCHA PATAGONICA", "unidad": "KG", "cantidad": 0.3, "costo": 5850.0}, {"insumo": "PURE DE BONIATO KILO", "unidad": "KG", "cantidad": 0.1, "costo": 548.8903333}, {"insumo": "ACEITE DE OLIVA", "unidad": "LT", "cantidad": 0.005, "costo": 60.95}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.002, "costo": 1.65}], "CHORIZO": [{"insumo": "CHORIZO", "unidad": "KG", "cantidad": 0.15, "costo": 1485.0}, {"insumo": "CHIMICHURRI DE HIERBAS LITRO", "unidad": "LT", "cantidad": 0.015, "costo": 135.8291129}, {"insumo": "SALSA CRIOLLA KILO", "unidad": "KG", "cantidad": 0.015, "costo": 94.995}], "MORCILLA": [{"insumo": "MORCILLA", "unidad": "KG", "cantidad": 0.15, "costo": 1237.5}, {"insumo": "CHIMICHURRI DE HIERBAS LITRO", "unidad": "LT", "cantidad": 0.015, "costo": 135.8291129}, {"insumo": "SALSA CRIOLLA KILO", "unidad": "KG", "cantidad": 0.015, "costo": 94.995}], "MOLLEJAS": [{"insumo": "MOLLEJAS", "unidad": "KG", "cantidad": 1.0, "costo": 26400.0}, {"insumo": "AJO", "unidad": "KG", "cantidad": 0.02, "costo": 230.0}, {"insumo": "LIMON", "unidad": "KG", "cantidad": 0.13, "costo": 299.0}, {"insumo": "MANTECA", "unidad": "KG", "cantidad": 0.05, "costo": 300.0}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.005, "costo": 4.125}, {"insumo": "PIMIENTA NEGRA", "unidad": "KG", "cantidad": 0.002, "costo": 36.0}, {"insumo": "TOMILLO", "unidad": "KG", "cantidad": 0.01, "costo": 37.9}], "LANGOSTINOS AL AJILLO": [{"insumo": "LANGOSTINOS ENTEROS", "unidad": "KG", "cantidad": 1.0, "costo": 13580.0}, {"insumo": "PROVENZAL", "unidad": "KG", "cantidad": 0.025, "costo": 187.5}, {"insumo": "VINO BLANCO", "unidad": "LT", "cantidad": 0.05, "costo": 384.5}, {"insumo": "MANTECA", "unidad": "KG", "cantidad": 0.08, "costo": 480.0}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.02, "costo": 16.5}, {"insumo": "PIMIENTA NEGRA", "unidad": "KG", "cantidad": 0.02, "costo": 360.0}, {"insumo": "BISQUET KILO", "unidad": "KG", "cantidad": 0.1, "costo": 337.0343333}], "BU\u00d1UELOS DE ACELGA AMARILLA": [{"insumo": "BU\u00d1UELO ACELGA PORCION", "unidad": "UNIDAD", "cantidad": 1.0, "costo": 847.95056}, {"insumo": "ALIOLI KILO", "unidad": "KG", "cantidad": 0.2, "costo": 544.4625}], "EMPANADA DE CARNE A LA LE\u00d1A": [{"insumo": "RELLENO EMPANADA DE CARNE", "unidad": "UNIDAD", "cantidad": 1.0, "costo": 1340.918}, {"insumo": "TAPA HOJALDRE EMPANADA", "unidad": "UNIDAD", "cantidad": 1.0, "costo": 244.0}], "EMPANADA DE HUMITA A LA LE\u00d1A": [{"insumo": "RELLENO EMPANADA DE HUMITA", "unidad": "UNIDAD", "cantidad": 1.0, "costo": 650.6245}, {"insumo": "TAPA HOJALDRE EMPANADA", "unidad": "UNIDAD", "cantidad": 1.0, "costo": 244.0}], "RUCULA Y CHEDDAR INGLES": [{"insumo": "RUCULA", "unidad": "KG", "cantidad": 0.1, "costo": 325.0}, {"insumo": "QUESO CHEDDAR INGLES", "unidad": "KG", "cantidad": 0.02, "costo": 1400.0}, {"insumo": "ACEITE DE OLIVA", "unidad": "LT", "cantidad": 0.01, "costo": 121.9}, {"insumo": "LIMON", "unidad": "KG", "cantidad": 0.05, "costo": 115.0}], "ENSALADA DE REMOLACHA": [{"insumo": "ENSALADA DE REMOLACHA x6", "unidad": "UNIDAD", "cantidad": 1.0, "costo": 1301.160667}], "HUMITA GRATINADA": [{"insumo": "HUMITA GRATINADA x8", "unidad": "UNIDAD", "cantidad": 1.0, "costo": 2232.28125}], "ESPINACAS A LA CREMA": [{"insumo": "ESPINACA A LA CREMA x4", "unidad": "UNIDAD", "cantidad": 1.0, "costo": 3748.8125}], "PAPAS FRITAS TRIPLE COCCI\u00d3N": [{"insumo": "PAPAS FRITAS 3COCCION x5", "unidad": "UNIDAD", "cantidad": 1.0, "costo": 1337.96}], "PAPA ROSTI": [{"insumo": "PAPA ROSTI x4", "unidad": "UNIDAD", "cantidad": 1.0, "costo": 2212.3625}], "PURE DE PAPAS": [{"insumo": "PURE DE PAPA x5", "unidad": "UNIDAD", "cantidad": 1.0, "costo": 922.171}], "PASTA RELLENA DE ESPINACA": [{"insumo": "PASTA RELLENA ESPINACA PORCION", "unidad": "KG", "cantidad": 2.4, "costo": 3625.442176}, {"insumo": "POMODORO", "unidad": "KG", "cantidad": 0.5, "costo": 1750.0}, {"insumo": "ALBAHACA", "unidad": "KG", "cantidad": 0.01, "costo": 372.5}], "GNOCCHIS ALLA ROMANA": [{"insumo": "GNOCCHI KILO", "unidad": "KG", "cantidad": 0.2, "costo": 724.9586667}, {"insumo": "POMODORO KILO", "unidad": "KG", "cantidad": 0.05, "costo": 371.4875}, {"insumo": "QUESO SBRINZ", "unidad": "KG", "cantidad": 0.01, "costo": 309.98}, {"insumo": "PESTO DE ALBAHACA KILO", "unidad": "KG", "cantidad": 0.01, "costo": 200.61501}], "PANQUEQUE DE DULCE DE LECHE": [{"insumo": "MASA PANQUEQUE UNIDAD", "unidad": "UNIDAD", "cantidad": 1.0, "costo": 41.29578947}, {"insumo": "REDUCCION DE NARANJA LITRO", "unidad": "LT", "cantidad": 0.01, "costo": 29.53656}, {"insumo": "REDUCCION DE ARANDANO LITRO", "unidad": "LT", "cantidad": 0.01, "costo": 55.556805}, {"insumo": "CREMA BATIDA KILO", "unidad": "KG", "cantidad": 0.03, "costo": 243.330636}, {"insumo": "DULCE DE LECHE", "unidad": "KG", "cantidad": 0.05, "costo": 165.84}, {"insumo": "AZUCAR", "unidad": "KG", "cantidad": 0.015, "costo": 14.76}], "TORTA VASCA DE PISTACHO": [{"insumo": "TORTA VASCA PISTACHO PORCION", "unidad": "UNIDAD", "cantidad": 1.0, "costo": 6156.475}], "VIGILANTE CLASICO": [{"insumo": "DULCE BONIATO PORCION", "unidad": "UNIDAD", "cantidad": 1.0, "costo": 1294.791857}, {"insumo": "QUESO SEMIDURO", "unidad": "KG", "cantidad": 0.07, "costo": 1260.0}], "TIRAMISU": [{"insumo": "CAFE ESPRESSO LITRO", "unidad": "LT", "cantidad": 0.1, "costo": 494.881}, {"insumo": "LICOR AMARULA", "unidad": "LT", "cantidad": 0.07, "costo": 2479.54}, {"insumo": "VAINILLAS", "unidad": "KG", "cantidad": 0.1, "costo": 1456.8}, {"insumo": "CREMA DE TIRAMISU", "unidad": "UNIDAD", "cantidad": 0.15, "costo": 354.5730375}, {"insumo": "CACAO EN POLVO", "unidad": "KG", "cantidad": 0.005, "costo": 60.0}], "ALFAJOR DE LIMON": [{"insumo": "TAPA ALFAJOR CHOCOLATE UNIDAD", "unidad": "UNIDAD", "cantidad": 1.0, "costo": 365.197}, {"insumo": "RELLENO ALFAJOR LIMON PORCION", "unidad": "UNIDAD", "cantidad": 1.0, "costo": 685.2181818}]}, "sub_blocks": {"MANTECA AHUMADA x KILO": [{"insumo": "MANTECA", "unidad": "KG", "cantidad": 1.0, "costo": 6000.0}], "PAN DE CAMPO DE LA CASA": [{"insumo": "HARINA 000", "unidad": "KG", "cantidad": 1.0, "costo": 700.0}, {"insumo": "LEVADURA FRESCA", "unidad": "KG", "cantidad": 0.005, "costo": 17.5}, {"insumo": "AGUA", "unidad": "LT", "cantidad": 0.6, "costo": 0.006}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.0015, "costo": 1.2375}, {"insumo": "AZUCAR", "unidad": "KG", "cantidad": 0.005, "costo": 4.92}, {"insumo": "EXTRACTO DE MALTA", "unidad": "KG", "cantidad": 0.005, "costo": 30.825}, {"insumo": "LECHE EN POLVO", "unidad": "KG", "cantidad": 0.08, "costo": 640.0}, {"insumo": "GRASA VACUNA", "unidad": "KG", "cantidad": 0.13, "costo": 390.0}], "ALIOLI": [{"insumo": "LECHE", "unidad": "LT", "cantidad": 0.5, "costo": 691.825}, {"insumo": "ACEITE DE GIRASOL", "unidad": "LT", "cantidad": 1.5, "costo": 4030.2}, {"insumo": "AJO", "unidad": "KG", "cantidad": 0.03, "costo": 345.0}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.008, "costo": 6.6}, {"insumo": "PIMIENTA NEGRA", "unidad": "KG", "cantidad": 0.004, "costo": 72.0}, {"insumo": "LIMON", "unidad": "KG", "cantidad": 0.13, "costo": 299.0}], "ADEREZO CAESAR 1/2 KILO": [{"insumo": "ALIOLI KILO", "unidad": "KG", "cantidad": 0.5, "costo": 1361.15625}, {"insumo": "MOSTAZA DIJON", "unidad": "KG", "cantidad": 0.05, "costo": 1100.0}, {"insumo": "LIMON", "unidad": "KG", "cantidad": 0.13, "costo": 299.0}, {"insumo": "ANCHOAS", "unidad": "KG", "cantidad": 0.05, "costo": 3500.0}, {"insumo": "ALCAPARRAS", "unidad": "KG", "cantidad": 0.03, "costo": 750.0}, {"insumo": "QUESO SBRINZ", "unidad": "KG", "cantidad": 0.04, "costo": 1239.92}, {"insumo": "SALSA worcestershire", "unidad": "LT", "cantidad": 0.01, "costo": 140.0}], "POLLO ASADO CAESAR": [{"insumo": "SUPREMA DE POLLO", "unidad": "KG", "cantidad": 1.0, "costo": 9900.0}, {"insumo": "MANTECA", "unidad": "KG", "cantidad": 0.1, "costo": 600.0}, {"insumo": "TOMILLO", "unidad": "KG", "cantidad": 0.01, "costo": 37.9}, {"insumo": "AJO", "unidad": "KG", "cantidad": 0.01, "costo": 115.0}, {"insumo": "LIMON", "unidad": "KG", "cantidad": 0.13, "costo": 299.0}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.003, "costo": 2.475}, {"insumo": "PIMIENTA NEGRA", "unidad": "KG", "cantidad": 0.002, "costo": 36.0}], "TRUCHA CURADA AHUMADA": [{"insumo": "TRUCHA PATAGONICA", "unidad": "KG", "cantidad": 1.0, "costo": 19500.0}, {"insumo": "REMOLACHA", "unidad": "KG", "cantidad": 0.2, "costo": 400.0}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.5, "costo": 412.5}, {"insumo": "AZUCAR", "unidad": "KG", "cantidad": 0.5, "costo": 492.0}, {"insumo": "ENELDO", "unidad": "KG", "cantidad": 0.01, "costo": 22.5}], "PRALINE DE AVELLANAS": [{"insumo": "AZUCAR", "unidad": "KG", "cantidad": 0.25, "costo": 246.0}, {"insumo": "MANTECA", "unidad": "KG", "cantidad": 0.08, "costo": 480.0}, {"insumo": "AVELLANA", "unidad": "KG", "cantidad": 0.3, "costo": 5400.0}], "MASA DE PASTA SIMPLE": [{"insumo": "SEMOLIN", "unidad": "KG", "cantidad": 0.8, "costo": 614.4}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.008, "costo": 6.6}, {"insumo": "HUEVO", "unidad": "UNIDAD", "cantidad": 2.0, "costo": 440.0}, {"insumo": "AGUA", "unidad": "LT", "cantidad": 0.165, "costo": 0.00165}], "MASA DE ESPINACA DE PASTA RELLENA": [{"insumo": "SEMOLIN", "unidad": "KG", "cantidad": 2.5, "costo": 1920.0}, {"insumo": "HUEVO", "unidad": "UNIDAD", "cantidad": 10.0, "costo": 2200.0}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.025, "costo": 20.625}, {"insumo": "ESPINACA EN POLVO", "unidad": "KG", "cantidad": 0.1, "costo": 789.6}, {"insumo": "AGUA", "unidad": "LT", "cantidad": 0.3, "costo": 0.003}], "CHIMICHURRI DE HIERBAS": [{"insumo": "PEREJIL", "unidad": "KG", "cantidad": 0.1, "costo": 390.0}, {"insumo": "OREGANO", "unidad": "KG", "cantidad": 0.05, "costo": 250.0}, {"insumo": "ROMERO", "unidad": "KG", "cantidad": 0.025, "costo": 375.0}, {"insumo": "TOMILLO", "unidad": "KG", "cantidad": 0.025, "costo": 94.75}, {"insumo": "AJO", "unidad": "KG", "cantidad": 0.03, "costo": 345.0}, {"insumo": "LIMON", "unidad": "KG", "cantidad": 0.05, "costo": 115.0}, {"insumo": "AJI MOLIDO", "unidad": "KG", "cantidad": 0.01, "costo": 70.27}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.008, "costo": 6.6}, {"insumo": "PIMIENTA NEGRA", "unidad": "KG", "cantidad": 0.05, "costo": 900.0}, {"insumo": "SALVIA", "unidad": "KG", "cantidad": 0.01, "costo": 150.0}, {"insumo": "MENTA", "unidad": "KG", "cantidad": 0.01, "costo": 37.9}, {"insumo": "VINAGRE DE VINO TINTO", "unidad": "LT", "cantidad": 0.075, "costo": 441.75}, {"insumo": "ACEITE DE OLIVA", "unidad": "LT", "cantidad": 0.2, "costo": 2438.0}], "COSTILLAR AHUMADO 8 HORAS": [{"insumo": "VENTANA DE ASADO (COSTILLAR)", "unidad": "KG", "cantidad": 4.0, "costo": 118800.0}, {"insumo": "PIMENTON", "unidad": "KG", "cantidad": 0.002, "costo": 14.152}, {"insumo": "COMINO", "unidad": "KG", "cantidad": 0.001, "costo": 6.0}, {"insumo": "NUEZ MOSCADA", "unidad": "KG", "cantidad": null, "costo": null}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.0016, "costo": 1.32}, {"insumo": "PIMIENTA NEGRA", "unidad": "KG", "cantidad": 0.002, "costo": 36.0}, {"insumo": "ACEITE DE OLIVA", "unidad": "LT", "cantidad": 0.002, "costo": 24.38}, {"insumo": "MOSTAZA DIJON", "unidad": "KG", "cantidad": 0.002, "costo": 44.0}, {"insumo": "CHIMICHURRI DE HIERBAS LITRO", "unidad": "LT", "cantidad": 0.0075, "costo": 67.91455645}, {"insumo": "SALSA CRIOLLA KILO", "unidad": "KG", "cantidad": 0.0075, "costo": 47.4975}], "HUEVADA PARA MILANESA": [{"insumo": "HUEVO", "unidad": "UNIDAD", "cantidad": 12.0, "costo": 2640.0}, {"insumo": "MOSTAZA DIJON", "unidad": "KG", "cantidad": 0.04, "costo": 880.0}, {"insumo": "AJO", "unidad": "KG", "cantidad": 0.03, "costo": 345.0}, {"insumo": "PEREJIL", "unidad": "KG", "cantidad": 0.002, "costo": 7.8}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.001, "costo": 0.825}, {"insumo": "PIMIENTA NEGRA", "unidad": "KG", "cantidad": 0.005, "costo": 90.0}, {"insumo": "NUEZ MOSCADA", "unidad": "KG", "cantidad": 0.005, "costo": 100.0}], "PURE DE BONIATO": [{"insumo": "BONIATO", "unidad": "KG", "cantidad": 1.0, "costo": 6112.5}, {"insumo": "MANTECA", "unidad": "KG", "cantidad": 0.3, "costo": 1800.0}, {"insumo": "LECHE", "unidad": "LT", "cantidad": 0.2, "costo": 276.73}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.005, "costo": 4.125}, {"insumo": "NUEZ MOSCADA", "unidad": "KG", "cantidad": 0.002, "costo": 40.0}], "MASA DE GNOCCHI DE S\u00c9MOLA": [{"insumo": "LECHE", "unidad": "LT", "cantidad": 1.0, "costo": 1383.65}, {"insumo": "SEMOLIN", "unidad": "KG", "cantidad": 0.3, "costo": 230.4}, {"insumo": "MANTECA", "unidad": "KG", "cantidad": 0.07, "costo": 420.0}, {"insumo": "HUEVO", "unidad": "UNIDAD", "cantidad": 4.0, "costo": 880.0}, {"insumo": "QUESO SBRINZ", "unidad": "KG", "cantidad": 0.08, "costo": 2479.84}, {"insumo": "NUEZ MOSCADA", "unidad": "KG", "cantidad": 0.002, "costo": 40.0}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.004, "costo": 3.3}], "POMODORO": [{"insumo": "PURE DE TOMATE", "unidad": "KG", "cantidad": 2.0, "costo": 5600.0}, {"insumo": "AJO", "unidad": "KG", "cantidad": 0.02, "costo": 230.0}, {"insumo": "ACEITE DE OLIVA", "unidad": "LT", "cantidad": 0.1, "costo": 1219.0}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.01, "costo": 8.25}, {"insumo": "ALBAHACA", "unidad": "KG", "cantidad": 0.01, "costo": 372.5}], "SALSA CRIOLLA": [{"insumo": "CEBOLLA MORADA", "unidad": "KG", "cantidad": 0.1, "costo": 149.0}, {"insumo": "MORRON ROJO", "unidad": "KG", "cantidad": 0.04, "costo": 156.0}, {"insumo": "MORRON AMARILLO", "unidad": "KG", "cantidad": 0.04, "costo": 128.0}, {"insumo": "MORRON VERDE", "unidad": "KG", "cantidad": 0.04, "costo": 92.0}, {"insumo": "AJO", "unidad": "KG", "cantidad": 0.01, "costo": 115.0}, {"insumo": "PEREJIL", "unidad": "KG", "cantidad": 0.01, "costo": 39.0}, {"insumo": "LIMON", "unidad": "KG", "cantidad": 0.13, "costo": 299.0}, {"insumo": "ACEITE DE OLIVA", "unidad": "LT", "cantidad": 0.15, "costo": 1828.5}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.004, "costo": 3.3}, {"insumo": "PIMIENTA NEGRA", "unidad": "KG", "cantidad": 0.002, "costo": 36.0}], "CEBOLLA MORADA ENCURTIDA KILO": [{"insumo": "CEBOLLA MORADA", "unidad": "KG", "cantidad": 1.0, "costo": 1490.0}, {"insumo": "PIMIENTA NEGRA", "unidad": "KG", "cantidad": 0.01, "costo": 180.0}, {"insumo": "MOSTAZA EN GRANO", "unidad": "KG", "cantidad": 0.01, "costo": 40.0}, {"insumo": "ENELDO", "unidad": "KG", "cantidad": 0.02, "costo": 45.0}, {"insumo": "AJO", "unidad": "KG", "cantidad": 0.02, "costo": 230.0}, {"insumo": "LIQUIDO DE GOBIERNO", "unidad": "LT", "cantidad": 0.75, "costo": 2021.10375}], "AJIES ENCURTIDOS": [{"insumo": "AJIES VINAGREROS", "unidad": "KG", "cantidad": 1.0, "costo": 6560.0}, {"insumo": "PIMIENTA NEGRA", "unidad": "KG", "cantidad": 0.01, "costo": 180.0}, {"insumo": "MOSTAZA EN GRANO", "unidad": "KG", "cantidad": 0.01, "costo": 40.0}, {"insumo": "ROMERO", "unidad": "KG", "cantidad": 0.01, "costo": 150.0}, {"insumo": "AJO", "unidad": "KG", "cantidad": 0.02, "costo": 230.0}, {"insumo": "LIQUIDO DE GOBIERNO", "unidad": "LT", "cantidad": null, "costo": null}], "PEPINOS ENCURTIDOS": [{"insumo": "PEPINO", "unidad": "KG", "cantidad": 1.0, "costo": 1900.0}, {"insumo": "PIMIENTA NEGRA", "unidad": "KG", "cantidad": 0.01, "costo": 180.0}, {"insumo": "MOSTAZA EN GRANO", "unidad": "KG", "cantidad": 0.01, "costo": 40.0}, {"insumo": "SEMILLA DE HINOJO", "unidad": "KG", "cantidad": 0.01, "costo": 90.0}, {"insumo": "AJO", "unidad": "KG", "cantidad": 0.02, "costo": 230.0}, {"insumo": "LIQUIDO DE GOBIERNO", "unidad": "LT", "cantidad": 0.75, "costo": 2021.10375}], "VINAGRETA DE MOSTAZA": [{"insumo": "ACEITE DE OLIVA", "unidad": "LT", "cantidad": 0.3, "costo": 3657.0}, {"insumo": "MOSTAZA DIJON", "unidad": "KG", "cantidad": 0.04, "costo": 880.0}, {"insumo": "LIMON", "unidad": "KG", "cantidad": 0.13, "costo": 299.0}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.01, "costo": 8.25}, {"insumo": "PIMIENTA NEGRA", "unidad": "KG", "cantidad": 0.01, "costo": 180.0}, {"insumo": "AJO", "unidad": "KG", "cantidad": 0.04, "costo": 460.0}, {"insumo": "MIEL", "unidad": "KG", "cantidad": 0.015, "costo": 225.0}], "PROVENZAL": [{"insumo": "AJO", "unidad": "KG", "cantidad": 0.02, "costo": 230.0}, {"insumo": "PEREJIL", "unidad": "KG", "cantidad": 0.05, "costo": 195.0}, {"insumo": "LIMON", "unidad": "KG", "cantidad": 0.13, "costo": 299.0}, {"insumo": "ACEITE DE OLIVA", "unidad": "LT", "cantidad": 0.1, "costo": 1219.0}], "MARINADA MATAMBRITO": [{"insumo": "SALSA DE SOJA", "unidad": "LT", "cantidad": 0.3, "costo": 2400.0}, {"insumo": "SALSA DE OSTRAS", "unidad": "KG", "cantidad": 0.05, "costo": 1495.2}, {"insumo": "AJO", "unidad": "KG", "cantidad": 0.02, "costo": 230.0}, {"insumo": "LIMON", "unidad": "KG", "cantidad": 0.13, "costo": 299.0}, {"insumo": "TOMILLO", "unidad": "KG", "cantidad": 0.01, "costo": 37.9}, {"insumo": "ROMERO", "unidad": "KG", "cantidad": 0.01, "costo": 150.0}, {"insumo": "MIEL", "unidad": "KG", "cantidad": 0.1, "costo": 1500.0}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.04, "costo": 33.0}, {"insumo": "PIMENTON", "unidad": "KG", "cantidad": 0.02, "costo": 141.52}, {"insumo": "PIMIENTA NEGRA", "unidad": "KG", "cantidad": 0.002, "costo": 36.0}, {"insumo": "AJI JALAPE\u00d1O ROJO", "unidad": "KG", "cantidad": 0.005, "costo": 40.0}], "DEMIGLACE DE CEBOLLA": [{"insumo": "CEBOLLA", "unidad": "KG", "cantidad": 2.0, "costo": 2400.0}, {"insumo": "AJO", "unidad": "KG", "cantidad": 0.04, "costo": 460.0}, {"insumo": "MANTECA", "unidad": "KG", "cantidad": 0.1, "costo": 600.0}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.005, "costo": 4.125}, {"insumo": "TOMILLO", "unidad": "KG", "cantidad": 0.01, "costo": 37.9}, {"insumo": "LAUREL", "unidad": "KG", "cantidad": 0.002, "costo": 16.0}, {"insumo": "VINO BLANCO", "unidad": "LT", "cantidad": 0.5, "costo": 3845.0}, {"insumo": "AGUA", "unidad": "LT", "cantidad": 1.0, "costo": 0.01}], "CROUTONS X 1/2KILO": [{"insumo": "PAN SOBRANTE", "unidad": "KG", "cantidad": 1.0, "costo": 0.01}, {"insumo": "ACEITE DE OLIVA", "unidad": "LT", "cantidad": 0.02, "costo": 243.8}, {"insumo": "AJO EN POLVO", "unidad": "KG", "cantidad": 0.005, "costo": 20.0}, {"insumo": "CEBOLLA EN POLVO", "unidad": "KG", "cantidad": 0.005, "costo": 43.125}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.002, "costo": 1.65}, {"insumo": "PIMENTON", "unidad": "KG", "cantidad": 0.005, "costo": 35.38}], "LIQUIDO DE GOBIERNO": [{"insumo": "AGUA", "unidad": "LT", "cantidad": 0.5, "costo": 0.005}, {"insumo": "VINAGRE ALCOHOL", "unidad": "LT", "cantidad": 0.5, "costo": 2481.5}, {"insumo": "AZUCAR", "unidad": "KG", "cantidad": 0.2, "costo": 196.8}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.02, "costo": 16.5}], "MORRONES ASADOS": [{"insumo": "MORRON ROJO", "unidad": "KG", "cantidad": 1.0, "costo": 3900.0}, {"insumo": "MORRON VERDE", "unidad": "KG", "cantidad": 1.0, "costo": 2300.0}, {"insumo": "MORRON AMARILLO", "unidad": "KG", "cantidad": 1.0, "costo": 3200.0}, {"insumo": "AJO", "unidad": "KG", "cantidad": 0.02, "costo": 230.0}, {"insumo": "TOMILLO", "unidad": "KG", "cantidad": 0.01, "costo": 37.9}, {"insumo": "ACEITE DE GIRASOL", "unidad": "LT", "cantidad": 1.0, "costo": 2686.8}, {"insumo": "CHIPS DE AJO", "unidad": "KG", "cantidad": 0.03, "costo": 172.5}, {"insumo": "CIBOULETTE", "unidad": "KG", "cantidad": 0.03, "costo": 67.5}], "SALSA CRIOLLA 1/2 KILO": [{"insumo": "CEBOLLA MORADA", "unidad": "KG", "cantidad": 0.1, "costo": 149.0}, {"insumo": "MORRON ROJO", "unidad": "KG", "cantidad": 0.04, "costo": 156.0}, {"insumo": "MORRON AMARILLO", "unidad": "KG", "cantidad": 0.04, "costo": 128.0}, {"insumo": "MORRON VERDE", "unidad": "KG", "cantidad": 0.04, "costo": 92.0}, {"insumo": "AJO", "unidad": "KG", "cantidad": 0.01, "costo": 115.0}, {"insumo": "PEREJIL", "unidad": "KG", "cantidad": 0.01, "costo": 39.0}, {"insumo": "LIMON", "unidad": "KG", "cantidad": 0.13, "costo": 299.0}, {"insumo": "ACEITE DE OLIVA", "unidad": "LT", "cantidad": 0.15, "costo": 1828.5}, {"insumo": "PIMIENTA NEGRA", "unidad": "KG", "cantidad": 0.02, "costo": 360.0}], "BISQUET": [{"insumo": "DESECHO LANGOSTINO", "unidad": "KG", "cantidad": 1.0, "costo": 0.01}, {"insumo": "CEBOLLA", "unidad": "KG", "cantidad": 0.4, "costo": 480.0}, {"insumo": "ZANAHORIA", "unidad": "KG", "cantidad": 0.4, "costo": 760.0}, {"insumo": "APIO", "unidad": "KG", "cantidad": 0.4, "costo": 876.0}, {"insumo": "PUERRO", "unidad": "KG", "cantidad": 0.4, "costo": 2112.0}, {"insumo": "VERDEO", "unidad": "KG", "cantidad": 0.4, "costo": 2112.0}, {"insumo": "AJO", "unidad": "KG", "cantidad": 0.03, "costo": 345.0}, {"insumo": "AGUA", "unidad": "LT", "cantidad": 2.0, "costo": 0.02}, {"insumo": "VINO BLANCO", "unidad": "LT", "cantidad": 0.4, "costo": 3076.0}, {"insumo": "EXTRACTO DE TOMATE", "unidad": "KG", "cantidad": 0.1, "costo": 350.0}], "CHIPS DE AJO": [{"insumo": "AJO", "unidad": "KG", "cantidad": 0.5, "costo": 5750.0}], "ENSALADA DE REMOLACHA x6": [{"insumo": "REMOLACHA", "unidad": "KG", "cantidad": 1.0, "costo": 2000.0}, {"insumo": "NARANJA", "unidad": "KG", "cantidad": 0.36, "costo": 702.0}, {"insumo": "QUESO AZUL", "unidad": "KG", "cantidad": 0.2, "costo": 2873.764}, {"insumo": "ACETO BALSAMICO", "unidad": "LT", "cantidad": 0.1, "costo": 721.8}, {"insumo": "ACEITE DE OLIVA", "unidad": "LT", "cantidad": 0.1, "costo": 1219.0}, {"insumo": "AJO", "unidad": "KG", "cantidad": 0.02, "costo": 230.0}, {"insumo": "TOMILLO", "unidad": "KG", "cantidad": 0.01, "costo": 37.9}, {"insumo": "ENELDO", "unidad": "KG", "cantidad": 0.01, "costo": 22.5}], "HUMITA GRATINADA x8": [{"insumo": "CHOCLO AMARILLO EN GRANO", "unidad": "KG", "cantidad": 1.0, "costo": 5500.0}, {"insumo": "CEBOLLA", "unidad": "KG", "cantidad": 0.35, "costo": 420.0}, {"insumo": "MANTECA", "unidad": "KG", "cantidad": 0.3, "costo": 1800.0}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.005, "costo": 4.125}, {"insumo": "AZUCAR", "unidad": "KG", "cantidad": 0.005, "costo": 4.92}, {"insumo": "CREMA DE LECHE", "unidad": "LT", "cantidad": 0.35, "costo": 2740.92}, {"insumo": "QUESO PROVOLONE", "unidad": "KG", "cantidad": 0.15, "costo": 3508.35}, {"insumo": "ALBAHACA", "unidad": "KG", "cantidad": 0.02, "costo": 745.0}, {"insumo": "QUESO SBRINZ", "unidad": "KG", "cantidad": 0.1, "costo": 3099.8}, {"insumo": "AJI MOLIDO", "unidad": "KG", "cantidad": 0.005, "costo": 35.135}], "ESPINACA A LA CREMA RECETA GRANDE": [{"insumo": "HARINA 0000", "unidad": "KG", "cantidad": 0.05, "costo": 44.5}, {"insumo": "MANTECA", "unidad": "KG", "cantidad": 0.05, "costo": 300.0}, {"insumo": "CEBOLLA", "unidad": "KG", "cantidad": 0.2, "costo": 240.0}, {"insumo": "AJO", "unidad": "KG", "cantidad": 0.005, "costo": 57.5}, {"insumo": "LECHE", "unidad": "LT", "cantidad": 1.0, "costo": 1383.65}, {"insumo": "ESPINACA", "unidad": "KG", "cantidad": 0.6, "costo": 2700.0}, {"insumo": "QUESO MOZZARELLA", "unidad": "KG", "cantidad": 0.5, "costo": 4070.0}, {"insumo": "QUESO SBRINZ", "unidad": "KG", "cantidad": 0.2, "costo": 6199.6}], "PAPAS FRITAS TRIPLE COCCI\u00d3N x5": [{"insumo": "PAPA BLANCA", "unidad": "KG", "cantidad": 1.0, "costo": 2490.0}, {"insumo": "QUESO SBRINZ", "unidad": "KG", "cantidad": 0.1, "costo": 3099.8}, {"insumo": "HUEVO", "unidad": "UNIDAD", "cantidad": 5.0, "costo": 1100.0}], "PAPA ROSTI x4": [{"insumo": "PAPA BLANCA", "unidad": "KG", "cantidad": 2.0, "costo": 4980.0}, {"insumo": "TOMILLO", "unidad": "KG", "cantidad": 0.01, "costo": 37.9}, {"insumo": "QUESO SBRINZ", "unidad": "KG", "cantidad": 0.1, "costo": 3099.8}, {"insumo": "CIBOULETTE", "unidad": "KG", "cantidad": 0.02, "costo": 45.0}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.05, "costo": 41.25}, {"insumo": "ACEITE DE OLIVA", "unidad": "LT", "cantidad": 0.05, "costo": 609.5}, {"insumo": "PIMIENTA NEGRA", "unidad": "KG", "cantidad": 0.002, "costo": 36.0}], "PURE DE PAPA x5": [{"insumo": "PAPA BLANCA", "unidad": "KG", "cantidad": 1.0, "costo": 2490.0}, {"insumo": "MANTECA", "unidad": "KG", "cantidad": 0.3, "costo": 1800.0}, {"insumo": "LECHE", "unidad": "LT", "cantidad": 0.2, "costo": 276.73}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.005, "costo": 4.125}, {"insumo": "NUEZ MOSCADA", "unidad": "KG", "cantidad": 0.002, "costo": 40.0}], "SETAS DE CARDO ASADA x9": [{"insumo": "SETA DE CARDO", "unidad": "KG", "cantidad": 1.0, "costo": 19652.0}, {"insumo": "CHIMICHURRI DE HIERBAS LITRO", "unidad": "LT", "cantidad": 0.05, "costo": 452.7637097}, {"insumo": "ACEITE DE OLIVA", "unidad": "LT", "cantidad": 0.02, "costo": 243.8}, {"insumo": "DEMIGLACE DE CEBOLLA", "unidad": "KG", "cantidad": 0.3, "costo": 1380.569063}, {"insumo": "BONIATO", "unidad": "KG", "cantidad": 1.0, "costo": 6112.5}], "MASA DE PANQUEQUE x38": [{"insumo": "HARINA 0000", "unidad": "KG", "cantidad": 0.25, "costo": 222.5}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.001, "costo": 0.825}, {"insumo": "HUEVO", "unidad": "UNIDAD", "cantidad": 4.0, "costo": 880.0}, {"insumo": "AGUA", "unidad": "LT", "cantidad": 0.25, "costo": 0.0025}, {"insumo": "LECHE", "unidad": "LT", "cantidad": 0.25, "costo": 345.9125}, {"insumo": "MANTECA", "unidad": "KG", "cantidad": 0.02, "costo": 120.0}], "REDUCCION DE NARANJA": [{"insumo": "NARANJA", "unidad": "KG", "cantidad": 0.1, "costo": 195.0}, {"insumo": "AZUCAR", "unidad": "KG", "cantidad": 0.05, "costo": 49.2}, {"insumo": "LICOR TRIPLE SEC", "unidad": "LT", "cantidad": 0.05, "costo": 494.214}], "REDUCCION DE ARANDANOS": [{"insumo": "ARANDANOS", "unidad": "KG", "cantidad": 0.125, "costo": 4065.0}, {"insumo": "AZUCAR", "unidad": "KG", "cantidad": 0.075, "costo": 73.8}, {"insumo": "AGUA", "unidad": "LT", "cantidad": 0.05, "costo": 0.0005}, {"insumo": "LICOR AMARULA", "unidad": "LT", "cantidad": 0.04, "costo": 1416.88}], "CREMA BATIDA": [{"insumo": "CREMA DE LECHE", "unidad": "LT", "cantidad": 0.5, "costo": 3915.6}, {"insumo": "ESENCIA DE VAINILLA", "unidad": "LT", "cantidad": 0.02, "costo": 90.7106}, {"insumo": "AZUCAR", "unidad": "KG", "cantidad": 0.05, "costo": 49.2}], "MOUSE DE CHOCOLATE RECETA": [{"insumo": "CREMA DE LECHE", "unidad": "LT", "cantidad": 0.4, "costo": 3132.48}, {"insumo": "HUEVO", "unidad": "UNIDAD", "cantidad": 8.0, "costo": 1760.0}, {"insumo": "AZUCAR", "unidad": "KG", "cantidad": 0.25, "costo": 246.0}, {"insumo": "LICOR AMARULA", "unidad": "LT", "cantidad": 0.12, "costo": 4250.64}, {"insumo": "CHOCOLATE SEMI AMARGO", "unidad": "KG", "cantidad": 0.48, "costo": 7200.0}, {"insumo": "MANTECA", "unidad": "KG", "cantidad": 0.08, "costo": 480.0}], "QUINOTOS EN ALMIBAR": [{"insumo": "QUINOTOS", "unidad": "KG", "cantidad": 1.0, "costo": 5800.0}, {"insumo": "AGUA", "unidad": "LT", "cantidad": 1.0, "costo": 0.01}, {"insumo": "AZUCAR", "unidad": "KG", "cantidad": 1.0, "costo": 984.0}, {"insumo": "BICARBONATO", "unidad": "KG", "cantidad": 0.005, "costo": 73.39}, {"insumo": "LIMON", "unidad": "KG", "cantidad": 0.13, "costo": 299.0}, {"insumo": "CLAVO DE OLOR", "unidad": "KG", "cantidad": 0.002, "costo": 93.178}, {"insumo": "CANELA EN RAMA", "unidad": "KG", "cantidad": 0.002, "costo": 127.78}], "AVELLANAS ACARAMELADAS": [{"insumo": "AVELLANAS PELADAS", "unidad": "KG", "cantidad": 0.4, "costo": 20520.0}, {"insumo": "AZUCAR", "unidad": "KG", "cantidad": 0.4, "costo": 393.6}], "TORTA VASCA DE PISTACHO": [{"insumo": "QUESO CREMA CREMATTO", "unidad": "KG", "cantidad": 1.0, "costo": 10251.64}, {"insumo": "HUEVO", "unidad": "UNIDAD", "cantidad": 10.0, "costo": 2200.0}, {"insumo": "AZUCAR", "unidad": "KG", "cantidad": 0.5, "costo": 492.0}, {"insumo": "CREMA DE LECHE", "unidad": "LT", "cantidad": 0.3, "costo": 2349.36}, {"insumo": "FECULA DE MAIZ", "unidad": "KG", "cantidad": 0.06, "costo": 108.0}, {"insumo": "LIMON", "unidad": "KG", "cantidad": 0.01, "costo": 23.0}, {"insumo": "PASTA DE PISTACHO", "unidad": "KG", "cantidad": 0.35, "costo": 21514.85}], "DULCE DE BONIATO": [{"insumo": "BONIATO", "unidad": "KG", "cantidad": 0.5, "costo": 3056.25}, {"insumo": "AZUCAR", "unidad": "KG", "cantidad": 0.3, "costo": 295.2}, {"insumo": "ESENCIA DE VAINILLA", "unidad": "LT", "cantidad": 0.005, "costo": 22.67765}, {"insumo": "AGAR AGAR", "unidad": "KG", "cantidad": 0.007, "costo": 510.24792}], "TIRAMISU": [{"insumo": "CAFE ESPRESSO LITRO", "unidad": "LT", "cantidad": 0.1, "costo": 494.881}, {"insumo": "LICOR AMARULA", "unidad": "LT", "cantidad": 0.07, "costo": 2479.54}, {"insumo": "VAINILLAS", "unidad": "KG", "cantidad": 0.1, "costo": 1456.8}, {"insumo": "CREMA DE TIRAMISU", "unidad": "UNIDAD", "cantidad": 0.15, "costo": 354.5730375}, {"insumo": "CACAO EN POLVO", "unidad": "KG", "cantidad": 0.005, "costo": 60.0}], "CAFE LITRO": [{"insumo": "CAFE ESPRESSO MOLIDO", "unidad": "KG", "cantidad": 0.075, "costo": 4948.8}, {"insumo": "AGUA", "unidad": "LT", "cantidad": 1.0, "costo": 0.01}], "CREMA DE TIRAMISU": [{"insumo": "HUEVO", "unidad": "UNIDAD", "cantidad": 6.0, "costo": 1320.0}, {"insumo": "AZUCAR", "unidad": "KG", "cantidad": 0.24, "costo": 236.16}, {"insumo": "AGUA", "unidad": "LT", "cantidad": 0.2, "costo": 0.002}, {"insumo": "QUESO MARCARPONE", "unidad": "KG", "cantidad": 0.8, "costo": 17354.4}], "VAINILLAS PREPARACION": [{"insumo": "HUEVO", "unidad": "UNIDAD", "cantidad": 4.0, "costo": 880.0}, {"insumo": "AZUCAR", "unidad": "KG", "cantidad": 0.2, "costo": 196.8}, {"insumo": "HARINA 0000", "unidad": "KG", "cantidad": 0.2, "costo": 178.0}], "TAPA ALFAJOR DE CHOCOLATE": [{"insumo": "HARINA 0000", "unidad": "KG", "cantidad": 0.315, "costo": 280.35}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.005, "costo": 4.125}, {"insumo": "MANTECA", "unidad": "KG", "cantidad": 0.225, "costo": 1350.0}, {"insumo": "AZUCAR IMPALPABLE", "unidad": "KG", "cantidad": 0.1, "costo": 120.0}, {"insumo": "HUEVO", "unidad": "UNIDAD", "cantidad": 3.0, "costo": 660.0}, {"insumo": "CACAO AMARGO", "unidad": "KG", "cantidad": 0.035, "costo": 1237.495}], "RELLENO ALFAJOR LIMON": [{"insumo": "AZUCAR", "unidad": "KG", "cantidad": 0.35, "costo": 344.4}, {"insumo": "HUEVO", "unidad": "UNIDAD", "cantidad": 6.0, "costo": 1320.0}, {"insumo": "HUEVO", "unidad": "UNIDAD", "cantidad": 9.0, "costo": 1980.0}, {"insumo": "MANTECA", "unidad": "KG", "cantidad": 0.3, "costo": 1800.0}, {"insumo": "LIMON", "unidad": "KG", "cantidad": 0.91, "costo": 2093.0}], "PASTA RELLENA MASA ESPINACA PRODUCCION": [{"insumo": "MASA DE ESPINACA KILO", "unidad": "KG", "cantidad": 2.4, "costo": 11832.5472}, {"insumo": "STRACCIATELLA", "unidad": "KG", "cantidad": 0.5, "costo": 13481.5}, {"insumo": "QUESO MOZZARELLA", "unidad": "KG", "cantidad": 0.25, "costo": 2035.0}, {"insumo": "QUESO SBRINZ", "unidad": "KG", "cantidad": 0.2, "costo": 6199.6}, {"insumo": "POMODORO KILO", "unidad": "KG", "cantidad": 0.08, "costo": 594.38}, {"insumo": "ALBAHACA", "unidad": "KG", "cantidad": 0.3, "costo": 11175.0}], "PAN DE QUESO": [{"insumo": "FECULA DE MAIZ", "unidad": "KG", "cantidad": 0.06, "costo": 108.0}, {"insumo": "FECULA DE MANDIOCA", "unidad": "KG", "cantidad": 0.25, "costo": 805.75}, {"insumo": "QUESO SEMIDURO", "unidad": "KG", "cantidad": 0.05, "costo": 900.0}, {"insumo": "RICOTA", "unidad": "KG", "cantidad": 0.3, "costo": 2100.0}, {"insumo": "QUESO MOZZARELLA", "unidad": "KG", "cantidad": 0.1, "costo": 814.0}, {"insumo": "AZUCAR", "unidad": "KG", "cantidad": 0.03, "costo": 29.52}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.01, "costo": 8.25}, {"insumo": "HUEVO", "unidad": "UNIDAD", "cantidad": 2.0, "costo": 440.0}], "LIBRITO DE GRASA": [{"insumo": "HARINA 000", "unidad": "KG", "cantidad": 0.5, "costo": 350.0}, {"insumo": "AGUA", "unidad": "LT", "cantidad": 0.25, "costo": 0.0025}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.025, "costo": 20.625}, {"insumo": "AZUCAR", "unidad": "KG", "cantidad": 0.015, "costo": 14.76}, {"insumo": "LEVADURA FRESCA", "unidad": "KG", "cantidad": 0.15, "costo": 525.0}, {"insumo": "GRASA VACUNA", "unidad": "KG", "cantidad": 0.135, "costo": 405.0}], "PESTO DE ALBAHACA 1/2 KILO": [{"insumo": "ALBAHACA", "unidad": "KG", "cantidad": 0.1, "costo": 3725.0}, {"insumo": "AJO", "unidad": "KG", "cantidad": 0.01, "costo": 115.0}, {"insumo": "QUESO SBRINZ", "unidad": "KG", "cantidad": 0.05, "costo": 1549.9}, {"insumo": "NUECES", "unidad": "KG", "cantidad": 0.05, "costo": 946.2}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.002, "costo": 1.65}, {"insumo": "PIMIENTA NEGRA", "unidad": "KG", "cantidad": 0.002, "costo": 36.0}, {"insumo": "ACEITE DE OLIVA", "unidad": "LT", "cantidad": 0.3, "costo": 3657.0}, {"insumo": "HIELO", "unidad": "KG", "cantidad": 0.05, "costo": 0.0005}], "BU\u00d1UELOS DE ACELGA RECETA x5 porciones": [{"insumo": "HARINA 0000", "unidad": "KG", "cantidad": 0.2, "costo": 178.0}, {"insumo": "FECULA DE MAIZ", "unidad": "KG", "cantidad": 0.06, "costo": 108.0}, {"insumo": "POLVO DE HORNEAR", "unidad": "KG", "cantidad": 0.008, "costo": 32.0}, {"insumo": "AGUA", "unidad": "LT", "cantidad": 0.28, "costo": 0.0028}, {"insumo": "ACELGA", "unidad": "KG", "cantidad": 0.24, "costo": 528.0}, {"insumo": "QUESO SBRINZ", "unidad": "KG", "cantidad": 0.1, "costo": 3099.8}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.006, "costo": 4.95}, {"insumo": "CEBOLLA", "unidad": "KG", "cantidad": 0.1, "costo": 120.0}, {"insumo": "AJO", "unidad": "KG", "cantidad": 0.005, "costo": 57.5}, {"insumo": "CILANTRO", "unidad": "KG", "cantidad": 0.01, "costo": 22.5}, {"insumo": "PEREJIL", "unidad": "KG", "cantidad": 0.01, "costo": 39.0}, {"insumo": "OREGANO", "unidad": "KG", "cantidad": 0.01, "costo": 50.0}], "RELLENO EMPANADA DE CARNE": [{"insumo": "LOMO DE VACA", "unidad": "KG", "cantidad": 1.0, "costo": 31900.0}, {"insumo": "CEBOLLA", "unidad": "KG", "cantidad": 1.5, "costo": 1800.0}, {"insumo": "MORRON ROJO", "unidad": "KG", "cantidad": 0.5, "costo": 1950.0}, {"insumo": "MANTECA", "unidad": "KG", "cantidad": 0.5, "costo": 3000.0}, {"insumo": "CEBOLLA DE VERDEO", "unidad": "KG", "cantidad": 0.1, "costo": 528.0}, {"insumo": "AJO", "unidad": "KG", "cantidad": 0.025, "costo": 287.5}, {"insumo": "PIMENTON", "unidad": "KG", "cantidad": 0.02, "costo": 141.52}, {"insumo": "COMINO", "unidad": "KG", "cantidad": 0.008, "costo": 48.0}, {"insumo": "AJI MOLIDO", "unidad": "KG", "cantidad": 0.01, "costo": 70.27}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.01, "costo": 8.25}, {"insumo": "PIMIENTA NEGRA", "unidad": "KG", "cantidad": 0.005, "costo": 90.0}, {"insumo": "LIMON", "unidad": "KG", "cantidad": 0.13, "costo": 299.0}, {"insumo": "EXTRACTO DE TOMATE", "unidad": "KG", "cantidad": 0.03, "costo": 105.0}], "RELLENO EMPANADA DE HUMITA": [{"insumo": "CEBOLLA", "unidad": "KG", "cantidad": 0.8, "costo": 960.0}, {"insumo": "AJI JALAPE\u00d1O ROJO", "unidad": "KG", "cantidad": 0.05, "costo": 400.0}, {"insumo": "CHOCLO AMARILLO EN GRANO", "unidad": "KG", "cantidad": 0.8, "costo": 4400.0}, {"insumo": "QUESO SBRINZ", "unidad": "KG", "cantidad": 0.075, "costo": 2324.85}, {"insumo": "QUESO PROVOLONE", "unidad": "KG", "cantidad": 0.14, "costo": 3274.46}, {"insumo": "LECHE", "unidad": "LT", "cantidad": 0.7, "costo": 968.555}, {"insumo": "HARINA 0000", "unidad": "KG", "cantidad": 0.05, "costo": 44.5}, {"insumo": "MANTECA", "unidad": "KG", "cantidad": 0.1, "costo": 600.0}, {"insumo": "SAL FINA", "unidad": "KG", "cantidad": 0.005, "costo": 4.125}, {"insumo": "PIMIENTA NEGRA", "unidad": "KG", "cantidad": 0.002, "costo": 36.0}]}, "insumos": [{"nombre": "ACEITE DE GIRASOL", "unidad": "LT", "costo": 2686.8, "iva": 0.21, "final": 3251.028}, {"nombre": "ACEITE DE OLIVA", "unidad": "LT", "costo": 12190.0, "iva": 0.21, "final": 14749.9}, {"nombre": "ACELGA", "unidad": "KG", "costo": 2200.0, "iva": 0.0, "final": 2200.0}, {"nombre": "ACETO BALSAMICO", "unidad": "LT", "costo": 7218.0, "iva": 0.21, "final": 8733.78}, {"nombre": "AJI JALAPE\u00d1O ROJO", "unidad": "KG", "costo": 8000.0, "iva": 0.0, "final": 8000.0}, {"nombre": "AJI MOLIDO", "unidad": "KG", "costo": 7027.0, "iva": 0.21, "final": 8502.67}, {"nombre": "AJIES VINAGREROS", "unidad": "KG", "costo": 6560.0, "iva": 0.0, "final": 6560.0}, {"nombre": "AJO", "unidad": "KG", "costo": 11500.0, "iva": 0.0, "final": 11500.0}, {"nombre": "AJO EN POLVO", "unidad": "KG", "costo": 4000.0, "iva": 0.21, "final": 4840.0}, {"nombre": "ALBAHACA", "unidad": "KG", "costo": 37250.0, "iva": 0.0, "final": 37250.0}, {"nombre": "ALCAPARRAS", "unidad": "KG", "costo": 25000.0, "iva": 0.21, "final": 30250.0}, {"nombre": "ANCHOAS", "unidad": "KG", "costo": 70000.0, "iva": 0.21, "final": 84700.0}, {"nombre": "ASADO BANDERITA", "unidad": "KG", "costo": 20350.0, "iva": 0.105, "final": 22486.75}, {"nombre": "AVELLANA", "unidad": "KG", "costo": 18000.0, "iva": 0.21, "final": 21780.0}, {"nombre": "AZUCAR", "unidad": "KG", "costo": 984.0, "iva": 0.21, "final": 1190.64}, {"nombre": "AZUCAR IMPALPABLE", "unidad": "KG", "costo": 1200.0, "iva": 0.21, "final": 1452.0}, {"nombre": "BIFE DE CHORIZO", "unidad": "KG", "costo": 28600.0, "iva": 0.105, "final": 31603.0}, {"nombre": "BONIATO", "unidad": "KG", "costo": 6112.5, "iva": 0.0, "final": 6112.5}, {"nombre": "CACAO EN POLVO", "unidad": "KG", "costo": 12000.0, "iva": 0.21, "final": 14520.0}, {"nombre": "CAF\u00c9", "unidad": "KG", "costo": 14000.0, "iva": 0.21, "final": 16940.0}, {"nombre": "CEBOLLA", "unidad": "KG", "costo": 1200.0, "iva": 0.0, "final": 1200.0}, {"nombre": "CEBOLLA MORADA", "unidad": "KG", "costo": 1490.0, "iva": 0.0, "final": 1490.0}, {"nombre": "CEBOLLA DE VERDEO", "unidad": "KG", "costo": 5280.0, "iva": 0.0, "final": 5280.0}, {"nombre": "QUESO CHEDDAR INGLES", "unidad": "KG", "costo": 70000.0, "iva": 0.21, "final": 84700.0}, {"nombre": "CHOCLO AMARILLO EN GRANO", "unidad": "KG", "costo": 5500.0, "iva": 0.21, "final": 6655.0}, {"nombre": "CHOCOLATE SEMI AMARGO", "unidad": "KG", "costo": 15000.0, "iva": 0.21, "final": 18150.0}, {"nombre": "CHORIZO", "unidad": "KG", "costo": 9900.0, "iva": 0.0, "final": 9900.0}, {"nombre": "CIBOULETTE", "unidad": "KG", "costo": 2250.0, "iva": 0.0, "final": 2250.0}, {"nombre": "CILANTRO", "unidad": "KG", "costo": 2250.0, "iva": 0.0, "final": 2250.0}, {"nombre": "COMINO", "unidad": "KG", "costo": 6000.0, "iva": 0.21, "final": 7260.0}, {"nombre": "CREMA DE LECHE", "unidad": "LT", "costo": 7831.2, "iva": 0.21, "final": 9475.752}, {"nombre": "DULCE DE LECHE", "unidad": "KG", "costo": 3316.8, "iva": 0.21, "final": 4013.328}, {"nombre": "DULCE DE LECHE REPOSTERO", "unidad": "KG", "costo": 3316.8, "iva": 0.21, "final": 4013.328}, {"nombre": "ENELDO", "unidad": "KG", "costo": 2250.0, "iva": 0.0, "final": 2250.0}, {"nombre": "ENTRA\u00d1A", "unidad": "KG", "costo": 29700.0, "iva": 0.0, "final": 29700.0}, {"nombre": "ESCAROLA", "unidad": "KG", "costo": 3000.0, "iva": 0.0, "final": 3000.0}, {"nombre": "ESPINACA", "unidad": "KG", "costo": 4500.0, "iva": 0.0, "final": 4500.0}, {"nombre": "EXTRACTO DE MALTA L\u00cdQUIDO", "unidad": "KG", "costo": 7000.0, "iva": 0.21, "final": 8470.0}, {"nombre": "EXTRACTO DE TOMATE", "unidad": "KG", "costo": 3500.0, "iva": 0.21, "final": 4235.0}, {"nombre": "FECULA DE MAIZ", "unidad": "KG", "costo": 1800.0, "iva": 0.21, "final": 2178.0}, {"nombre": "GRASA VACUNA", "unidad": "KG", "costo": 3000.0, "iva": 0.21, "final": 3630.0}, {"nombre": "HARINA 000", "unidad": "KG", "costo": 700.0, "iva": 0.21, "final": 847.0}, {"nombre": "HARINA 0000", "unidad": "KG", "costo": 890.0, "iva": 0.21, "final": 1076.9}, {"nombre": "HUEVO", "unidad": "UNIDAD", "costo": 220.0, "iva": 0.0, "final": 220.0}, {"nombre": "JAM\u00d3N CRUDO IMPORTADO BELLOTA", "unidad": "KG", "costo": 130000.0, "iva": 0.21, "final": 157300.0}, {"nombre": "JAM\u00d3N CRUDO NACIONAL", "unidad": "KG", "costo": 30000.0, "iva": 0.21, "final": 36300.0}, {"nombre": "LANGOSTINOS ENTEROS", "unidad": "KG", "costo": 13580.0, "iva": 0.21, "final": 16431.8}, {"nombre": "LAUREL", "unidad": "KG", "costo": 8000.0, "iva": 0.21, "final": 9680.0}, {"nombre": "LECHE", "unidad": "LT", "costo": 1383.65, "iva": 0.21, "final": 1674.2165}, {"nombre": "LECHE EN POLVO", "unidad": "KG", "costo": 8000.0, "iva": 0.21, "final": 9680.0}, {"nombre": "LECHUGA MORADA", "unidad": "KG", "costo": 2900.0, "iva": 0.0, "final": 2900.0}, {"nombre": "LECHUGA VERDE", "unidad": "KG", "costo": 2900.0, "iva": 0.0, "final": 2900.0}, {"nombre": "LEVADURA FRESCA", "unidad": "KG", "costo": 3500.0, "iva": 0.21, "final": 4235.0}, {"nombre": "LICOR AMARULA", "unidad": "LT", "costo": 35422.0, "iva": 0.21, "final": 42860.62}, {"nombre": "LIMON", "unidad": "KG", "costo": 2300.0, "iva": 0.0, "final": 2300.0}, {"nombre": "LOMO DE VACA", "unidad": "KG", "costo": 31900.0, "iva": 0.0, "final": 31900.0}, {"nombre": "MANI", "unidad": "KG", "costo": 5000.0, "iva": 0.21, "final": 6050.0}, {"nombre": "MANTECA", "unidad": "KG", "costo": 6000.0, "iva": 0.21, "final": 7260.0}, {"nombre": "MATAMBRE DE CERDO", "unidad": "KG", "costo": 10890.0, "iva": 0.0, "final": 10890.0}, {"nombre": "MEJILLONES", "unidad": "KG", "costo": 11200.0, "iva": 0.21, "final": 13552.0}, {"nombre": "MENTA", "unidad": "KG", "costo": 3790.0, "iva": 0.0, "final": 3790.0}, {"nombre": "MIEL", "unidad": "KG", "costo": 15000.0, "iva": 0.21, "final": 18150.0}, {"nombre": "MOLLEJAS", "unidad": "KG", "costo": 26400.0, "iva": 0.0, "final": 26400.0}, {"nombre": "MORCILLA", "unidad": "KG", "costo": 8250.0, "iva": 0.0, "final": 8250.0}, {"nombre": "MORRON AMARILLO", "unidad": "KG", "costo": 3200.0, "iva": 0.0, "final": 3200.0}, {"nombre": "MORRON ROJO", "unidad": "KG", "costo": 3900.0, "iva": 0.0, "final": 3900.0}, {"nombre": "MORRON VERDE", "unidad": "KG", "costo": 2300.0, "iva": 0.0, "final": 2300.0}, {"nombre": "MOSTAZA DIJON", "unidad": "KG", "costo": 22000.0, "iva": 0.21, "final": 26620.0}, {"nombre": "MOSTAZA EN GRANO", "unidad": "KG", "costo": 4000.0, "iva": 0.21, "final": 4840.0}, {"nombre": "NARANJA", "unidad": "KG", "costo": 1950.0, "iva": 0.0, "final": 1950.0}, {"nombre": "NUECES", "unidad": "KG", "costo": 18924.0, "iva": 0.21, "final": 22898.04}, {"nombre": "NUEZ MOSCADA", "unidad": "KG", "costo": 20000.0, "iva": 0.21, "final": 24200.0}, {"nombre": "OJO DE BIFE", "unidad": "KG", "costo": 29700.0, "iva": 0.0, "final": 29700.0}, {"nombre": "OREGANO", "unidad": "KG", "costo": 5000.0, "iva": 0.21, "final": 6050.0}, {"nombre": "PAN SOBRANTE", "unidad": "KG", "costo": 0.01, "iva": 0.0, "final": 0.01}, {"nombre": "PANKO", "unidad": "KG", "costo": 6000.0, "iva": 0.21, "final": 7260.0}, {"nombre": "PAPA BLANCA", "unidad": "KG", "costo": 2490.0, "iva": 0.0, "final": 2490.0}, {"nombre": "PATAMUSLO POLLO", "unidad": "KG", "costo": 5290.0, "iva": 0.0, "final": 5290.0}, {"nombre": "PEPINO", "unidad": "KG", "costo": 1900.0, "iva": 0.0, "final": 1900.0}, {"nombre": "PEREJIL", "unidad": "KG", "costo": 3900.0, "iva": 0.0, "final": 3900.0}, {"nombre": "PIMENTON", "unidad": "KG", "costo": 7076.0, "iva": 0.21, "final": 8561.96}, {"nombre": "PIMIENTA NEGRA", "unidad": "KG", "costo": 18000.0, "iva": 0.21, "final": 21780.0}, {"nombre": "POLVO DE HORNEAR", "unidad": "KG", "costo": 4000.0, "iva": 0.21, "final": 4840.0}, {"nombre": "POMODORO", "unidad": "KG", "costo": 3500.0, "iva": 0.21, "final": 4235.0}, {"nombre": "PROVENZAL", "unidad": "KG", "costo": 7500.0, "iva": 0.21, "final": 9075.0}, {"nombre": "PURE DE TOMATE", "unidad": "KG", "costo": 2800.0, "iva": 0.21, "final": 3388.0}, {"nombre": "QUESO AZUL", "unidad": "KG", "costo": 14368.82, "iva": 0.21, "final": 17386.2722}, {"nombre": "QUESO CREMA", "unidad": "KG", "costo": 7500.0, "iva": 0.21, "final": 9075.0}, {"nombre": "QUESO MARCARPONE", "unidad": "KG", "costo": 21693.0, "iva": 0.21, "final": 26248.53}, {"nombre": "QUESO MOZZARELLA", "unidad": "KG", "costo": 8140.0, "iva": 0.21, "final": 9849.4}, {"nombre": "QUESO PROVOLETA", "unidad": "KG", "costo": 20201.0, "iva": 0.21, "final": 24443.21}, {"nombre": "QUESO PROVOLONE", "unidad": "KG", "costo": 23389.0, "iva": 0.21, "final": 28300.69}, {"nombre": "QUESO SBRINZ", "unidad": "KG", "costo": 30998.0, "iva": 0.21, "final": 37507.58}, {"nombre": "QUESO SEMIDURO", "unidad": "KG", "costo": 18000.0, "iva": 0.21, "final": 21780.0}, {"nombre": "REMOLACHA", "unidad": "KG", "costo": 2000.0, "iva": 0.0, "final": 2000.0}, {"nombre": "RICOTA", "unidad": "KG", "costo": 7000.0, "iva": 0.21, "final": 8470.0}, {"nombre": "RUCULA", "unidad": "KG", "costo": 3250.0, "iva": 0.0, "final": 3250.0}, {"nombre": "SAL FINA", "unidad": "KG", "costo": 825.0, "iva": 0.21, "final": 998.25}, {"nombre": "SALSA DE OSTRAS", "unidad": "KG", "costo": 29904.0, "iva": 0.21, "final": 36183.84}, {"nombre": "SALSA DE SOJA", "unidad": "LT", "costo": 8000.0, "iva": 0.21, "final": 9680.0}, {"nombre": "SALSA worcestershire", "unidad": "LT", "costo": 14000.0, "iva": 0.21, "final": 16940.0}, {"nombre": "SALVIA", "unidad": "KG", "costo": 15000.0, "iva": 0.21, "final": 18150.0}, {"nombre": "SEMILLA DE HINOJO", "unidad": "KG", "costo": 9000.0, "iva": 0.21, "final": 10890.0}, {"nombre": "SEMOLIN", "unidad": "KG", "costo": 768.0, "iva": 0.21, "final": 929.28}, {"nombre": "SETA DE CARDO", "unidad": "KG", "costo": 19652.0, "iva": 0.105, "final": 21715.46}, {"nombre": "STRACCIATELLA", "unidad": "KG", "costo": 26963.0, "iva": 0.21, "final": 32625.23}, {"nombre": "SUPREMA DE POLLO", "unidad": "KG", "costo": 9900.0, "iva": 0.0, "final": 9900.0}, {"nombre": "TAPA DE EMPANADA", "unidad": "UNIDAD", "costo": 149.83, "iva": 0.21, "final": 181.2943}, {"nombre": "TOMILLO", "unidad": "KG", "costo": 3790.0, "iva": 0.0, "final": 3790.0}, {"nombre": "TRUCHA CURADA AHUMADA", "unidad": "KG", "costo": 29200.0, "iva": 0.21, "final": 35332.0}, {"nombre": "TRUCHA PATAGONICA", "unidad": "KG", "costo": 19500.0, "iva": 0.21, "final": 23595.0}, {"nombre": "VAINILLAS", "unidad": "KG", "costo": 14568.0, "iva": 0.21, "final": 17627.28}, {"nombre": "VENTANA DE ASADO (COSTILLAR)", "unidad": "KG", "costo": 29700.0, "iva": 0.0, "final": 29700.0}, {"nombre": "VINAGRE DE VINO TINTO", "unidad": "LT", "costo": 5890.0, "iva": 0.21, "final": 7126.9}, {"nombre": "VINO BLANCO", "unidad": "LT", "costo": 7690.0, "iva": 0.21, "final": 9304.9}, {"nombre": "LIBRITO DE GRASA", "unidad": "KG", "costo": 9863.0, "iva": 0.21, "final": 11934.23}, {"nombre": "ROMERO", "unidad": "KG", "costo": 15000.0, "iva": 0.0, "final": 15000.0}, {"nombre": "HUEVADA PARA MILANESA", "unidad": "KG", "costo": 4063.0, "iva": 0.0, "final": 4063.0}, {"nombre": "ESPINACA EN POLVO", "unidad": "KG", "costo": 7896.0, "iva": 0.21, "final": 9554.16}, {"nombre": "AGUA", "unidad": "LT", "costo": 0.01, "iva": 0.0, "final": 0.0}, {"nombre": "VINAGRE ALCOHOL", "unidad": "LT", "costo": 4963.0, "iva": 0.0, "final": 4963.0}, {"nombre": "CEBOLLA EN POLVO", "unidad": "KG", "costo": 8625.0, "iva": 0.21, "final": 10436.25}, {"nombre": "DESECHO LANGOSTINO", "unidad": "KG", "costo": 0.01, "iva": 0.0, "final": 0.01}, {"nombre": "ZANAHORIA", "unidad": "KG", "costo": 1900.0, "iva": 0.0, "final": 1900.0}, {"nombre": "APIO", "unidad": "KG", "costo": 2190.0, "iva": 0.0, "final": 2190.0}, {"nombre": "PUERRO", "unidad": "KG", "costo": 5280.0, "iva": 0.0, "final": 5280.0}, {"nombre": "VERDEO", "unidad": "KG", "costo": 5280.0, "iva": 0.0, "final": 5280.0}, {"nombre": "EXTRACTO DE TOMATE", "unidad": "KG", "costo": 4297.52, "iva": 0.21, "final": 5199.9992}, {"nombre": "CHIPS DE AJO", "unidad": "KG", "costo": 5750.0, "iva": 0.0, "final": 5750.0}, {"nombre": "ENSALADA DE REMOLACHA x6", "unidad": "UNIDAD", "costo": 1301.160667, "iva": 0.0, "final": 1301.160667}, {"nombre": "HUMITA GRATINADA x8", "unidad": "UNIDAD", "costo": 2232.28125, "iva": 0.0, "final": 2232.28125}, {"nombre": "ESPINACA A LA CREMA x4", "unidad": "UNIDAD", "costo": 3748.8125, "iva": 0.0, "final": 3748.8125}, {"nombre": "PAPAS FRITAS 3COCCION x5", "unidad": "UNIDAD", "costo": 1337.96, "iva": 0.0, "final": 1337.96}, {"nombre": "PAPA ROSTI x4", "unidad": "UNIDAD", "costo": 2212.3625, "iva": 0.0, "final": 2212.3625}, {"nombre": "PURE DE PAPA x5", "unidad": "UNIDAD", "costo": 922.171, "iva": 0.0, "final": 922.171}, {"nombre": "MASA PANQUEQUE UNIDAD", "unidad": "UNIDAD", "costo": 41.29578947, "iva": 0.0, "final": 41.29578947}, {"nombre": "LICOR TRIPLE SEC", "unidad": "LT", "costo": 9884.28, "iva": 0.21, "final": 11959.9788}, {"nombre": "ARANDANOS", "unidad": "KG", "costo": 32520.0, "iva": 0.0, "final": 32520.0}, {"nombre": "ESENCIA DE VAINILLA", "unidad": "LT", "costo": 4535.53, "iva": 0.21, "final": 5487.9913}, {"nombre": "QUINOTOS", "unidad": "KG", "costo": 5800.0, "iva": 0.0, "final": 5800.0}, {"nombre": "BICARBONATO", "unidad": "KG", "costo": 14678.0, "iva": 0.21, "final": 17760.38}, {"nombre": "CLAVO DE OLOR", "unidad": "KG", "costo": 46589.0, "iva": 0.21, "final": 56372.69}, {"nombre": "CANELA EN RAMA", "unidad": "KG", "costo": 63890.0, "iva": 0.21, "final": 77306.9}, {"nombre": "AVELLANAS PELADAS", "unidad": "KG", "costo": 51300.0, "iva": 0.21, "final": 62073.0}, {"nombre": "QUESO CREMA CREMATTO", "unidad": "KG", "costo": 10251.64, "iva": 0.21, "final": 12404.4844}, {"nombre": "PASTA DE PISTACHO", "unidad": "KG", "costo": 61471.0, "iva": 0.21, "final": 74379.91}, {"nombre": "TORTA VASCA PISTACHO PORCION", "unidad": "UNIDAD", "costo": 6156.475, "iva": 0.0, "final": 6156.475}, {"nombre": "AGAR AGAR", "unidad": "KG", "costo": 72892.56, "iva": 0.21, "final": 88199.9976}, {"nombre": "DULCE BONIATO PORCION", "unidad": "UNIDAD", "costo": 1294.791857, "iva": 0.0, "final": 1294.791857}, {"nombre": "CAFE ESPRESSO MOLIDO", "unidad": "KG", "costo": 65984.0, "iva": 0.21, "final": 79840.64}, {"nombre": "CAFE ESPRESSO LITRO", "unidad": "LT", "costo": 4948.81, "iva": 0.0, "final": 4948.81}, {"nombre": "CREMA DE TIRAMISU", "unidad": "UNIDAD", "costo": 2363.82025, "iva": 0.21, "final": 2860.222503}, {"nombre": "CACAO AMARGO", "unidad": "KG", "costo": 35357.0, "iva": 0.21, "final": 42781.97}, {"nombre": "TAPA ALFAJOR CHOCOLATE UNIDAD", "unidad": "UNIDAD", "costo": 365.197, "iva": 0.0, "final": 365.197}, {"nombre": "RELLENO ALFAJOR LIMON PORCION", "unidad": "UNIDAD", "costo": 685.2181818, "iva": 0.0, "final": 685.2181818}, {"nombre": "EXTRACTO DE MALTA", "unidad": "KG", "costo": 6165.0, "iva": 0.21, "final": 7459.65}, {"nombre": "FECULA DE MANDIOCA", "unidad": "KG", "costo": 3223.0, "iva": 0.21, "final": 3899.83}, {"nombre": "MANTECA AHUMADA PORCION", "unidad": "UNIDAD", "costo": 150.0, "iva": 0.0, "final": 150.0}, {"nombre": "ALIOLI KILO", "unidad": "KG", "costo": 2722.3125, "iva": 0.0, "final": 2722.3125}, {"nombre": "CROUTONS KILO", "unidad": "KG", "costo": 687.93, "iva": 0.0, "final": 687.93}, {"nombre": "POLLO ASADO CAESAR KILO", "unidad": "KG", "costo": 10990.375, "iva": 0.0, "final": 10990.375}, {"nombre": "ADEREZO CAESAR KILO", "unidad": "KG", "costo": 16780.1525, "iva": 0.0, "final": 16780.1525}, {"nombre": "LIQUIDO DE GOBIERNO", "unidad": "LT", "costo": 2694.805, "iva": 0.0, "final": 2694.805}, {"nombre": "CEBOLLA ENCURTIDA KILO", "unidad": "KG", "costo": 4006.10375, "iva": 0.0, "final": 4006.10375}, {"nombre": "PRALINE DE AVELLANA KILO", "unidad": "KG", "costo": 20399.58, "iva": 0.0, "final": 20399.58}, {"nombre": "MORRONES ASADOS KILO", "unidad": "KG", "costo": 4198.233333, "iva": 0.0, "final": 4198.233333}, {"nombre": "MARINADA MATAMBRITO LITRO", "unidad": "LT", "costo": 1590.655, "iva": 0.0, "final": 1590.655}, {"nombre": "BISQUET KILO", "unidad": "KG", "costo": 3370.343333, "iva": 0.0, "final": 3370.343333}, {"nombre": "REDUCCION DE NARANJA LITRO", "unidad": "LT", "costo": 2953.656, "iva": 0.0, "final": 2953.656}, {"nombre": "REDUCCION DE ARANDANO LITRO", "unidad": "LT", "costo": 5555.6805, "iva": 0.0, "final": 5555.6805}, {"nombre": "CREMA BATIDA KILO", "unidad": "KG", "costo": 8111.0212, "iva": 0.0, "final": 8111.0212}, {"nombre": "CHIMICHURRI DE HIERBAS LITRO", "unidad": "LT", "costo": 9055.274194, "iva": 0.0, "final": 9055.274194}, {"nombre": "SALSA CRIOLLA KILO", "unidad": "KG", "costo": 6333.0, "iva": 0.0, "final": 6333.0}, {"nombre": "HIELO", "unidad": "KG", "costo": 0.01, "iva": 0.0, "final": 0.01}, {"nombre": "PESTO DE ALBAHACA KILO", "unidad": "KG", "costo": 20061.501, "iva": 0.0, "final": 20061.501}, {"nombre": "POMODORO KILO", "unidad": "KG", "costo": 7429.75, "iva": 0.0, "final": 7429.75}, {"nombre": "MASA PASTA SIMPLE KILO", "unidad": "KG", "costo": 1061.00165, "iva": 0.0, "final": 1061.00165}, {"nombre": "MASA DE ESPINACA KILO", "unidad": "KG", "costo": 4930.228, "iva": 0.0, "final": 4930.228}, {"nombre": "PASTA RELLENA ESPINACA PORCION", "unidad": "KG", "costo": 1510.600907, "iva": 0.0, "final": 1510.600907}, {"nombre": "BU\u00d1UELO ACELGA PORCION", "unidad": "UNIDAD", "costo": 847.95056, "iva": 0.0, "final": 847.95056}, {"nombre": "TAPA DE EMPANADA", "unidad": "UNIDAD", "costo": 244.95, "iva": 0.21, "final": 296.3895}, {"nombre": "RELLENO EMPANADA DE CARNE", "unidad": "UNIDAD", "costo": 1340.918, "iva": 0.0, "final": 1340.918}, {"nombre": "TAPA HOJALDRE EMPANADA", "unidad": "UNIDAD", "costo": 244.0, "iva": 0.0, "final": 244.0}, {"nombre": "RELLENO EMPANADA DE HUMITA", "unidad": "UNIDAD", "costo": 650.6245, "iva": 0.0, "final": 650.6245}, {"nombre": "DEMIGLACE DE CEBOLLA", "unidad": "KG", "costo": 4601.896875, "iva": 0, "final": null}, {"nombre": "HUEVADA PARA MILANESA", "unidad": "KG", "costo": null, "iva": 0, "final": null}, {"nombre": "ALIOLI KILO", "unidad": "KG", "costo": 680.578125, "iva": 0.0, "final": 680.578125}, {"nombre": "VINAGRETA DE MOSTAZA", "unidad": "KG", "costo": 5709.25, "iva": 0.0, "final": 5709.25}, {"nombre": "CHIPS DE AJO", "unidad": "KG", "costo": 5750.0, "iva": 0.0, "final": 5750.0}, {"nombre": "SALSA CRIOLLA KILO", "unidad": "KG", "costo": 5691.6, "iva": 0.0, "final": 5691.6}, {"nombre": "PAN DE CAMPO UNIDAD", "unidad": "UNIDAD", "costo": 446.122125, "iva": 0.0, "final": 446.122125}, {"nombre": "GNOCCHI KILO", "unidad": "KG", "costo": 3624.793333, "iva": 0.0, "final": 3624.793333}, {"nombre": "PURE DE BONIATO KILO", "unidad": "KG", "costo": 5488.903333, "iva": 0.0, "final": 5488.903333}, {"nombre": "DEMIGLACE DE CEBOLLA", "unidad": "KG", "costo": 4601.896875, "iva": 0.0, "final": 4601.896875}], "urgentes": ["MOLLEJAS", "OJO DE BIFE", "BIFE DE LOMO", "COSTILLA AHUMADA 8 HS.", "LANGOSTINOS AL AJILLO", "TRUCH\u00d3N ASADO", "SETAS DE CARDO", "BIFE DE CUADRIL", "PASTA SIMPLE", "MOUSSE DE CHOCOLATE"], "prod_map": {"POMODORO": "POMODORO", "HUEVADA PARA MILANESA": "HUEVADA PARA MILANESA", "HUMITA GRATINADA x8": "HUMITA GRATINADA x8", "ENSALADA DE REMOLACHA x6": "ENSALADA DE REMOLACHA x6", "PROVENZAL": "PROVENZAL", "RELLENO EMPANADA DE CARNE": "RELLENO EMPANADA DE CARNE", "CREMA DE TIRAMISU": "CREMA DE TIRAMISU", "RELLENO EMPANADA DE HUMITA": "RELLENO EMPANADA DE HUMITA", "VINAGRETA DE MOSTAZA": "VINAGRETA DE MOSTAZA", "LIBRITO DE GRASA": "LIBRITO DE GRASA", "LIQUIDO DE GOBIERNO": "LIQUIDO DE GOBIERNO", "PURE DE PAPA x5": "PURE DE PAPA x5", "CHIPS DE AJO": "CHIPS DE AJO", "TRUCHA CURADA AHUMADA": "TRUCHA CURADA AHUMADA", "DEMIGLACE DE CEBOLLA": "DEMIGLACE DE CEBOLLA", "PAPA ROSTI x4": "PAPA ROSTI x4", "ALIOLI KILO": "ALIOLI", "ADEREZO CAESAR KILO": "ADEREZO CAESAR 1/2 KILO", "BISQUET KILO": "BISQUET", "BU\u00d1UELO ACELGA PORCION": "BU\u00d1UELOS DE ACELGA RECETA x5 porciones", "CAFE ESPRESSO LITRO": "CAFE LITRO", "CEBOLLA ENCURTIDA KILO": "CEBOLLA MORADA ENCURTIDA KILO", "CHIMICHURRI DE HIERBAS LITRO": "CHIMICHURRI DE HIERBAS", "CREMA BATIDA KILO": "CREMA BATIDA", "CROUTONS KILO": "CROUTONS X 1/2KILO", "DULCE BONIATO PORCION": "DULCE DE BONIATO", "ESPINACA A LA CREMA x4": "ESPINACA A LA CREMA RECETA GRANDE", "GNOCCHI KILO": "MASA DE GNOCCHI DE S\u00c9MOLA", "MARINADA MATAMBRITO LITRO": "MARINADA MATAMBRITO", "MASA DE ESPINACA KILO": "MASA DE ESPINACA DE PASTA RELLENA", "MASA PANQUEQUE UNIDAD": "MASA DE PANQUEQUE x38", "MORRONES ASADOS KILO": "MORRONES ASADOS", "PAPAS FRITAS 3COCCION x5": "PAPAS FRITAS TRIPLE COCCI\u00d3N x5", "PASTA RELLENA ESPINACA PORCION": "PASTA RELLENA MASA ESPINACA PRODUCCION", "PESTO DE ALBAHACA KILO": "PESTO DE ALBAHACA 1/2 KILO", "POLLO ASADO CAESAR KILO": "POLLO ASADO CAESAR", "POMODORO KILO": "POMODORO", "PRALINE DE AVELLANA KILO": "PRALINE DE AVELLANAS", "PURE DE BONIATO KILO": "PURE DE BONIATO", "REDUCCION DE ARANDANO LITRO": "REDUCCION DE ARANDANOS", "REDUCCION DE NARANJA LITRO": "REDUCCION DE NARANJA", "RELLENO ALFAJOR LIMON PORCION": "RELLENO ALFAJOR LIMON", "SALSA CRIOLLA KILO": "SALSA CRIOLLA", "TAPA ALFAJOR CHOCOLATE UNIDAD": "TAPA ALFAJOR DE CHOCOLATE", "TORTA VASCA PISTACHO PORCION": "TORTA VASCA DE PISTACHO"}};
+let insumosPrices = {};
+let rendimientos = {};
+let insumosPricesCI = {};
+let prodMapCI = {};
+let prodBaseCost = {};
+const prodFractionCache = new WeakMap();
+let saveTimer = null;
+let recetas = {};
+let prodRinde = {};
+let platosExtra = [];
+let produccionesExtra = [];
+let recipeEditMode = false;
+let insumoDatalistHTML = null;
+let recetaRendimientos = {};
+let platosDeleted = [];
+let produccionesDeleted = [];
+let insumosExtra = [];
+let insumosDeleted = [];
+
+function normName(s) { return (s || '').trim().toUpperCase(); }
+
+function saveStateDebounced() {
+  window.__saveDirty = true;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    if (window.__saveState) window.__saveState({
+      insumos: insumosPrices,
+      rendimientos,
+      recetas,
+      prodRinde,
+      platosExtra,
+      produccionesExtra,
+      recetaRendimientos,
+      platosDeleted,
+      produccionesDeleted,
+      insumosExtra,
+      insumosDeleted
+    });
+  }, 600);
+}
+
+function getAllInsumos() {
+  const base = DATA.insumos.filter(i => !insumosDeleted.includes(i.nombre));
+  const seen = new Set(base.map(i => i.nombre));
+  const extra = insumosExtra.filter(i => !seen.has(i.nombre));
+  return [...base, ...extra];
+}
+function insumoExists(nombre) {
+  const n = normName(nombre);
+  return getAllInsumos().some(i => normName(i.nombre) === n);
+}
+function eliminarInsumo(nombre) {
+  const refs = findReferencesToProd(nombre);
+  if (refs.length) {
+    alert(`No se puede eliminar: lo usan en ${refs.join(', ')}. Sacalo de esas recetas primero.`);
+    return;
+  }
+  if (!confirm(`¿Eliminar el insumo "${nombre}"? Esta acción no se puede deshacer.`)) return;
+  const idx = insumosExtra.findIndex(i => i.nombre === nombre);
+  if (idx >= 0) insumosExtra.splice(idx, 1);
+  else if (!insumosDeleted.includes(nombre)) insumosDeleted.push(nombre);
+  delete insumosPrices[nombre];
+  delete rendimientos[nombre];
+  insumoDatalistHTML = null;
+  saveStateDebounced();
+  renderInsumos();
+}
+
+// Rendimiento efectivo de un insumo dentro de una receta/producción puntual:
+// el override específico de esa receta si existe, si no el general del insumo
+// (ej. limpieza es igual en todos lados, corte puede variar por receta).
+function getEffectiveRend(recetaNombre, insumoNombre) {
+  const local = recetaRendimientos[recetaNombre] && recetaRendimientos[recetaNombre][insumoNombre];
+  return local || rendimientos[insumoNombre] || { enabled: false, factor: 1 };
+}
+
+Object.keys(DATA.prod_map).forEach(k => { prodMapCI[normName(k)] = DATA.prod_map[k]; });
+Object.keys(DATA.sub_blocks).forEach(k => { if (!prodMapCI[normName(k)]) prodMapCI[normName(k)] = k; });
+
+// ──── Helpers que mezclan DATA (semilla fija) con las ediciones del usuario ──
+function getPlatoIngredients(nombre) { return recetas[nombre] || DATA.plato_ingredients[nombre] || null; }
+function getProdIngredients(nombre) { return recetas[nombre] || DATA.sub_blocks[nombre] || null; }
+function getAllCategorias() {
+  const merged = {};
+  Object.entries(DATA.categorias).forEach(([c, arr]) => { merged[c] = arr.filter(nm => !platosDeleted.includes(nm)); });
+  platosExtra.forEach(p => {
+    if (!merged[p.categoria]) merged[p.categoria] = [];
+    merged[p.categoria].push(p.nombre);
+  });
+  return merged;
+}
+function getPlatoMeta(nombre) {
+  return DATA.platos.find(p => p.nombre === nombre) || platosExtra.find(p => p.nombre === nombre) || null;
+}
+function getAllProdNames() { return [...Object.keys(DATA.sub_blocks).filter(nm => !produccionesDeleted.includes(nm)), ...produccionesExtra]; }
+function platoExists(nombre) {
+  const n = normName(nombre);
+  return DATA.platos.some(p => normName(p.nombre) === n && !platosDeleted.includes(p.nombre)) || platosExtra.some(p => normName(p.nombre) === n);
+}
+function prodExists(nombre) {
+  const n = normName(nombre);
+  return getAllProdNames().some(nm => normName(nm) === n);
+}
+function removeProdFromMap(nombre) {
+  Object.keys(prodMapCI).forEach(k => { if (normName(prodMapCI[k]) === normName(nombre)) delete prodMapCI[k]; });
+}
+function findReferencesToProd(nombre) {
+  const refs = [];
+  DATA.platos.concat(platosExtra).forEach(p => {
+    if (platosDeleted.includes(p.nombre)) return;
+    const ings = getPlatoIngredients(p.nombre) || [];
+    if (ings.some(ing => normName(ing.insumo) === normName(nombre))) refs.push(p.nombre);
+  });
+  getAllProdNames().forEach(pn => {
+    if (normName(pn) === normName(nombre)) return;
+    const ings = getProdIngredients(pn) || [];
+    if (ings.some(ing => normName(ing.insumo) === normName(nombre))) refs.push(pn);
+  });
+  return refs;
+}
+function eliminarPlato(nombre) {
+  if (!confirm(`¿Eliminar el plato "${nombre}"? Esta acción no se puede deshacer.`)) return;
+  const idx = platosExtra.findIndex(p => p.nombre === nombre);
+  if (idx >= 0) platosExtra.splice(idx, 1);
+  else if (!platosDeleted.includes(nombre)) platosDeleted.push(nombre);
+  delete recetas[nombre];
+  recipeStack = [];
+  recipeEditMode = false;
+  saveStateDebounced();
+  switchTab('platos');
+}
+function eliminarProduccion(nombre) {
+  const refs = findReferencesToProd(nombre);
+  if (refs.length) {
+    alert(`No se puede eliminar: la usan como ingrediente en ${refs.join(', ')}. Sacala de esas recetas primero.`);
+    return;
+  }
+  if (!confirm(`¿Eliminar la producción "${nombre}"? Esta acción no se puede deshacer.`)) return;
+  const idx = produccionesExtra.indexOf(nombre);
+  if (idx >= 0) produccionesExtra.splice(idx, 1);
+  else if (!produccionesDeleted.includes(nombre)) produccionesDeleted.push(nombre);
+  delete recetas[nombre];
+  delete prodRinde[nombre];
+  removeProdFromMap(nombre);
+  prodStack = [];
+  recipeStack = [];
+  recipeEditMode = false;
+  saveStateDebounced();
+  switchTab('producciones');
+}
+function ensureRecetaOverride(nombre, ctx) {
+  if (!recetas[nombre]) {
+    const base = ctx === 'prod' ? DATA.sub_blocks[nombre] : DATA.plato_ingredients[nombre];
+    recetas[nombre] = base ? base.map(x => ({ ...x })) : [];
+  }
+  return recetas[nombre];
+}
+function getInsumoDatalistHTML() {
+  if (insumoDatalistHTML != null) return insumoDatalistHTML;
+  const insumoOpts = getAllInsumos().map(i => `<option value="${i.nombre}" label="Insumo">`);
+  const prodOpts = getAllProdNames().map(n => `<option value="${n}" label="Producción">`);
+  insumoDatalistHTML = insumoOpts.concat(prodOpts).join('');
+  return insumoDatalistHTML;
+}
+
+const fmt = n => n == null ? '—' : '$' + Math.round(n).toLocaleString('es-AR');
+const fmtDec = n => n == null ? '—' : '$' + n.toFixed(2).replace('.', ',');
+const fmt3 = n => n == null ? '—' : n.toFixed(3).replace('.', ',');
+const pct = n => n == null ? '—' : (n * 100).toFixed(1) + '%';
+const cap = s => (s || '').charAt(0).toUpperCase() + (s || '').slice(1).toLowerCase();
+const safeid = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 50);
+function fcClass(fc) { return fc == null ? 'fc-none' : fc > 0.35 ? 'fc-bad' : fc > 0.30 ? 'fc-warn' : 'fc-ok'; }
+function fcBadge(fc) { return `<span class="fc-badge ${fcClass(fc)}">${pct(fc)}</span>`; }
+
+function getProdKey(insumoNombre) {
+  return prodMapCI[normName(insumoNombre)] || null;
+}
+
+function cantidadBruta(recetaNombre, insumoNombre, cantNeta) {
+  const r = getEffectiveRend(recetaNombre, insumoNombre);
+  if (r.enabled && r.factor > 0 && r.factor < 1) return cantNeta / r.factor;
+  return cantNeta;
+}
+
+function rendRatio(recetaNombre, insumoNombre) {
+  const r = getEffectiveRend(recetaNombre, insumoNombre);
+  if (r.enabled && r.factor > 0 && r.factor < 1) return 1 / r.factor;
+  return 1;
+}
+
+// Costo "horneado": la razón fija cantidad×costo tomada del scrape original.
+// Se usa solo como referencia estructural (no cambia con ediciones en vivo).
+function costoLineaIngBaked(ing) {
+  const unit = (ing.cantidad && ing.costo) ? (ing.costo / ing.cantidad) : 0;
+  return (ing.cantidad || 0) * unit;
+}
+
+function costoProduccionBaked(nombre) {
+  if (prodBaseCost[nombre] != null) return prodBaseCost[nombre];
+  const prod = DATA.sub_blocks[nombre];
+  const total = prod ? prod.reduce((a, ing) => a + costoLineaIngBaked(ing), 0) : 0;
+  prodBaseCost[nombre] = total;
+  return total;
+}
+
+// Qué fracción de una tanda de producción representa esta línea (fijo, basado
+// en las cantidades originales de la receta — no hay dato de "rinde del batch").
+function getProdFraction(ing, prodKey) {
+  if (prodFractionCache.has(ing)) return prodFractionCache.get(ing);
+  const base = costoProduccionBaked(prodKey);
+  const frac = (ing.costo != null && base > 0) ? (ing.costo / base) : null;
+  prodFractionCache.set(ing, frac);
+  return frac;
+}
+
+function costoLineaIng(ing, recetaNombre) {
+  const prodKey = getProdKey(ing.insumo);
+  if (prodKey) {
+    const rinde = prodRinde[prodKey];
+    if (rinde && rinde.cantidad > 0) {
+      const unitCost = costoProduccion(prodKey) / rinde.cantidad;
+      return (ing.cantidad || 0) * unitCost * rendRatio(recetaNombre, ing.insumo);
+    }
+    const frac = getProdFraction(ing, prodKey);
+    if (frac != null) return frac * costoProduccion(prodKey) * rendRatio(recetaNombre, ing.insumo);
+    // Sin rinde cargado ni costo original horneado (línea nueva) — no se puede inferir el costo.
+    const cantB = cantidadBruta(recetaNombre, ing.insumo, ing.cantidad || 0);
+    const unit = (ing.cantidad && ing.costo) ? (ing.costo / ing.cantidad) : 0;
+    return cantB * unit;
+  }
+  const liveKey = insumosPricesCI[normName(ing.insumo)];
+  const liveCosto = liveKey ? insumosPrices[liveKey].costo : null;
+  const unit = liveCosto != null ? liveCosto : ((ing.cantidad && ing.costo) ? (ing.costo / ing.cantidad) : 0);
+  const cantB = cantidadBruta(recetaNombre, ing.insumo, ing.cantidad || 0);
+  return cantB * unit;
+}
+
+function costoPlato(nombre) {
+  const ings = getPlatoIngredients(nombre) || [];
+  return ings.reduce((a, ing) => a + costoLineaIng(ing, nombre), 0);
+}
+
+function costoProduccion(nombre) {
+  const prod = getProdIngredients(nombre);
+  if (!prod) return 0;
+  return prod.reduce((a, ing) => a + costoLineaIng(ing, nombre), 0);
+}
+
+function switchTab(tabName) {
+  if (tabName !== 'recetas' && tabName !== 'producciones') recipeEditMode = false;
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(tabName + '-section').classList.add('active');
+  document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+  if (tabName === 'platos') renderPlatos();
+  else if (tabName === 'recetas') renderRecetas();
+  else if (tabName === 'producciones') renderProducciones();
+  else if (tabName === 'rendimientos') renderRendimientos();
+  else if (tabName === 'insumos') renderInsumos();
+}
+
+// ──── PLATOS ─────────────────────────────────────────────────────────────────
+let platosSearch = '';
+function filterPlatos(val) { platosSearch = val; renderPlatosList(); }
+
+function renderPlatos() {
+  let h = `<div class="header"><div class="title">Platos Finales</div><div class="subtitle">Todos los platos del menú. Clic en un plato para ver su receta.</div></div>`;
+  const categorias = getAllCategorias();
+  h += `<div class="detail-panel" style="margin-bottom:20px;padding:16px;"><div class="sim-cell" style="flex-wrap:wrap;">
+    <input class="ins-input" style="width:220px;" type="text" id="new-plato-nombre" placeholder="Nombre del plato nuevo">
+    <select class="ins-input" id="new-plato-categoria">${Object.keys(categorias).map(c=>`<option value="${c}">${cap(c)}</option>`).join('')}</select>
+    <input class="ins-input" type="number" id="new-plato-venta" placeholder="Precio venta (opcional)">
+    <button class="btn" onclick="crearPlato()">+ Nuevo plato</button>
+  </div></div>`;
+  h += `<div class="sim-cell" style="margin-bottom:16px;"><input class="ins-input" style="width:280px;" type="text" placeholder="Buscar plato..." value="${platosSearch}" oninput="filterPlatos(this.value)"><button class="btn" onclick="exportPlatosCSV()">⬇ Descargar reporte (CSV)</button></div>`;
+  h += `<div id="platos-list"></div>`;
+  document.getElementById('platos-section').innerHTML = h;
+  renderPlatosList();
+}
+
+function exportPlatosCSV() {
+  const rows = [['Categoría', 'Plato', 'Costo s/IVA', 'Precio Venta', 'Food Cost %']];
+  Object.entries(getAllCategorias()).forEach(([c, pn]) => {
+    pn.forEach(nm => {
+      const p = getPlatoMeta(nm); if (!p) return;
+      const hasR = getPlatoIngredients(nm) != null;
+      const costoCalc = hasR ? costoPlato(nm) : p.costo;
+      const fcCalc = p.venta ? costoCalc / p.venta : null;
+      rows.push([cap(c), nm, Math.round(costoCalc || 0), p.venta != null ? Math.round(p.venta) : '', fcCalc != null ? (fcCalc * 100).toFixed(1) : '']);
+    });
+  });
+  const csv = rows.map(r => r.map(cell => {
+    const s = String(cell == null ? '' : cell);
+    return /[",;\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }).join(';')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `farda_platos_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function renderPlatosList() {
+  const term = normName(platosSearch);
+  let h = '';
+  for(const[c,pn] of Object.entries(getAllCategorias())){
+    const filtered = term ? pn.filter(nm => normName(nm).includes(term)) : pn;
+    if (!filtered.length) continue;
+    h += `<div class="cat-header">${cap(c)}</div><div class="table-container"><table><thead><tr><th>Plato</th><th class="right">Costo s/IVA</th><th class="right">Venta actual</th><th class="right">Food Cost</th><th class="right">Simular nuevo precio</th></tr></thead><tbody>`;
+    filtered.forEach(nm=>{
+      const p=getPlatoMeta(nm); if(!p)return;
+      const sId='sim_'+safeid(nm), sfId=sId+'_fc', hasR=getPlatoIngredients(nm)!=null;
+      const costoCalc = hasR ? costoPlato(nm) : p.costo;
+      const fcCalc = p.venta ? costoCalc / p.venta : null;
+      h+=`<tr><td class="td-name" onclick="openRecipe('plato','${nm}')">${nm}</td><td class="td-num">${fmt(costoCalc)}</td><td class="td-num">${fmt(p.venta)}</td><td class="td-num">${fcBadge(fcCalc)}</td><td class="td-num"><div class="sim-cell"><input class="sim-input" type="number" id="${sId}" placeholder="nuevo $" data-costo="${costoCalc}" oninput="updateSimFC(this)"><span class="sim-fc fc-none" id="${sfId}">—</span></div></td></tr>`;
+    });
+    h+=`</tbody></table></div>`;
+  }
+  if (!h) h = `<div style="padding:20px;background:var(--bg-alt);border:1px solid var(--border);border-radius:8px;color:var(--text-sec);">Sin resultados.</div>`;
+  document.getElementById('platos-list').innerHTML = h;
+}
+
+function crearPlato() {
+  const nombreEl = document.getElementById('new-plato-nombre');
+  const nombre = nombreEl.value.trim();
+  if (!nombre) return;
+  if (platoExists(nombre)) { alert('Ya existe un plato con ese nombre.'); return; }
+  const categoria = document.getElementById('new-plato-categoria').value;
+  const ventaRaw = document.getElementById('new-plato-venta').value;
+  platosExtra.push({ nombre, categoria, venta: ventaRaw ? parseFloat(ventaRaw) : null });
+  recetas[nombre] = [];
+  saveStateDebounced();
+  openRecipe('plato', nombre, true);
+}
+
+function crearProduccion() {
+  const nombreEl = document.getElementById('new-prod-nombre');
+  const nombre = nombreEl.value.trim();
+  if (!nombre) return;
+  if (prodExists(nombre)) { alert('Ya existe una producción con ese nombre.'); return; }
+  produccionesExtra.push(nombre);
+  prodMapCI[normName(nombre)] = nombre;
+  recetas[nombre] = [];
+  saveStateDebounced();
+  openProd(nombre, true);
+}
+
+function updateSimFC(e) {
+  const v=parseFloat(e.value), c=parseFloat(e.dataset.costo), fc=document.getElementById(e.id+'_fc');
+  if(!v||!c){ fc.className='sim-fc fc-none'; fc.textContent='—'; return; }
+  const f=c/v; fc.className='sim-fc '+fcClass(f); fc.textContent=pct(f);
+}
+
+// ──── RECETAS ─────────────────────────────────────────────────────────────────
+let recipeStack = [];
+function openRecipe(type, name, edit) { recipeStack = [{ type, name }]; recipeEditMode = !!edit; switchTab('recetas'); }
+function pushRecipe(type, name) { recipeStack.push({ type, name }); renderRecetas(); }
+function popToIndex(idx) { recipeStack = recipeStack.slice(0, idx + 1); renderRecetas(); }
+
+let recetasSearch = '';
+function filterRecetas(val) { recetasSearch = val; renderRecetasList(); }
+
+function renderRecetasList() {
+  const term = normName(recetasSearch);
+  let h = '';
+  for(const[c,pn] of Object.entries(getAllCategorias())){
+    const filtered = term ? pn.filter(nm => normName(nm).includes(term)) : pn;
+    if (!filtered.length) continue;
+    h += `<div class="cat-header">${cap(c)}</div><div class="table-container"><table><thead><tr><th>Plato</th><th class="right">Costo total</th><th class="right">Venta</th><th class="right">Food Cost</th></tr></thead><tbody>`;
+    filtered.forEach(nm=>{
+      const p=getPlatoMeta(nm); if(!p)return;
+      const hasR=getPlatoIngredients(nm)!=null;
+      const costoCalc = hasR ? costoPlato(nm) : p.costo;
+      const fcCalc = p.venta ? costoCalc / p.venta : null;
+      h+=`<tr><td class="td-name" onclick="openRecipe('plato','${nm}')">${nm}</td><td class="td-num">${fmt(costoCalc)}</td><td class="td-num">${fmt(p.venta)}</td><td class="td-num">${fcBadge(fcCalc)}</td></tr>`;
+    });
+    h+=`</tbody></table></div>`;
+  }
+  if (!h) h = `<div style="padding:20px;background:var(--bg-alt);border:1px solid var(--border);border-radius:8px;color:var(--text-sec);">Sin resultados.</div>`;
+  document.getElementById('recetas-list').innerHTML = h;
+}
+
+function renderRecetas() {
+  let h = `<div class="header"><div class="title">Recetas</div><div class="subtitle">Clic en un plato para ver su receta. Si hay producciones, clic para entrar a su sub-receta.</div></div>`;
+  if (recipeStack.length === 0) {
+    h += `<div class="sim-cell" style="margin-bottom:16px;"><input class="ins-input" style="width:280px;" type="text" placeholder="Buscar plato..." value="${recetasSearch}" oninput="filterRecetas(this.value)"></div>`;
+    h += `<div id="recetas-list"></div>`;
+    document.getElementById('recetas-section').innerHTML = h;
+    renderRecetasList();
+    return;
+  } else {
+    h += '<div class="crumbs"><span class="crumb" onclick="recipeStack=[];recipeEditMode=false;renderRecetas()">Todas las recetas</span>';
+    recipeStack.forEach((item, idx) => {
+      h += '<span class="crumb-sep">/</span>';
+      const isLast = idx === recipeStack.length - 1;
+      h += `<span class="crumb ${isLast?'active':''}" ${!isLast?`onclick="popToIndex(${idx})"`:''}>${item.name}</span>`;
+    });
+    h += '</div>';
+    if (recipeStack.length > 1) {
+      const prev = recipeStack[recipeStack.length - 2];
+      h += `<button class="back-btn" onclick="popToIndex(${recipeStack.length - 2})">← Volver a ${prev.name}</button>`;
+    } else {
+      h += `<button class="back-btn" onclick="recipeStack=[];recipeEditMode=false;renderRecetas()">← Volver a la lista</button>`;
+    }
+    const current = recipeStack[recipeStack.length - 1];
+    if (current.type === 'plato') h += renderDetail(current.name, 'plato');
+    else h += renderDetail(current.name, 'prod');
+  }
+  document.getElementById('recetas-section').innerHTML = h;
+}
+
+function renderDetail(nm, type) {
+  let ings, venta=null, metaText;
+  const ctx = type === 'plato' ? 'plato' : 'prod-recetas';
+  if (type === 'plato') {
+    const p = getPlatoMeta(nm);
+    if (!p) return '<div style="padding:20px;">No encontrado</div>';
+    ings = getPlatoIngredients(nm) || [];
+    venta = p.venta;
+    metaText = 'Plato';
+  } else {
+    ings = getProdIngredients(nm);
+    if (!ings) return '<div style="padding:20px;">Producción no encontrada</div>';
+    metaText = 'Producción';
+  }
+
+  let tc = 0, ir = '';
+  ings.forEach((ing, idx) => {
+    const prodKey = getProdKey(ing.insumo);
+    const isProd = prodKey != null;
+    const liveKey = insumosPricesCI[normName(ing.insumo)];
+    const unit = !isProd && liveKey ? insumosPrices[liveKey].costo : ((ing.cantidad && ing.costo) ? (ing.costo / ing.cantidad) : 0);
+    const cantB = cantidadBruta(nm, ing.insumo, ing.cantidad || 0);
+    const cl = costoLineaIng(ing, nm);
+    tc += cl;
+
+    const r = getEffectiveRend(nm, ing.insumo);
+    const hasMerma = r.enabled && r.factor > 0 && r.factor < 1;
+    const isOverride = !!(recetaRendimientos[nm] && recetaRendimientos[nm][ing.insumo]);
+
+    const nameCell = isProd
+      ? `<span class="ing-name clickable" onclick="pushRecipe('prod','${prodKey}')">${ing.insumo}</span><span class="ing-prod-tag">PRODUCCIÓN</span>`
+      : `<span class="ing-name">${ing.insumo}</span>`;
+
+    let cantCell;
+    if (recipeEditMode) {
+      cantCell = `<input class="rend-input-inline" style="width:70px;" type="number" step="any" value="${ing.cantidad != null ? ing.cantidad : ''}" oninput="updateIngCantidad('${nm}', ${idx}, this.value, '${ctx}')">`;
+    } else {
+      cantCell = `${ing.cantidad != null ? ing.cantidad : '?'}`;
+      if (hasMerma && ing.cantidad) cantCell += `<span class="qty-bruta">compra ${fmt3(cantB)}</span>`;
+    }
+
+    let unidadCell;
+    if (recipeEditMode) {
+      unidadCell = `<select class="ins-input" onchange="updateIngUnidad('${nm}', ${idx}, this.value, '${ctx}')">
+        <option value="KG" ${ing.unidad==='KG'?'selected':''}>KG</option>
+        <option value="LT" ${ing.unidad==='LT'?'selected':''}>LT</option>
+        <option value="UNIDAD" ${ing.unidad==='UNIDAD'?'selected':''}>UNIDAD</option>
+      </select>`;
+    } else {
+      unidadCell = ing.unidad;
+    }
+
+    let costCell;
+    if (hasMerma && unit > 0) {
+      costCell = `${fmtDec(unit / r.factor)}/${(ing.unidad||'').toLowerCase()}`;
+      if (ing.cantidad != null) costCell += `<span class="usable-price">por receta ${fmtDec(cl)}</span>`;
+    } else {
+      costCell = ing.cantidad != null ? fmtDec(cl) : '—';
+    }
+
+    const delCell = recipeEditMode ? `<td class="td-center"><button class="logout-btn" style="padding:4px 8px;" onclick="removeIngLine('${nm}', ${idx}, '${ctx}')">🗑</button></td>` : '';
+    const clearLink = isOverride ? `<button class="logout-btn" style="padding:1px 5px;font-size:9px;" onclick="clearRecetaRend('${nm}','${ing.insumo}','${ctx}')" title="Usar el rendimiento general del insumo">↺ general</button>` : '';
+
+    ir += `<tr>
+      <td>${nameCell}</td>
+      <td class="ing-qty">${cantCell}</td>
+      <td class="ing-qty">${unidadCell}</td>
+      <td class="td-center">
+        <div class="rend-toggle">
+          <label class="switch"><input type="checkbox" ${r.enabled?'checked':''} onchange="toggleRecetaRend('${nm}','${ing.insumo}', this.checked, '${ctx}')"><span class="slider"></span></label>
+          <input class="rend-input-inline" type="number" value="${r.factor!=null&&r.factor<1?Math.round(r.factor*100):(r.enabled?100:'')}" placeholder="%" ${!r.enabled?'disabled':''} oninput="setRecetaRend('${nm}','${ing.insumo}', this.value, '${ctx}')">
+          <span style="font-size:10px;color:var(--text-ter);">%</span>
+          ${clearLink}
+        </div>
+      </td>
+      <td class="ing-cost">${costCell}</td>
+      ${delCell}
+    </tr>`;
+  });
+
+  let addRow = '';
+  if (recipeEditMode) {
+    const aid = 'addln_' + safeid(nm);
+    addRow = `<tr>
+      <td><input class="ins-input" style="width:100%;" list="insumo-datalist" id="${aid}_insumo" placeholder="Nombre del insumo/producción" oninput="autofillUnidad('${aid}')"></td>
+      <td class="ing-qty"><input class="rend-input-inline" style="width:70px;" type="number" step="any" id="${aid}_cant" placeholder="cant."></td>
+      <td class="ing-qty"><select class="ins-input" id="${aid}_unidad"><option value="KG">KG</option><option value="LT">LT</option><option value="UNIDAD">UNIDAD</option></select></td>
+      <td></td>
+      <td colspan="2" class="td-center"><button class="btn" onclick="addIngLine('${nm}', '${ctx}')">Agregar</button></td>
+    </tr>`;
+  }
+
+  const fc = venta ? tc / venta : null;
+  let summary = `<div class="cost-summary"><div><div class="cost-item-label">Costo total</div><div class="cost-item-value teal">${fmt(tc)}</div></div>`;
+  if (venta != null) summary += `<div><div class="cost-item-label">Precio venta</div><div class="cost-item-value">${fmt(venta)}</div></div>`;
+  if (fc != null) summary += `<div><div class="cost-item-label">Food Cost</div><div class="cost-item-value">${fcBadge(fc)}</div></div>`;
+  if (type === 'prod' && prodRinde[nm] && prodRinde[nm].cantidad > 0) {
+    summary += `<div><div class="cost-item-label">Costo por 1 ${prodRinde[nm].unidad}</div><div class="cost-item-value teal">${fmt(tc / prodRinde[nm].cantidad)}</div></div>`;
+  }
+  summary += `</div>`;
+
+  const colLabel = type === 'plato' ? 'Insumo / Producción' : 'Insumo';
+  const editBtn = `<button class="back-btn" onclick="recipeEditMode=!recipeEditMode;renderRecetas()">${recipeEditMode ? '✓ Listo de editar' : '✎ Editar receta'}</button>`;
+  const deleteBtn = type === 'plato'
+    ? `<button class="logout-btn" style="margin-left:8px;" onclick="eliminarPlato('${nm}')">🗑 Eliminar plato</button>`
+    : `<button class="logout-btn" style="margin-left:8px;" onclick="eliminarProduccion('${nm}')">🗑 Eliminar producción</button>`;
+
+  let rindeBlock = '';
+  if (type === 'prod') {
+    const rinde = prodRinde[nm];
+    const sid = safeid(nm);
+    if (recipeEditMode) {
+      rindeBlock = `<div class="sim-cell" style="margin-bottom:16px;">
+        <span style="font-size:12px;color:var(--text-sec);">Rinde este lote:</span>
+        <input class="rend-input-inline" style="width:70px;" type="number" step="any" id="${sid}_rinde_cant" value="${rinde ? rinde.cantidad : ''}" oninput="setProdRinde('${nm}', this.value, document.getElementById('${sid}_rinde_unidad').value)">
+        <select class="ins-input" id="${sid}_rinde_unidad" onchange="setProdRinde('${nm}', document.getElementById('${sid}_rinde_cant').value, this.value)">
+          <option value="KG" ${rinde&&rinde.unidad==='KG'?'selected':''}>KG</option>
+          <option value="LT" ${rinde&&rinde.unidad==='LT'?'selected':''}>LT</option>
+          <option value="UNIDAD" ${rinde&&rinde.unidad==='UNIDAD'?'selected':''}>UNIDAD</option>
+        </select>
+      </div>`;
+    } else if (rinde) {
+      rindeBlock = `<div class="detail-meta">Rinde: ${rinde.cantidad} ${rinde.unidad}</div>`;
+    }
+  }
+
+  return `<div class="detail-panel">
+    <div class="detail-title">${nm}</div>
+    <div class="detail-meta">${metaText}</div>
+    ${rindeBlock}
+    ${editBtn}${deleteBtn}
+    <datalist id="insumo-datalist">${getInsumoDatalistHTML()}</datalist>
+    <table class="ing-table">
+      <thead><tr><th>${colLabel}</th><th class="right">Cant. receta</th><th class="right">Unidad</th><th class="center">Rendimiento</th><th class="right">Costo línea</th>${recipeEditMode?'<th></th>':''}</tr></thead>
+      <tbody>${ir}${addRow}</tbody>
+    </table>
+    ${summary}
+  </div>`;
+}
+
+function toggleRend(nombre, enabled, ctx) {
+  if (!rendimientos[nombre]) rendimientos[nombre] = { enabled: false, factor: 1 };
+  rendimientos[nombre].enabled = enabled;
+  if (enabled && (!rendimientos[nombre].factor || rendimientos[nombre].factor >= 1)) rendimientos[nombre].factor = 1;
+  rerender(ctx);
+  saveStateDebounced();
+}
+
+function setRend(nombre, val, ctx) {
+  if (!rendimientos[nombre]) rendimientos[nombre] = { enabled: true, factor: 1 };
+  const f = parseFloat(val) / 100;
+  rendimientos[nombre].factor = (f > 0 && f <= 1) ? f : 1;
+  clearTimeout(window._rt);
+  window._rt = setTimeout(() => rerender(ctx), 600);
+  saveStateDebounced();
+}
+
+function rerender(ctx) {
+  if (ctx === 'prod-producciones') renderProducciones();
+  else if (ctx === 'insumos') renderInsumosTable();
+  else renderRecetas();
+}
+
+function entityKind(ctx) { return ctx === 'plato' ? 'plato' : 'prod'; }
+
+// Rendimiento específico de una receta/producción (no toca el general del insumo).
+function toggleRecetaRend(receta, nombre, enabled, ctx) {
+  if (!recetaRendimientos[receta]) recetaRendimientos[receta] = {};
+  const cur = { ...getEffectiveRend(receta, nombre) };
+  cur.enabled = enabled;
+  if (enabled && (!cur.factor || cur.factor >= 1)) cur.factor = 1;
+  recetaRendimientos[receta][nombre] = cur;
+  rerender(ctx);
+  saveStateDebounced();
+}
+
+function setRecetaRend(receta, nombre, val, ctx) {
+  if (!recetaRendimientos[receta]) recetaRendimientos[receta] = {};
+  const cur = recetaRendimientos[receta][nombre] || { enabled: true, factor: 1 };
+  const f = parseFloat(val) / 100;
+  cur.enabled = true;
+  cur.factor = (f > 0 && f <= 1) ? f : 1;
+  recetaRendimientos[receta][nombre] = cur;
+  clearTimeout(window._rt);
+  window._rt = setTimeout(() => rerender(ctx), 600);
+  saveStateDebounced();
+}
+
+function clearRecetaRend(receta, nombre, ctx) {
+  if (recetaRendimientos[receta]) delete recetaRendimientos[receta][nombre];
+  rerender(ctx);
+  saveStateDebounced();
+}
+
+function updateIngCantidad(nombre, idx, val, ctx) {
+  const arr = ensureRecetaOverride(nombre, entityKind(ctx));
+  if (!arr[idx]) return;
+  const v = parseFloat(val);
+  arr[idx].cantidad = isNaN(v) ? null : v;
+  clearTimeout(window._rtq);
+  window._rtq = setTimeout(() => rerender(ctx), 600);
+  saveStateDebounced();
+}
+
+function updateIngUnidad(nombre, idx, val, ctx) {
+  const arr = ensureRecetaOverride(nombre, entityKind(ctx));
+  if (!arr[idx]) return;
+  arr[idx].unidad = val;
+  rerender(ctx);
+  saveStateDebounced();
+}
+
+function removeIngLine(nombre, idx, ctx) {
+  const arr = ensureRecetaOverride(nombre, entityKind(ctx));
+  arr.splice(idx, 1);
+  rerender(ctx);
+  saveStateDebounced();
+}
+
+function autofillUnidad(aid) {
+  const insumoEl = document.getElementById(aid + '_insumo');
+  const unidadEl = document.getElementById(aid + '_unidad');
+  const val = insumoEl.value.trim();
+  if (!val) return;
+  const liveKey = insumosPricesCI[normName(val)];
+  if (liveKey && insumosPrices[liveKey].unidad) { unidadEl.value = insumosPrices[liveKey].unidad; return; }
+  const prodKey = getProdKey(val);
+  if (prodKey && prodRinde[prodKey]) unidadEl.value = prodRinde[prodKey].unidad;
+}
+
+function addIngLine(nombre, ctx) {
+  const prefix = 'addln_' + safeid(nombre);
+  const insumoEl = document.getElementById(prefix + '_insumo');
+  const cantEl = document.getElementById(prefix + '_cant');
+  const unidadEl = document.getElementById(prefix + '_unidad');
+  const insumo = insumoEl.value.trim();
+  const cantidad = parseFloat(cantEl.value);
+  if (!insumo || isNaN(cantidad)) return;
+  const esProd = getProdKey(insumo) != null;
+  const esInsumo = insumosPricesCI[normName(insumo)] != null;
+  if (!esProd && !esInsumo) {
+    if (!confirm(`No encontré ningún insumo ni producción llamado exactamente "${insumo}". El costo de esta línea va a dar $0 hasta que el nombre coincida exacto con uno existente. ¿Agregar igual?`)) return;
+  }
+  const arr = ensureRecetaOverride(nombre, entityKind(ctx));
+  arr.push({ insumo, unidad: unidadEl.value, cantidad });
+  rerender(ctx);
+  saveStateDebounced();
+}
+
+function setProdRinde(nombre, cantidadVal, unidad) {
+  const v = parseFloat(cantidadVal);
+  if (isNaN(v) || v <= 0) delete prodRinde[nombre];
+  else prodRinde[nombre] = { cantidad: v, unidad };
+  clearTimeout(window._rtr);
+  window._rtr = setTimeout(() => { renderRecetas(); renderProducciones(); }, 600);
+  saveStateDebounced();
+}
+
+// ──── PRODUCCIONES ───────────────────────────────────────────────────────────
+let prodStack = [];
+let produccionesSearch = '';
+function filterProducciones(val) { produccionesSearch = val; renderProduccionesList(); }
+
+function renderProduccionesList() {
+  const term = normName(produccionesSearch);
+  const names = term ? getAllProdNames().filter(nm => normName(nm).includes(term)) : getAllProdNames();
+  let h;
+  if (!names.length) {
+    h = `<div style="padding:20px;background:var(--bg-alt);border:1px solid var(--border);border-radius:8px;color:var(--text-sec);">Sin resultados.</div>`;
+  } else {
+    h = '<div class="table-container"><table><thead><tr><th>Producción</th><th class="right">Costo de lote</th><th class="right">Ingredientes</th></tr></thead><tbody>';
+    names.forEach(nm => {
+      const ings = getProdIngredients(nm) || [];
+      const tc = costoProduccion(nm);
+      const usaSubProd = ings.some(ing => getProdKey(ing.insumo) != null);
+      const tag = usaSubProd ? `<span class="ing-prod-tag">usa producciones</span>` : '';
+      h += `<tr><td class="td-name" onclick="openProd('${nm}')">${nm}${tag}</td><td class="td-num">${fmt(tc)}</td><td class="td-num">${ings.length}</td></tr>`;
+    });
+    h += '</tbody></table></div>';
+  }
+  document.getElementById('producciones-list').innerHTML = h;
+}
+
+function renderProducciones() {
+  let h = `<div class="header"><div class="title">Producciones</div><div class="subtitle">Sub-recetas y preparaciones base. Clic para ver el detalle.</div></div>`;
+  if (prodStack.length === 0) {
+    h += `<div class="detail-panel" style="margin-bottom:20px;padding:16px;"><div class="sim-cell">
+      <input class="ins-input" style="width:260px;" type="text" id="new-prod-nombre" placeholder="Nombre de la producción nueva">
+      <button class="btn" onclick="crearProduccion()">+ Nueva producción</button>
+    </div></div>`;
+    h += `<div class="sim-cell" style="margin-bottom:16px;"><input class="ins-input" style="width:280px;" type="text" placeholder="Buscar producción..." value="${produccionesSearch}" oninput="filterProducciones(this.value)"></div>`;
+    h += `<div id="producciones-list"></div>`;
+    document.getElementById('producciones-section').innerHTML = h;
+    renderProduccionesList();
+    return;
+  } else {
+    h += '<div class="crumbs"><span class="crumb" onclick="prodStack=[];recipeEditMode=false;renderProducciones()">Todas las producciones</span>';
+    prodStack.forEach((item, idx) => {
+      h += '<span class="crumb-sep">/</span>';
+      const isLast = idx === prodStack.length - 1;
+      h += `<span class="crumb ${isLast?'active':''}" ${!isLast?`onclick="prodStack=prodStack.slice(0,${idx+1});renderProducciones()"`:''}>${item}</span>`;
+    });
+    h += '</div>';
+    if (prodStack.length > 1) h += `<button class="back-btn" onclick="prodStack=prodStack.slice(0,${prodStack.length-1});renderProducciones()">← Volver a ${prodStack[prodStack.length-2]}</button>`;
+    else h += `<button class="back-btn" onclick="prodStack=[];recipeEditMode=false;renderProducciones()">← Volver a la lista</button>`;
+    h += renderProdDetailTab(prodStack[prodStack.length - 1]);
+  }
+  document.getElementById('producciones-section').innerHTML = h;
+}
+function openProd(nm, edit) { prodStack = [nm]; recipeEditMode = !!edit; renderProducciones(); }
+function pushProd(nm) { prodStack.push(nm); renderProducciones(); }
+
+function renderProdDetailTab(nm) {
+  const prod = getProdIngredients(nm);
+  if (!prod) return '<div style="padding:20px;">Producción no encontrada</div>';
+  const ctx = 'prod-producciones';
+  let tc=0, ir='';
+  prod.forEach((ing, idx) => {
+    const prodKey = getProdKey(ing.insumo);
+    const isSubProd = prodKey != null;
+    const liveKey = insumosPricesCI[normName(ing.insumo)];
+    const unit = !isSubProd && liveKey ? insumosPrices[liveKey].costo : ((ing.cantidad && ing.costo) ? (ing.costo / ing.cantidad) : 0);
+    const cantB = cantidadBruta(nm, ing.insumo, ing.cantidad || 0);
+    const cl = costoLineaIng(ing, nm);
+    tc += cl;
+    const r = getEffectiveRend(nm, ing.insumo);
+    const hasMerma = r.enabled && r.factor > 0 && r.factor < 1;
+    const isOverride = !!(recetaRendimientos[nm] && recetaRendimientos[nm][ing.insumo]);
+    const nameCell = isSubProd
+      ? `<span class="ing-name clickable" onclick="pushProd('${prodKey}')">${ing.insumo}</span><span class="ing-prod-tag">PRODUCCIÓN</span>`
+      : `<span class="ing-name">${ing.insumo}</span>`;
+    let cantCell;
+    if (recipeEditMode) {
+      cantCell = `<input class="rend-input-inline" style="width:70px;" type="number" step="any" value="${ing.cantidad != null ? ing.cantidad : ''}" oninput="updateIngCantidad('${nm}', ${idx}, this.value, '${ctx}')">`;
+    } else {
+      cantCell = `${ing.cantidad != null ? ing.cantidad : '?'}`;
+      if (hasMerma && ing.cantidad) cantCell += `<span class="qty-bruta">compra ${fmt3(cantB)}</span>`;
+    }
+    let unidadCell;
+    if (recipeEditMode) {
+      unidadCell = `<select class="ins-input" onchange="updateIngUnidad('${nm}', ${idx}, this.value, '${ctx}')">
+        <option value="KG" ${ing.unidad==='KG'?'selected':''}>KG</option>
+        <option value="LT" ${ing.unidad==='LT'?'selected':''}>LT</option>
+        <option value="UNIDAD" ${ing.unidad==='UNIDAD'?'selected':''}>UNIDAD</option>
+      </select>`;
+    } else {
+      unidadCell = ing.unidad;
+    }
+    let costCell;
+    if (hasMerma && unit > 0) {
+      costCell = `${fmtDec(unit / r.factor)}/${(ing.unidad||'').toLowerCase()}`;
+      if (ing.cantidad != null) costCell += `<span class="usable-price">por receta ${fmtDec(cl)}</span>`;
+    } else {
+      costCell = ing.cantidad != null ? fmtDec(cl) : '—';
+    }
+    const delCell = recipeEditMode ? `<td class="td-center"><button class="logout-btn" style="padding:4px 8px;" onclick="removeIngLine('${nm}', ${idx}, '${ctx}')">🗑</button></td>` : '';
+    const clearLink = isOverride ? `<button class="logout-btn" style="padding:1px 5px;font-size:9px;" onclick="clearRecetaRend('${nm}','${ing.insumo}','${ctx}')" title="Usar el rendimiento general del insumo">↺ general</button>` : '';
+    ir += `<tr>
+      <td>${nameCell}</td>
+      <td class="ing-qty">${cantCell}</td>
+      <td class="ing-qty">${unidadCell}</td>
+      <td class="td-center">
+        <div class="rend-toggle">
+          <label class="switch"><input type="checkbox" ${r.enabled?'checked':''} onchange="toggleRecetaRend('${nm}','${ing.insumo}', this.checked, '${ctx}')"><span class="slider"></span></label>
+          <input class="rend-input-inline" type="number" value="${r.factor!=null&&r.factor<1?Math.round(r.factor*100):(r.enabled?100:'')}" placeholder="%" ${!r.enabled?'disabled':''} oninput="setRecetaRend('${nm}','${ing.insumo}', this.value, '${ctx}')">
+          <span style="font-size:10px;color:var(--text-ter);">%</span>
+          ${clearLink}
+        </div>
+      </td>
+      <td class="ing-cost">${costCell}</td>
+      ${delCell}
+    </tr>`;
+  });
+
+  let addRow = '';
+  if (recipeEditMode) {
+    const aid = 'addln_' + safeid(nm);
+    addRow = `<tr>
+      <td><input class="ins-input" style="width:100%;" list="insumo-datalist" id="${aid}_insumo" placeholder="Nombre del insumo/producción" oninput="autofillUnidad('${aid}')"></td>
+      <td class="ing-qty"><input class="rend-input-inline" style="width:70px;" type="number" step="any" id="${aid}_cant" placeholder="cant."></td>
+      <td class="ing-qty"><select class="ins-input" id="${aid}_unidad"><option value="KG">KG</option><option value="LT">LT</option><option value="UNIDAD">UNIDAD</option></select></td>
+      <td></td>
+      <td colspan="2" class="td-center"><button class="btn" onclick="addIngLine('${nm}', '${ctx}')">Agregar</button></td>
+    </tr>`;
+  }
+
+  const editBtn = `<button class="back-btn" onclick="recipeEditMode=!recipeEditMode;renderProducciones()">${recipeEditMode ? '✓ Listo de editar' : '✎ Editar receta'}</button>`;
+  const deleteBtn = `<button class="logout-btn" style="margin-left:8px;" onclick="eliminarProduccion('${nm}')">🗑 Eliminar producción</button>`;
+  const rinde = prodRinde[nm];
+  const sid = safeid(nm);
+  let rindeBlock;
+  if (recipeEditMode) {
+    rindeBlock = `<div class="sim-cell" style="margin-bottom:16px;">
+      <span style="font-size:12px;color:var(--text-sec);">Rinde este lote:</span>
+      <input class="rend-input-inline" style="width:70px;" type="number" step="any" id="${sid}_rinde_cant" value="${rinde ? rinde.cantidad : ''}" oninput="setProdRinde('${nm}', this.value, document.getElementById('${sid}_rinde_unidad').value)">
+      <select class="ins-input" id="${sid}_rinde_unidad" onchange="setProdRinde('${nm}', document.getElementById('${sid}_rinde_cant').value, this.value)">
+        <option value="KG" ${rinde&&rinde.unidad==='KG'?'selected':''}>KG</option>
+        <option value="LT" ${rinde&&rinde.unidad==='LT'?'selected':''}>LT</option>
+        <option value="UNIDAD" ${rinde&&rinde.unidad==='UNIDAD'?'selected':''}>UNIDAD</option>
+      </select>
+    </div>`;
+  } else {
+    rindeBlock = rinde ? `<div class="detail-meta">Rinde: ${rinde.cantidad} ${rinde.unidad}</div>` : '';
+  }
+
+  let summary = `<div class="cost-summary"><div><div class="cost-item-label">Costo de lote</div><div class="cost-item-value teal">${fmt(tc)}</div></div>`;
+  if (rinde && rinde.cantidad > 0) {
+    summary += `<div><div class="cost-item-label">Costo por 1 ${rinde.unidad}</div><div class="cost-item-value teal">${fmt(tc / rinde.cantidad)}</div></div>`;
+  }
+  summary += `</div>`;
+  return `<div class="detail-panel"><div class="detail-title">${nm}</div><div class="detail-meta">Producción</div>${rindeBlock}${editBtn}${deleteBtn}<datalist id="insumo-datalist">${getInsumoDatalistHTML()}</datalist><table class="ing-table"><thead><tr><th>Insumo</th><th class="right">Cant. receta</th><th class="right">Unidad</th><th class="center">Rendimiento</th><th class="right">Costo línea</th>${recipeEditMode?'<th></th>':''}</tr></thead><tbody>${ir}${addRow}</tbody></table>${summary}</div>`;
+}
+
+// ──── RENDIMIENTOS ───────────────────────────────────────────────────────────
+function renderRendimientos() {
+  let h = `<div class="header"><div class="title">Rendimientos activos</div><div class="subtitle">Generales por insumo (se cargan desde INSUMOS) y específicos por receta/producción.</div></div>`;
+  const activos = Object.entries(rendimientos).filter(([k,v]) => v.enabled);
+  h += `<div class="cat-header">Generales (todas las recetas)</div>`;
+  if (activos.length === 0) {
+    h += `<div style="padding: 20px; background: var(--bg-alt); border: 1px solid var(--border); border-radius: 8px; color: var(--text-sec);">Sin rendimientos generales activos.</div>`;
+  } else {
+    h += '<div class="table-container"><table><thead><tr><th>Insumo</th><th class="right">Rinde</th><th class="right">Por cada 1 usable, comprás</th></tr></thead><tbody>';
+    activos.forEach(([nombre, v]) => {
+      const comprar = v.factor > 0 ? (1/v.factor) : 1;
+      h += `<tr><td class="ing-name">${nombre}</td><td class="td-num">${Math.round(v.factor*100)}%</td><td class="td-num">${comprar.toFixed(3).replace('.',',')}</td></tr>`;
+    });
+    h += '</tbody></table></div>';
+  }
+
+  const overrides = [];
+  Object.entries(recetaRendimientos).forEach(([receta, insumos]) => {
+    Object.entries(insumos || {}).forEach(([insumo, v]) => {
+      if (v && v.enabled) overrides.push({ receta, insumo, v });
+    });
+  });
+  h += `<div class="cat-header">Específicos por receta/producción</div>`;
+  if (overrides.length === 0) {
+    h += `<div style="padding: 20px; background: var(--bg-alt); border: 1px solid var(--border); border-radius: 8px; color: var(--text-sec);">Sin overrides específicos.</div>`;
+  } else {
+    h += '<div class="table-container"><table><thead><tr><th>Receta/producción</th><th>Insumo</th><th class="right">Rinde</th><th class="right">Por cada 1 usable, comprás</th></tr></thead><tbody>';
+    overrides.forEach(({ receta, insumo, v }) => {
+      const comprar = v.factor > 0 ? (1/v.factor) : 1;
+      h += `<tr><td class="ing-name">${receta}</td><td class="ing-name">${insumo}</td><td class="td-num">${Math.round(v.factor*100)}%</td><td class="td-num">${comprar.toFixed(3).replace('.',',')}</td></tr>`;
+    });
+    h += '</tbody></table></div>';
+  }
+  document.getElementById('rendimientos-section').innerHTML = h;
+}
+
+// ──── INSUMOS (simplificado: sin filtros) ────────────────────────────────────
+let insumosSearch = '';
+function filterInsumos(val) { insumosSearch = val; renderInsumosTable(); }
+
+function renderInsumos() {
+  let h = `<div class="header"><div class="title">Maestro de Insumos</div><div class="subtitle">Todos los insumos. Selecciona IVA y actualiza precios.</div></div>`;
+  h += `<div class="detail-panel" style="margin-bottom:20px;padding:16px;"><div class="sim-cell" style="flex-wrap:wrap;">
+    <input class="ins-input" style="width:220px;" type="text" id="new-insumo-nombre" placeholder="Nombre del insumo nuevo">
+    <select class="ins-input" id="new-insumo-unidad"><option value="KG">KG</option><option value="LT">LT</option><option value="UNIDAD">UNIDAD</option></select>
+    <input class="ins-input" type="number" id="new-insumo-costo" placeholder="Costo sin IVA">
+    <button class="btn" onclick="crearInsumo()">+ Nuevo insumo</button>
+  </div></div>`;
+  h += `<div class="sim-cell" style="margin-bottom:16px;"><input class="ins-input" style="width:280px;" type="text" placeholder="Buscar insumo..." value="${insumosSearch}" oninput="filterInsumos(this.value)"></div>`;
+  h += '<div class="table-container"><table><thead><tr><th>Insumo</th><th class="center">Unidad</th><th class="right">Costo sin IVA ($)</th><th class="center">IVA</th><th class="right">Precio final c/IVA ($)</th><th class="center">Rendimiento general</th><th class="right">Kilo final (usable)</th><th></th></tr></thead><tbody id="insumos-tbody"></tbody></table></div>';
+  document.getElementById('insumos-section').innerHTML = h;
+  renderInsumosTable();
+}
+
+function crearInsumo() {
+  const nombreEl = document.getElementById('new-insumo-nombre');
+  const nombre = nombreEl.value.trim();
+  if (!nombre) return;
+  if (insumoExists(nombre)) { alert('Ya existe un insumo con ese nombre.'); return; }
+  const unidad = document.getElementById('new-insumo-unidad').value;
+  const costoRaw = document.getElementById('new-insumo-costo').value;
+  const costo = costoRaw ? parseFloat(costoRaw) : 0;
+  insumosExtra.push({ nombre, unidad, costo, iva: 0 });
+  insumosPrices[nombre] = { costo, iva: 0, unidad };
+  insumosPricesCI[normName(nombre)] = nombre;
+  insumoDatalistHTML = null;
+  saveStateDebounced();
+  renderInsumos();
+}
+
+function renderInsumosTable() {
+  const seen = new Set();
+  const term = normName(insumosSearch);
+  let r = '';
+  getAllInsumos().forEach(ins => {
+    if(seen.has(ins.nombre)) return;
+    if(term && !normName(ins.nombre).includes(term)) return;
+    seen.add(ins.nombre);
+    const ov = insumosPrices[ins.nombre] || { costo: ins.costo, iva: ins.iva, unidad: ins.unidad };
+    const iId='ins_'+safeid(ins.nombre), fId=iId+'_final';
+    const ivaVal = (ov.iva || 0) * 100;
+    const ivaBtn0 = Math.abs(ivaVal - 0) < 0.01 ? 'active' : '';
+    const ivaBtn10 = Math.abs(ivaVal - 10.5) < 0.01 ? 'active' : '';
+    const ivaBtn21 = Math.abs(ivaVal - 21) < 0.01 ? 'active' : '';
+    const finalVal = (ov.costo || 0) * (1 + ivaVal / 100);
+    const rr = rendimientos[ins.nombre] || { enabled: false, factor: 1 };
+    const unidadActual = ov.unidad || ins.unidad;
+    r += `<tr>
+      <td>${ins.nombre}</td>
+      <td class="td-center">
+        <select class="ins-input" onchange="setInsumoUnidad('${ins.nombre}', this.value)">
+          <option value="KG" ${unidadActual==='KG'?'selected':''}>KG</option>
+          <option value="LT" ${unidadActual==='LT'?'selected':''}>LT</option>
+          <option value="UNIDAD" ${unidadActual==='UNIDAD'?'selected':''}>UNIDAD</option>
+        </select>
+      </td>
+      <td class="right"><input class="ins-input" type="number" id="${iId}" value="${ov.costo||''}" data-nombre="${ins.nombre}" oninput="calcFinal('${iId}','${fId}')"></td>
+      <td class="td-center">
+        <div class="iva-buttons">
+          <button class="iva-btn ${ivaBtn0}" onclick="setIVA('${iId}', 0, '${fId}')">0%</button>
+          <button class="iva-btn ${ivaBtn10}" onclick="setIVA('${iId}', 10.5, '${fId}')">10.5%</button>
+          <button class="iva-btn ${ivaBtn21}" onclick="setIVA('${iId}', 21, '${fId}')">21%</button>
+        </div>
+      </td>
+      <td class="right" id="${fId}">${fmtDec(finalVal)}</td>
+      <td class="td-center">
+        <div class="rend-toggle">
+          <label class="switch"><input type="checkbox" ${rr.enabled?'checked':''} onchange="toggleRend('${ins.nombre}', this.checked, 'insumos')"><span class="slider"></span></label>
+          <input class="rend-input-inline" type="number" value="${rr.factor!=null&&rr.factor<1?Math.round(rr.factor*100):(rr.enabled?100:'')}" placeholder="%" ${!rr.enabled?'disabled':''} oninput="setRend('${ins.nombre}', this.value, 'insumos')">
+          <span style="font-size:10px;color:var(--text-ter);">%</span>
+        </div>
+      </td>
+      <td class="right">${rr.enabled && rr.factor > 0 && rr.factor < 1 ? fmtDec((ov.costo||0) / rr.factor) : '—'}</td>
+      <td class="td-center"><button class="logout-btn" style="padding:4px 8px;" onclick="eliminarInsumo('${ins.nombre}')">🗑</button></td>
+    </tr>`;
+  });
+  const b=document.getElementById('insumos-tbody');
+  if(b) b.innerHTML=r;
+}
+
+function setInsumoUnidad(nombre, unidad) {
+  if (!insumosPrices[nombre]) return;
+  insumosPrices[nombre].unidad = unidad;
+  saveStateDebounced();
+}
+
+function setIVA(inputId, ivaVal, finalId) {
+  const btns = event.target.parentElement.querySelectorAll('.iva-btn');
+  btns.forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  calcFinal(inputId, finalId, ivaVal);
+}
+
+function calcFinal(costoId, finalId, ivaVal) {
+  const inp = document.getElementById(costoId);
+  const c = parseFloat(inp.value) || 0;
+  const nombre = inp && inp.dataset.nombre;
+  const prev = nombre ? insumosPrices[nombre] : null;
+  const iv = typeof ivaVal === 'number' ? ivaVal : (prev && prev.iva != null ? prev.iva * 100 : 0);
+  document.getElementById(finalId).textContent = fmtDec(c * (1 + iv/100));
+  if (prev) {
+    prev.costo = c;
+    if (typeof ivaVal === 'number') prev.iva = ivaVal / 100;
+    saveStateDebounced();
+  }
+}
+
+window.startApp = function (state) {
+  state = state || {};
+  insumosExtra = state.insumosExtra || [];
+  insumosDeleted = state.insumosDeleted || [];
+  insumosPrices = {};
+  getAllInsumos().forEach(ins => {
+    if (!insumosPrices[ins.nombre]) insumosPrices[ins.nombre] = { costo: ins.costo, iva: ins.iva, unidad: ins.unidad };
+  });
+  Object.entries(state.insumos || {}).forEach(([nombre, v]) => {
+    if (insumosPrices[nombre]) insumosPrices[nombre] = { costo: v.costo, iva: v.iva, unidad: v.unidad || insumosPrices[nombre].unidad };
+  });
+  insumosPricesCI = {};
+  Object.keys(insumosPrices).forEach(k => { insumosPricesCI[normName(k)] = k; });
+  rendimientos = state.rendimientos || {};
+  recetas = state.recetas || {};
+  prodRinde = state.prodRinde || {};
+  platosExtra = state.platosExtra || [];
+  produccionesExtra = state.produccionesExtra || [];
+  recetaRendimientos = state.recetaRendimientos || {};
+  platosDeleted = state.platosDeleted || [];
+  produccionesDeleted = state.produccionesDeleted || [];
+  produccionesExtra.forEach(nm => { if (!prodMapCI[normName(nm)]) prodMapCI[normName(nm)] = nm; });
+  produccionesDeleted.forEach(nm => removeProdFromMap(nm));
+  insumoDatalistHTML = null;
+  renderPlatos();
+};
+</script>
+</body>
+</html>
