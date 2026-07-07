@@ -397,6 +397,15 @@ function getPlatoMeta(nombre) {
   return base;
 }
 function getAllProdNames() { return [...Object.keys(DATA.sub_blocks).filter(nm => !produccionesDeleted.includes(nm)), ...produccionesExtra]; }
+function currentCategoriaDePlato(nombre) {
+  if (categoriaOverrides[nombre]) return categoriaOverrides[nombre];
+  const extra = platosExtra.find(p => p.nombre === nombre);
+  if (extra) return extra.categoria;
+  for (const [c, arr] of Object.entries(DATA.categorias)) {
+    if (arr.includes(nombre)) return c;
+  }
+  return null;
+}
 function platoExists(nombre) {
   const n = normName(nombre);
   return DATA.platos.some(p => normName(p.nombre) === n && !platosDeleted.includes(p.nombre)) || platosExtra.some(p => normName(p.nombre) === n);
@@ -641,7 +650,8 @@ function cambiarCategoriaPlato(sel) {
   const nuevaCat = sel.value;
   categoriaOverrides[nombre] = nuevaCat;
   saveStateDebounced();
-  renderPlatosList();
+  if (document.getElementById('platos-list')) renderPlatosList();
+  if (recipeStack.length) renderRecetas();
 }
 
 function guardarPrecioPlato(inputId) {
@@ -869,9 +879,21 @@ function renderDetail(nm, type) {
     }
   }
 
+  let categoriaBlock = '';
+  if (type === 'plato') {
+    const catActual = currentCategoriaDePlato(nm);
+    const catOptions = Object.keys(DATA.categorias);
+    const nmEsc = nm.replace(/"/g,'&quot;');
+    categoriaBlock = `<div class="detail-meta">Plato · Categoría:
+      <select class="ins-input" style="width:170px;display:inline-block;margin-left:6px;" data-nombre="${nmEsc}" onchange="cambiarCategoriaPlato(this)">
+        ${catOptions.map(opt=>`<option value="${opt}" ${opt===catActual?'selected':''}>${cap(opt)}</option>`).join('')}
+      </select>
+    </div>`;
+  }
+
   return `<div class="detail-panel">
     <div class="detail-title">${nm}</div>
-    <div class="detail-meta">${metaText}</div>
+    ${type === 'plato' ? categoriaBlock : `<div class="detail-meta">${metaText}</div>`}
     ${rindeBlock}
     ${editBtn}${deleteBtn}
     <datalist id="insumo-datalist">${getInsumoDatalistHTML()}</datalist>
