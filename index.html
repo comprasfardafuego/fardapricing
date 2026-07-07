@@ -305,6 +305,7 @@ let produccionesDeleted = [];
 let insumosExtra = [];
 let insumosDeleted = [];
 let ventaOverrides = {};
+let categoriaOverrides = {};
 
 function normName(s) { return (s || '').trim().toUpperCase(); }
 
@@ -324,7 +325,8 @@ function saveStateDebounced() {
       produccionesDeleted,
       insumosExtra,
       insumosDeleted,
-      ventaOverrides
+      ventaOverrides,
+      categoriaOverrides
     });
   }, 600);
 }
@@ -372,10 +374,19 @@ function getPlatoIngredients(nombre) { return recetas[nombre] || DATA.plato_ingr
 function getProdIngredients(nombre) { return recetas[nombre] || DATA.sub_blocks[nombre] || null; }
 function getAllCategorias() {
   const merged = {};
-  Object.entries(DATA.categorias).forEach(([c, arr]) => { merged[c] = arr.filter(nm => !platosDeleted.includes(nm)); });
+  Object.keys(DATA.categorias).forEach(c => { merged[c] = []; });
+  Object.entries(DATA.categorias).forEach(([c, arr]) => {
+    arr.forEach(nm => {
+      if (platosDeleted.includes(nm)) return;
+      const cat = categoriaOverrides[nm] || c;
+      if (!merged[cat]) merged[cat] = [];
+      merged[cat].push(nm);
+    });
+  });
   platosExtra.forEach(p => {
-    if (!merged[p.categoria]) merged[p.categoria] = [];
-    merged[p.categoria].push(p.nombre);
+    const cat = categoriaOverrides[p.nombre] || p.categoria;
+    if (!merged[cat]) merged[cat] = [];
+    merged[cat].push(p.nombre);
   });
   return merged;
 }
@@ -418,6 +429,7 @@ function eliminarPlato(nombre) {
   else if (!platosDeleted.includes(nombre)) platosDeleted.push(nombre);
   delete recetas[nombre];
   delete ventaOverrides[nombre];
+  delete categoriaOverrides[nombre];
   recipeStack = [];
   recipeEditMode = false;
   saveStateDebounced();
@@ -601,24 +613,35 @@ function exportPlatosCSV() {
 
 function renderPlatosList() {
   const term = normName(platosSearch);
+  const catOptions = Object.keys(DATA.categorias);
   let h = '';
   let contador = 0;
   for(const[c,pn] of Object.entries(getAllCategorias())){
     const filtered = term ? pn.filter(nm => normName(nm).includes(term)) : pn;
     if (!filtered.length) continue;
-    h += `<div class="cat-header">${cap(c)}</div><div class="table-container"><table><thead><tr><th style="width:44px;">#</th><th>Plato</th><th class="right">Costo s/IVA</th><th class="right">Venta actual</th><th class="right">Food Cost</th><th class="right">Actualizar precio</th></tr></thead><tbody>`;
+    h += `<div class="cat-header">${cap(c)}</div><div class="table-container"><table><thead><tr><th style="width:44px;">#</th><th>Plato</th><th>Categoría</th><th class="right">Costo s/IVA</th><th class="right">Venta actual</th><th class="right">Food Cost</th><th class="right">Actualizar precio</th></tr></thead><tbody>`;
     filtered.forEach(nm=>{
       const p=getPlatoMeta(nm); if(!p)return;
       contador++;
       const sId='sim_'+safeid(nm), sfId=sId+'_fc', hasR=getPlatoIngredients(nm)!=null;
       const costoCalc = hasR ? costoPlato(nm) : p.costo;
       const fcCalc = p.venta ? costoCalc / p.venta : null;
-      h+=`<tr><td class="td-num" style="color:var(--text-ter);">${contador}</td><td class="td-name" onclick="openRecipe('plato','${nm}')">${nm}</td><td class="td-num">${fmt(costoCalc)}</td><td class="td-num">${fmt(p.venta)}</td><td class="td-num">${fcBadge(fcCalc)}</td><td class="td-num"><div class="sim-cell"><input class="sim-input" type="number" id="${sId}" placeholder="nuevo $" data-costo="${costoCalc}" data-nombre="${nm.replace(/"/g,'&quot;')}" oninput="updateSimFC(this)" onkeydown="if(event.key==='Enter')guardarPrecioPlato('${sId}')"><span class="sim-fc fc-none" id="${sfId}">—</span><button class="btn" style="padding:6px 10px;font-size:12px;" onclick="guardarPrecioPlato('${sId}')">Guardar</button></div></td></tr>`;
+      const nmEsc = nm.replace(/"/g,'&quot;');
+      const catSelect = `<select class="ins-input" style="width:150px;" data-nombre="${nmEsc}" onchange="cambiarCategoriaPlato(this)">${catOptions.map(opt=>`<option value="${opt}" ${opt===c?'selected':''}>${cap(opt)}</option>`).join('')}</select>`;
+      h+=`<tr><td class="td-num" style="color:var(--text-ter);">${contador}</td><td class="td-name" onclick="openRecipe('plato','${nm}')">${nm}</td><td>${catSelect}</td><td class="td-num">${fmt(costoCalc)}</td><td class="td-num">${fmt(p.venta)}</td><td class="td-num">${fcBadge(fcCalc)}</td><td class="td-num"><div class="sim-cell"><input class="sim-input" type="number" id="${sId}" placeholder="nuevo $" data-costo="${costoCalc}" data-nombre="${nmEsc}" oninput="updateSimFC(this)" onkeydown="if(event.key==='Enter')guardarPrecioPlato('${sId}')"><span class="sim-fc fc-none" id="${sfId}">—</span><button class="btn" style="padding:6px 10px;font-size:12px;" onclick="guardarPrecioPlato('${sId}')">Guardar</button></div></td></tr>`;
     });
     h+=`</tbody></table></div>`;
   }
   if (!h) h = `<div style="padding:20px;background:var(--bg-alt);border:1px solid var(--border);border-radius:8px;color:var(--text-sec);">Sin resultados.</div>`;
   document.getElementById('platos-list').innerHTML = h;
+}
+
+function cambiarCategoriaPlato(sel) {
+  const nombre = sel.dataset.nombre;
+  const nuevaCat = sel.value;
+  categoriaOverrides[nombre] = nuevaCat;
+  saveStateDebounced();
+  renderPlatosList();
 }
 
 function guardarPrecioPlato(inputId) {
@@ -1302,6 +1325,7 @@ window.startApp = function (state) {
   platosDeleted = state.platosDeleted || [];
   produccionesDeleted = state.produccionesDeleted || [];
   ventaOverrides = state.ventaOverrides || {};
+  categoriaOverrides = state.categoriaOverrides || {};
   produccionesExtra.forEach(nm => { if (!prodMapCI[normName(nm)]) prodMapCI[normName(nm)] = nm; });
   produccionesDeleted.forEach(nm => removeProdFromMap(nm));
   insumoDatalistHTML = null;
