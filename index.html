@@ -479,6 +479,11 @@ function getInsumoDatalistHTML() {
 }
 
 const fmt = n => n == null ? '—' : '$' + Math.round(n).toLocaleString('es-AR');
+function pctDisplay(f) {
+  if (f == null) return '';
+  const v = Math.round(f * 1000) / 10;
+  return (v % 1 === 0) ? String(v) : v.toFixed(1);
+}
 const fmtDec = n => n == null ? '—' : '$' + n.toFixed(2).replace('.', ',');
 const fmt3 = n => n == null ? '—' : n.toFixed(3).replace('.', ',');
 const pct = n => n == null ? '—' : (n * 100).toFixed(1) + '%';
@@ -823,7 +828,7 @@ function renderDetail(nm, type) {
       <td class="td-center">
         <div class="rend-toggle">
           <label class="switch"><input type="checkbox" ${r.enabled?'checked':''} onchange="toggleRecetaRend('${nm}','${ing.insumo}', this.checked, '${ctx}')"><span class="slider"></span></label>
-          <input class="rend-input-inline" type="number" value="${r.factor!=null&&r.factor<1?Math.round(r.factor*100):(r.enabled?100:'')}" placeholder="%" ${!r.enabled?'disabled':''} oninput="setRecetaRend('${nm}','${ing.insumo}', this.value, '${ctx}')">
+          <input class="rend-input-inline" type="number" value="${r.factor!=null&&r.factor<1?pctDisplay(r.factor):(r.enabled?100:'')}" placeholder="%" ${!r.enabled?'disabled':''} oninput="setRecetaRend('${nm}','${ing.insumo}', this.value, '${ctx}')">
           <span style="font-size:10px;color:var(--text-ter);">%</span>
           ${clearLink}
         </div>
@@ -1129,7 +1134,7 @@ function renderProdDetailTab(nm) {
       <td class="td-center">
         <div class="rend-toggle">
           <label class="switch"><input type="checkbox" ${r.enabled?'checked':''} onchange="toggleRecetaRend('${nm}','${ing.insumo}', this.checked, '${ctx}')"><span class="slider"></span></label>
-          <input class="rend-input-inline" type="number" value="${r.factor!=null&&r.factor<1?Math.round(r.factor*100):(r.enabled?100:'')}" placeholder="%" ${!r.enabled?'disabled':''} oninput="setRecetaRend('${nm}','${ing.insumo}', this.value, '${ctx}')">
+          <input class="rend-input-inline" type="number" value="${r.factor!=null&&r.factor<1?pctDisplay(r.factor):(r.enabled?100:'')}" placeholder="%" ${!r.enabled?'disabled':''} oninput="setRecetaRend('${nm}','${ing.insumo}', this.value, '${ctx}')">
           <span style="font-size:10px;color:var(--text-ter);">%</span>
           ${clearLink}
         </div>
@@ -1189,7 +1194,7 @@ function renderRendimientos() {
     h += '<div class="table-container"><table><thead><tr><th>Insumo</th><th class="right">Rinde</th><th class="right">Por cada 1 usable, comprás</th></tr></thead><tbody>';
     activos.forEach(([nombre, v]) => {
       const comprar = v.factor > 0 ? (1/v.factor) : 1;
-      h += `<tr><td class="ing-name">${nombre}</td><td class="td-num">${Math.round(v.factor*100)}%</td><td class="td-num">${comprar.toFixed(3).replace('.',',')}</td></tr>`;
+      h += `<tr><td class="ing-name">${nombre}</td><td class="td-num">${pctDisplay(v.factor)}%</td><td class="td-num">${comprar.toFixed(3).replace('.',',')}</td></tr>`;
     });
     h += '</tbody></table></div>';
   }
@@ -1207,7 +1212,7 @@ function renderRendimientos() {
     h += '<div class="table-container"><table><thead><tr><th>Receta/producción</th><th>Insumo</th><th class="right">Rinde</th><th class="right">Por cada 1 usable, comprás</th></tr></thead><tbody>';
     overrides.forEach(({ receta, insumo, v }) => {
       const comprar = v.factor > 0 ? (1/v.factor) : 1;
-      h += `<tr><td class="ing-name">${receta}</td><td class="ing-name">${insumo}</td><td class="td-num">${Math.round(v.factor*100)}%</td><td class="td-num">${comprar.toFixed(3).replace('.',',')}</td></tr>`;
+      h += `<tr><td class="ing-name">${receta}</td><td class="ing-name">${insumo}</td><td class="td-num">${pctDisplay(v.factor)}%</td><td class="td-num">${comprar.toFixed(3).replace('.',',')}</td></tr>`;
     });
     h += '</tbody></table></div>';
   }
@@ -1286,7 +1291,7 @@ function renderInsumosTable() {
       <td class="td-center">
         <div class="rend-toggle">
           <label class="switch"><input type="checkbox" ${rr.enabled?'checked':''} onchange="toggleRend('${ins.nombre}', this.checked, 'insumos')"><span class="slider"></span></label>
-          <input class="rend-input-inline" type="number" value="${rr.factor!=null&&rr.factor<1?Math.round(rr.factor*100):(rr.enabled?100:'')}" placeholder="%" ${!rr.enabled?'disabled':''} oninput="setRend('${ins.nombre}', this.value, 'insumos')">
+          <input class="rend-input-inline" type="number" value="${rr.factor!=null&&rr.factor<1?pctDisplay(rr.factor):(rr.enabled?100:'')}" placeholder="%" ${!rr.enabled?'disabled':''} oninput="setRend('${ins.nombre}', this.value, 'insumos')">
           <span style="font-size:10px;color:var(--text-ter);">%</span>
         </div>
       </td>
