@@ -774,7 +774,11 @@ function renderDetail(nm, type) {
   if (type === 'plato') {
     const p = getPlatoMeta(nm);
     if (!p) return '<div style="padding:20px;">No encontrado</div>';
-    ings = getPlatoIngredients(nm) || [];
+    ings = getPlatoIngredients(nm);
+    if (!ings || !ings.length) {
+      const liveKey = insumosPricesCI[normName(nm)];
+      ings = liveKey ? [{ insumo: liveKey, unidad: insumosPrices[liveKey].unidad || '', cantidad: 1, costo: null }] : [];
+    }
     venta = p.venta;
     metaText = 'Plato';
   } else {
