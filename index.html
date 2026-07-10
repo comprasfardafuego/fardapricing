@@ -202,6 +202,8 @@
         producciones_deleted: state.produccionesDeleted,
         insumos_extra: state.insumosExtra,
         insumos_deleted: state.insumosDeleted,
+        venta_overrides: state.ventaOverrides,
+        categoria_overrides: state.categoriaOverrides,
         updated_at: new Date().toISOString()
       })
       .select('updated_at')
@@ -239,7 +241,7 @@
   }
 
   async function loadAndStart() {
-    const res = await supabase.from('pricing_state').select('insumos, rendimientos, recetas, prod_rinde, platos_extra, producciones_extra, receta_rendimientos, platos_deleted, producciones_deleted, insumos_extra, insumos_deleted, updated_at').eq('id', 1).maybeSingle();
+    const res = await supabase.from('pricing_state').select('insumos, rendimientos, recetas, prod_rinde, platos_extra, producciones_extra, receta_rendimientos, platos_deleted, producciones_deleted, insumos_extra, insumos_deleted, venta_overrides, categoria_overrides, updated_at').eq('id', 1).maybeSingle();
     if (res.error) {
       console.error('No se pudo leer de la nube', res.error);
       loadedOk = false;
@@ -260,7 +262,9 @@
       platosDeleted: data.platos_deleted || [],
       produccionesDeleted: data.producciones_deleted || [],
       insumosExtra: data.insumos_extra || [],
-      insumosDeleted: data.insumos_deleted || []
+      insumosDeleted: data.insumos_deleted || [],
+      ventaOverrides: data.venta_overrides || {},
+      categoriaOverrides: data.categoria_overrides || {}
     });
   }
 
