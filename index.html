@@ -563,6 +563,12 @@ function costoPlato(nombre) {
   const ings = getPlatoIngredients(nombre) || [];
   return ings.reduce((a, ing) => a + costoLineaIng(ing, nombre), 0);
 }
+function costoActualPlato(nombre, meta) {
+  if (getPlatoIngredients(nombre)) return costoPlato(nombre);
+  const liveKey = insumosPricesCI[normName(nombre)];
+  if (liveKey && insumosPrices[liveKey]) return insumosPrices[liveKey].costo;
+  return meta ? meta.costo : null;
+}
 
 function costoProduccion(nombre) {
   const prod = getProdIngredients(nombre);
@@ -609,7 +615,7 @@ function exportPlatosCSV() {
     pn.forEach(nm => {
       const p = getPlatoMeta(nm); if (!p) return;
       const hasR = getPlatoIngredients(nm) != null;
-      const costoCalc = hasR ? costoPlato(nm) : p.costo;
+      const costoCalc = costoActualPlato(nm, p);
       const fcCalc = p.venta ? costoCalc / p.venta : null;
       rows.push([cap(c), nm, Math.round(costoCalc || 0), p.venta != null ? Math.round(p.venta) : '', fcCalc != null ? (fcCalc * 100).toFixed(1) : '']);
     });
@@ -642,7 +648,7 @@ function renderPlatosList() {
       const p=getPlatoMeta(nm); if(!p)return;
       contador++;
       const sId='sim_'+safeid(nm), sfId=sId+'_fc', hasR=getPlatoIngredients(nm)!=null;
-      const costoCalc = hasR ? costoPlato(nm) : p.costo;
+      const costoCalc = costoActualPlato(nm, p);
       const fcCalc = p.venta ? costoCalc / p.venta : null;
       const nmEsc = nm.replace(/"/g,'&quot;');
       const catSelect = `<select class="ins-input" style="width:150px;" data-nombre="${nmEsc}" onchange="cambiarCategoriaPlato(this)">${catOptions.map(opt=>`<option value="${opt}" ${opt===c?'selected':''}>${cap(opt)}</option>`).join('')}</select>`;
@@ -723,7 +729,7 @@ function renderRecetasList() {
     filtered.forEach(nm=>{
       const p=getPlatoMeta(nm); if(!p)return;
       const hasR=getPlatoIngredients(nm)!=null;
-      const costoCalc = hasR ? costoPlato(nm) : p.costo;
+      const costoCalc = costoActualPlato(nm, p);
       const fcCalc = p.venta ? costoCalc / p.venta : null;
       h+=`<tr><td class="td-name" onclick="openRecipe('plato','${nm}')">${nm}</td><td class="td-num">${fmt(costoCalc)}</td><td class="td-num">${fmt(p.venta)}</td><td class="td-num">${fcBadge(fcCalc)}</td></tr>`;
     });
@@ -1386,25 +1392,20 @@ function renderExportar() {
 
 function buildExportData() {
   const platos = [];
-  Object.keys(DATA.categorias).forEach(cat => {
-    (DATA.categorias[cat] || []).forEach(nombre => {
-      if (platosDeleted.includes(nombre)) return;
-      const p = getPlatoMeta ? getPlatoMeta(nombre) : null;
-      const meta = p || DATA.platos.find(x => x.nombre === nombre) || {};
+  Object.entries(getAllCategorias()).forEach(([cat, nombres]) => {
+    nombres.forEach(nombre => {
+      const p = getPlatoMeta(nombre);
+      if (!p) return;
+      const costoLive = costoActualPlato(nombre, p);
+      const fcLive = (costoLive != null && p.venta) ? costoLive / p.venta : null;
       platos.push({
         categoria: cat,
         nombre: nombre,
-        costo: meta.costo != null ? Math.round(meta.costo * 100) / 100 : '',
-        venta: meta.venta != null ? Math.round(meta.venta * 100) / 100 : '',
-        fc: meta.fc != null ? Math.round(meta.fc * 10000) / 100 : ''
+        costo: costoLive != null ? Math.round(costoLive * 100) / 100 : '',
+        venta: p.venta != null ? Math.round(p.venta * 100) / 100 : '',
+        fc: fcLive != null ? Math.round(fcLive * 10000) / 100 : ''
       });
     });
-  });
-  platosExtra.forEach(nombre => {
-    if (platosDeleted.includes(nombre)) return;
-    if (platos.some(x => x.nombre === nombre)) return;
-    const meta = (getPlatoMeta ? getPlatoMeta(nombre) : null) || {};
-    platos.push({ categoria: 'EXTRA', nombre, costo: meta.costo || '', venta: meta.venta || '', fc: meta.fc ? Math.round(meta.fc*10000)/100 : '' });
   });
 
   const recetasRows = [];
