@@ -806,7 +806,7 @@ function renderDetail(nm, type) {
     const prodKey = getProdKey(ing.insumo);
     const isProd = prodKey != null;
     const liveKey = insumosPricesCI[normName(ing.insumo)];
-    const unit = !isProd && liveKey ? insumosPrices[liveKey].costo : ((ing.cantidad && ing.costo) ? (ing.costo / ing.cantidad) : 0);
+    const unit = precioUnitarioIng(ing, nm);
     const cantB = cantidadBruta(nm, ing.insumo, ing.cantidad || 0);
     const cl = costoLineaIng(ing, nm);
     tc += cl;
@@ -1122,7 +1122,7 @@ function renderProdDetailTab(nm) {
     const prodKey = getProdKey(ing.insumo);
     const isSubProd = prodKey != null;
     const liveKey = insumosPricesCI[normName(ing.insumo)];
-    const unit = !isSubProd && liveKey ? insumosPrices[liveKey].costo : ((ing.cantidad && ing.costo) ? (ing.costo / ing.cantidad) : 0);
+    const unit = precioUnitarioIng(ing, nm);
     const cantB = cantidadBruta(nm, ing.insumo, ing.cantidad || 0);
     const cl = costoLineaIng(ing, nm);
     tc += cl;
