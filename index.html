@@ -537,6 +537,20 @@ function getProdFraction(ing, prodKey) {
   return frac;
 }
 
+function precioUnitarioIng(ing, recetaNombre) {
+  const prodKey = getProdKey(ing.insumo);
+  if (prodKey) {
+    const rinde = prodRinde[prodKey];
+    if (rinde && rinde.cantidad > 0) return costoProduccion(prodKey) / rinde.cantidad;
+    const frac = getProdFraction(ing, prodKey);
+    if (frac != null && ing.cantidad) return (frac * costoProduccion(prodKey)) / ing.cantidad;
+    return (ing.cantidad && ing.costo) ? (ing.costo / ing.cantidad) : 0;
+  }
+  const liveKey = insumosPricesCI[normName(ing.insumo)];
+  const liveCosto = liveKey ? insumosPrices[liveKey].costo : null;
+  return liveCosto != null ? liveCosto : ((ing.cantidad && ing.costo) ? (ing.costo / ing.cantidad) : 0);
+}
+
 function costoLineaIng(ing, recetaNombre) {
   const prodKey = getProdKey(ing.insumo);
   if (prodKey) {
@@ -835,10 +849,13 @@ function renderDetail(nm, type) {
     const delCell = recipeEditMode ? `<td class="td-center"><button class="logout-btn" style="padding:4px 8px;" onclick="removeIngLine('${nm}', ${idx}, '${ctx}')">🗑</button></td>` : '';
     const clearLink = isOverride ? `<button class="logout-btn" style="padding:1px 5px;font-size:9px;" onclick="clearRecetaRend('${nm}','${ing.insumo}','${ctx}')" title="Usar el rendimiento general del insumo">↺ general</button>` : '';
 
+    const puCell = ing.cantidad != null ? fmtDec(precioUnitarioIng(ing, nm)) + '/' + (ing.unidad||'').toLowerCase() : '—';
+
     ir += `<tr>
       <td>${nameCell}</td>
       <td class="ing-qty">${cantCell}</td>
       <td class="ing-qty">${unidadCell}</td>
+      <td class="ing-qty" style="color:var(--text-ter);">${puCell}</td>
       <td class="td-center">
         <div class="rend-toggle">
           <label class="switch"><input type="checkbox" ${r.enabled?'checked':''} onchange="toggleRecetaRend('${nm}','${ing.insumo}', this.checked, '${ctx}')"><span class="slider"></span></label>
@@ -917,7 +934,7 @@ function renderDetail(nm, type) {
     ${editBtn}${deleteBtn}
     <datalist id="insumo-datalist">${getInsumoDatalistHTML()}</datalist>
     <table class="ing-table">
-      <thead><tr><th>${colLabel}</th><th class="right">Cant. receta</th><th class="right">Unidad</th><th class="center">Rendimiento</th><th class="right">Costo línea</th>${recipeEditMode?'<th></th>':''}</tr></thead>
+      <thead><tr><th>${colLabel}</th><th class="right">Cant. receta</th><th class="right">Unidad</th><th class="right">Precio unit.</th><th class="center">Rendimiento</th><th class="right">Costo línea</th>${recipeEditMode?'<th></th>':''}</tr></thead>
       <tbody>${ir}${addRow}</tbody>
     </table>
     ${summary}
@@ -1141,10 +1158,13 @@ function renderProdDetailTab(nm) {
     }
     const delCell = recipeEditMode ? `<td class="td-center"><button class="logout-btn" style="padding:4px 8px;" onclick="removeIngLine('${nm}', ${idx}, '${ctx}')">🗑</button></td>` : '';
     const clearLink = isOverride ? `<button class="logout-btn" style="padding:1px 5px;font-size:9px;" onclick="clearRecetaRend('${nm}','${ing.insumo}','${ctx}')" title="Usar el rendimiento general del insumo">↺ general</button>` : '';
+    const puCell = ing.cantidad != null ? fmtDec(precioUnitarioIng(ing, nm)) + '/' + (ing.unidad||'').toLowerCase() : '—';
+
     ir += `<tr>
       <td>${nameCell}</td>
       <td class="ing-qty">${cantCell}</td>
       <td class="ing-qty">${unidadCell}</td>
+      <td class="ing-qty" style="color:var(--text-ter);">${puCell}</td>
       <td class="td-center">
         <div class="rend-toggle">
           <label class="switch"><input type="checkbox" ${r.enabled?'checked':''} onchange="toggleRecetaRend('${nm}','${ing.insumo}', this.checked, '${ctx}')"><span class="slider"></span></label>
@@ -1194,7 +1214,7 @@ function renderProdDetailTab(nm) {
     summary += `<div><div class="cost-item-label">Costo por 1 ${rinde.unidad}</div><div class="cost-item-value teal">${fmt(tc / rinde.cantidad)}</div></div>`;
   }
   summary += `</div>`;
-  return `<div class="detail-panel"><div class="detail-title">${nm}</div><div class="detail-meta">Producción</div>${rindeBlock}${editBtn}${deleteBtn}<datalist id="insumo-datalist">${getInsumoDatalistHTML()}</datalist><table class="ing-table"><thead><tr><th>Insumo</th><th class="right">Cant. receta</th><th class="right">Unidad</th><th class="center">Rendimiento</th><th class="right">Costo línea</th>${recipeEditMode?'<th></th>':''}</tr></thead><tbody>${ir}${addRow}</tbody></table>${summary}</div>`;
+  return `<div class="detail-panel"><div class="detail-title">${nm}</div><div class="detail-meta">Producción</div>${rindeBlock}${editBtn}${deleteBtn}<datalist id="insumo-datalist">${getInsumoDatalistHTML()}</datalist><table class="ing-table"><thead><tr><th>Insumo</th><th class="right">Cant. receta</th><th class="right">Unidad</th><th class="right">Precio unit.</th><th class="center">Rendimiento</th><th class="right">Costo línea</th>${recipeEditMode?'<th></th>':''}</tr></thead><tbody>${ir}${addRow}</tbody></table>${summary}</div>`;
 }
 
 // ──── RENDIMIENTOS ───────────────────────────────────────────────────────────
