@@ -125,6 +125,7 @@
   <button class="tab-btn" data-tab="rendimientos" onclick="switchTab('rendimientos')">RENDIMIENTOS</button>
   <button class="tab-btn" data-tab="insumos" onclick="switchTab('insumos')">INSUMOS</button>
   <button class="tab-btn" data-tab="exportar" onclick="switchTab('exportar')">EXPORTAR</button>
+  <button class="tab-btn" data-tab="historial" onclick="switchTab('historial')">HISTORIAL</button>
 </div>
 <div class="main">
   <div id="platos-section" class="section active"></div>
@@ -133,6 +134,7 @@
   <div id="rendimientos-section" class="section"></div>
   <div id="insumos-section" class="section"></div>
   <div id="exportar-section" class="section"></div>
+  <div id="historial-section" class="section"></div>
 </div>
 </div>
 
@@ -197,25 +199,26 @@
       }
     }
     if (status) status.textContent = 'Guardando…';
+    const payload = {
+      id: 1,
+      insumos: state.insumos,
+      rendimientos: state.rendimientos,
+      recetas: state.recetas,
+      prod_rinde: state.prodRinde,
+      platos_extra: state.platosExtra,
+      producciones_extra: state.produccionesExtra,
+      receta_rendimientos: state.recetaRendimientos,
+      platos_deleted: state.platosDeleted,
+      producciones_deleted: state.produccionesDeleted,
+      insumos_extra: state.insumosExtra,
+      insumos_deleted: state.insumosDeleted,
+      venta_overrides: state.ventaOverrides,
+      categoria_overrides: state.categoriaOverrides,
+      updated_at: new Date().toISOString()
+    };
     const { data: saved, error } = await supabase
       .from('pricing_state')
-      .upsert({
-        id: 1,
-        insumos: state.insumos,
-        rendimientos: state.rendimientos,
-        recetas: state.recetas,
-        prod_rinde: state.prodRinde,
-        platos_extra: state.platosExtra,
-        producciones_extra: state.produccionesExtra,
-        receta_rendimientos: state.recetaRendimientos,
-        platos_deleted: state.platosDeleted,
-        producciones_deleted: state.produccionesDeleted,
-        insumos_extra: state.insumosExtra,
-        insumos_deleted: state.insumosDeleted,
-        venta_overrides: state.ventaOverrides,
-        categoria_overrides: state.categoriaOverrides,
-        updated_at: new Date().toISOString()
-      })
+      .upsert(payload)
       .select('updated_at')
       .single();
     if (error) {
@@ -227,7 +230,32 @@
       loadedUpdatedAt = saved ? saved.updated_at : new Date().toISOString();
       window.__saveDirty = false;
       if (status) status.textContent = 'Guardado ✓';
+      // Guardar una copia en el historial (no bloqueante: si falla, no afecta el guardado principal)
+      supabase.from('pricing_state_history').insert({
+        snapshot: payload,
+        changed_by: window.__currentUserEmail || null
+      }).then(({ error: histError }) => {
+        if (histError) console.error('No se pudo guardar el historial', histError);
+      });
     }
+  };
+
+  window.__getHistory = async function (limit) {
+    const { data, error } = await supabase
+      .from('pricing_state_history')
+      .select('id, changed_by, created_at')
+      .order('created_at', { ascending: false })
+      .limit(limit || 200);
+    return { data, error };
+  };
+
+  window.__getHistorySnapshot = async function (id) {
+    const { data, error } = await supabase
+      .from('pricing_state_history')
+      .select('snapshot')
+      .eq('id', id)
+      .single();
+    return { data, error };
   };
 
   window.addEventListener('beforeunload', function (e) {
@@ -286,6 +314,7 @@
         loginScreen.style.display = 'none';
         appEl.style.display = 'grid';
         window.__isViewerSession = session.user.email === VIEWER_EMAIL;
+        window.__currentUserEmail = session.user.email;
         const badge = document.getElementById('viewer-badge');
         if (badge) badge.style.display = window.__isViewerSession ? 'inline' : 'none';
         await loadAndStart();
@@ -626,6 +655,7 @@ function switchTab(tabName) {
   else if (tabName === 'rendimientos') renderRendimientos();
   else if (tabName === 'insumos') renderInsumos();
   else if (tabName === 'exportar') renderExportar();
+  else if (tabName === 'historial') renderHistorial();
 }
 
 // ──── PLATOS ─────────────────────────────────────────────────────────────────
@@ -1405,9 +1435,8 @@ function calcFinal(costoId, finalId, ivaVal) {
   }
 }
 
-window.startApp = function (state) {
+function applyState(state) {
   state = state || {};
-  isViewer = !!window.__isViewerSession;
   insumosExtra = state.insumosExtra || [];
   insumosDeleted = state.insumosDeleted || [];
   insumosPrices = {};
@@ -1432,6 +1461,11 @@ window.startApp = function (state) {
   produccionesExtra.forEach(nm => { if (!prodMapCI[normName(nm)]) prodMapCI[normName(nm)] = nm; });
   produccionesDeleted.forEach(nm => removeProdFromMap(nm));
   insumoDatalistHTML = null;
+}
+
+window.startApp = function (state) {
+  isViewer = !!window.__isViewerSession;
+  applyState(state);
   renderPlatos();
 };
 
@@ -1626,6 +1660,160 @@ function exportPDF() {
   w.document.write(html);
   w.document.close();
   setTimeout(() => w.print(), 400);
+}
+
+// ──── HISTORIAL ──────────────────────────────────────────────────────────────
+function fmtFechaHora(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('es-AR') + ' ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+}
+
+async function renderHistorial() {
+  const el = document.getElementById('historial-section');
+  el.innerHTML = `<div class="header"><div class="title">Historial de Cambios</div><div class="subtitle">Cargando…</div></div>`;
+  const { data, error } = await window.__getHistory(200);
+  if (error) {
+    el.innerHTML = `<div class="header"><div class="title">Historial de Cambios</div></div><div style="padding:20px;color:var(--red);">No se pudo cargar el historial.</div>`;
+    return;
+  }
+  window.__historyList = data || [];
+  let h = `<div class="header"><div class="title">Historial de Cambios</div><div class="subtitle">Últimas ${window.__historyList.length} versiones guardadas.</div></div>`;
+  h += `<div class="table-container"><table><thead><tr><th>Fecha</th><th>Quién</th><th></th></tr></thead><tbody>`;
+  window.__historyList.forEach((v, idx) => {
+    h += `<tr><td>${fmtFechaHora(v.created_at)}</td><td>${v.changed_by || '—'}</td><td class="td-center"><button class="btn" style="padding:6px 12px;font-size:12px;" onclick="verCambiosHistorial(${idx})">Ver cambios</button></td></tr>`;
+  });
+  h += `</tbody></table></div><div id="historial-detalle" style="margin-top:20px;"></div>`;
+  el.innerHTML = h;
+}
+
+function diffEstados(anterior, actual) {
+  const cambios = [];
+  anterior = anterior || {};
+  actual = actual || {};
+
+  // Precios de insumos
+  const insA = anterior.insumos || {}, insB = actual.insumos || {};
+  new Set([...Object.keys(insA), ...Object.keys(insB)]).forEach(nombre => {
+    const a = insA[nombre], b = insB[nombre];
+    if (!a && b) cambios.push(`🆕 Precio cargado — ${nombre}: $${fmtDec(b.costo)}`);
+    else if (a && !b) cambios.push(`Precio de ${nombre} vuelto al valor original`);
+    else if (a && b && (a.costo !== b.costo || a.iva !== b.iva)) {
+      cambios.push(`💲 ${nombre}: costo $${fmtDec(a.costo)} → $${fmtDec(b.costo)}${a.iva !== b.iva ? ` (IVA ${Math.round(a.iva*100)}% → ${Math.round(b.iva*100)}%)` : ''}`);
+    }
+  });
+
+  // Precio de venta
+  const vA = anterior.venta_overrides || {}, vB = actual.venta_overrides || {};
+  new Set([...Object.keys(vA), ...Object.keys(vB)]).forEach(nombre => {
+    if (vA[nombre] !== vB[nombre]) {
+      if (vA[nombre] == null) cambios.push(`💰 ${nombre}: precio de venta actualizado a $${fmtDec(vB[nombre])}`);
+      else if (vB[nombre] == null) cambios.push(`💰 ${nombre}: precio de venta vuelto al original`);
+      else cambios.push(`💰 ${nombre}: precio de venta $${fmtDec(vA[nombre])} → $${fmtDec(vB[nombre])}`);
+    }
+  });
+
+  // Categoría
+  const cA = anterior.categoria_overrides || {}, cB = actual.categoria_overrides || {};
+  new Set([...Object.keys(cA), ...Object.keys(cB)]).forEach(nombre => {
+    if (cA[nombre] !== cB[nombre]) {
+      cambios.push(`📁 ${nombre}: categoría ${cA[nombre] ? cap(cA[nombre]) : 'original'} → ${cB[nombre] ? cap(cB[nombre]) : 'original'}`);
+    }
+  });
+
+  // Platos nuevos/eliminados
+  const platosExtraA = (anterior.platos_extra || []).map(p => p.nombre);
+  const platosExtraB = (actual.platos_extra || []).map(p => p.nombre);
+  platosExtraB.filter(n => !platosExtraA.includes(n)).forEach(n => cambios.push(`➕ Plato nuevo: ${n}`));
+  platosExtraA.filter(n => !platosExtraB.includes(n)).forEach(n => cambios.push(`➖ Plato nuevo eliminado: ${n}`));
+  const delA = anterior.platos_deleted || [], delB = actual.platos_deleted || [];
+  delB.filter(n => !delA.includes(n)).forEach(n => cambios.push(`🗑 Plato eliminado: ${n}`));
+  delA.filter(n => !delB.includes(n)).forEach(n => cambios.push(`↩ Plato restaurado: ${n}`));
+
+  // Producciones nuevas/eliminadas
+  const prodExtraA = anterior.producciones_extra || [], prodExtraB = actual.producciones_extra || [];
+  prodExtraB.filter(n => !prodExtraA.includes(n)).forEach(n => cambios.push(`➕ Producción nueva: ${n}`));
+  prodExtraA.filter(n => !prodExtraB.includes(n)).forEach(n => cambios.push(`➖ Producción nueva eliminada: ${n}`));
+  const pdelA = anterior.producciones_deleted || [], pdelB = actual.producciones_deleted || [];
+  pdelB.filter(n => !pdelA.includes(n)).forEach(n => cambios.push(`🗑 Producción eliminada: ${n}`));
+  pdelA.filter(n => !pdelB.includes(n)).forEach(n => cambios.push(`↩ Producción restaurada: ${n}`));
+
+  // Insumos nuevos/eliminados
+  const iExtraA = (anterior.insumos_extra || []).map(i => i.nombre), iExtraB = (actual.insumos_extra || []).map(i => i.nombre);
+  iExtraB.filter(n => !iExtraA.includes(n)).forEach(n => cambios.push(`➕ Insumo nuevo: ${n}`));
+  iExtraA.filter(n => !iExtraB.includes(n)).forEach(n => cambios.push(`➖ Insumo nuevo eliminado: ${n}`));
+
+  // Rendimientos generales por insumo
+  const rA = anterior.rendimientos || {}, rB = actual.rendimientos || {};
+  new Set([...Object.keys(rA), ...Object.keys(rB)]).forEach(nombre => {
+    const a = rA[nombre], b = rB[nombre];
+    const aOn = a && a.enabled, bOn = b && b.enabled;
+    if (!!aOn !== !!bOn || (aOn && bOn && a.factor !== b.factor)) {
+      cambios.push(`📉 Rendimiento de ${nombre}: ${bOn ? pctDisplay(b.factor) + '%' : 'desactivado'}`);
+    }
+  });
+
+  // Recetas modificadas (sin detalle línea por línea, solo aviso)
+  const recA = anterior.recetas || {}, recB = actual.recetas || {};
+  new Set([...Object.keys(recA), ...Object.keys(recB)]).forEach(nombre => {
+    if (JSON.stringify(recA[nombre]) !== JSON.stringify(recB[nombre])) {
+      cambios.push(`📝 Se modificó la receta de: ${nombre}`);
+    }
+  });
+
+  return cambios;
+}
+
+async function verCambiosHistorial(idx) {
+  const detalle = document.getElementById('historial-detalle');
+  detalle.innerHTML = '<div style="padding:16px;color:var(--text-sec);">Cargando cambios…</div>';
+  const entry = window.__historyList[idx];
+  const anteriorEntry = window.__historyList[idx + 1];
+  const [actualRes, anteriorRes] = await Promise.all([
+    window.__getHistorySnapshot(entry.id),
+    anteriorEntry ? window.__getHistorySnapshot(anteriorEntry.id) : Promise.resolve({ data: { snapshot: {} } })
+  ]);
+  const cambios = diffEstados(anteriorRes.data ? anteriorRes.data.snapshot : {}, actualRes.data ? actualRes.data.snapshot : {});
+  let h = `<div class="detail-panel">
+    <div class="detail-title" style="font-size:16px;">Cambios del ${fmtFechaHora(entry.created_at)}</div>
+    <div class="detail-meta">Guardado por: ${entry.changed_by || '—'}</div>`;
+  if (!cambios.length) {
+    h += `<div style="padding:12px 0;color:var(--text-sec);">No se detectaron cambios respecto a la versión anterior (guardado sin modificaciones nuevas).</div>`;
+  } else {
+    h += `<ul style="margin-top:12px;padding-left:0;list-style:none;">`;
+    cambios.forEach(c => { h += `<li style="padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">${c}</li>`; });
+    h += `</ul>`;
+  }
+  if (!isViewer) {
+    h += `<button class="logout-btn" style="margin-top:16px;" onclick="restaurarVersion(${entry.id})">↺ Restaurar esta versión</button>`;
+  }
+  h += `</div>`;
+  detalle.innerHTML = h;
+}
+
+async function restaurarVersion(id) {
+  if (blockIfViewer()) return;
+  if (!confirm('¿Restaurar esta versión? Va a quedar como el estado actual. (Si te arrepentís, esto también queda guardado en el historial y podés volver a restaurar la versión de antes.)')) return;
+  const { data, error } = await window.__getHistorySnapshot(id);
+  if (error || !data) { alert('No se pudo cargar esa versión.'); return; }
+  const snap = data.snapshot;
+  applyState({
+    insumos: snap.insumos,
+    rendimientos: snap.rendimientos,
+    recetas: snap.recetas,
+    prodRinde: snap.prod_rinde,
+    platosExtra: snap.platos_extra,
+    produccionesExtra: snap.producciones_extra,
+    recetaRendimientos: snap.receta_rendimientos,
+    platosDeleted: snap.platos_deleted,
+    produccionesDeleted: snap.producciones_deleted,
+    insumosExtra: snap.insumos_extra,
+    insumosDeleted: snap.insumos_deleted,
+    ventaOverrides: snap.venta_overrides,
+    categoriaOverrides: snap.categoria_overrides
+  });
+  saveStateDebounced();
+  alert('Versión restaurada y guardada como el estado actual.');
+  switchTab('platos');
 }
 </script>
 </body>
