@@ -364,7 +364,7 @@ let insumosExtra = [];
 let insumosDeleted = [];
 let ventaOverrides = {};
 let categoriaOverrides = {};
-let competencia = { locations: ['Local A', 'Local B', 'Local C', 'Local D'], prices: {} };
+let competencia = { locations: ['Local A', 'Local B', 'Local C', 'Local D'], urls: ['', '', '', ''], prices: {} };
 
 function normName(s) { return (s || '').trim().toUpperCase(); }
 
@@ -1465,7 +1465,8 @@ function applyState(state) {
   produccionesDeleted = state.produccionesDeleted || [];
   ventaOverrides = state.ventaOverrides || {};
   categoriaOverrides = state.categoriaOverrides || {};
-  competencia = state.competencia && state.competencia.locations ? state.competencia : { locations: ['Local A', 'Local B', 'Local C', 'Local D'], prices: {} };
+  competencia = state.competencia && state.competencia.locations ? state.competencia : { locations: ['Local A', 'Local B', 'Local C', 'Local D'], urls: ['', '', '', ''], prices: {} };
+  if (!competencia.urls) competencia.urls = ['', '', '', ''];
   produccionesExtra.forEach(nm => { if (!prodMapCI[normName(nm)]) prodMapCI[normName(nm)] = nm; });
   produccionesDeleted.forEach(nm => removeProdFromMap(nm));
   insumoDatalistHTML = null;
@@ -1829,17 +1830,22 @@ function renderComparativa() {
   const el = document.getElementById('comparativa-section');
   let h = `<div class="header"><div class="title">Comparativa de Precios</div><div class="subtitle">Comparación de tus precios de venta contra otros locales. Solo para referencia, no afecta el pricing de FARDA.</div></div>`;
 
-  h += `<div class="detail-panel" style="margin-bottom:20px;max-width:640px;">
-    <div class="detail-title" style="font-size:14px;margin-bottom:10px;">Nombres de los locales a comparar</div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;">`;
+  h += `<div class="detail-panel" style="margin-bottom:20px;max-width:900px;">
+    <div class="detail-title" style="font-size:14px;margin-bottom:10px;">Locales a comparar</div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;">`;
   competencia.locations.forEach((loc, idx) => {
-    h += `<input class="ins-input" style="width:140px;" value="${(loc||'').replace(/"/g,'&quot;')}" ${isViewer?'disabled':''} onchange="renombrarLocalComparativa(${idx}, this.value)">`;
+    h += `<div style="display:flex;flex-direction:column;gap:6px;">
+      <input class="ins-input" style="width:160px;" value="${(loc||'').replace(/"/g,'&quot;')}" ${isViewer?'disabled':''} placeholder="Nombre del local" onchange="renombrarLocalComparativa(${idx}, this.value)">
+      <input class="ins-input" style="width:160px;font-size:11px;" value="${(competencia.urls[idx]||'').replace(/"/g,'&quot;')}" ${isViewer?'disabled':''} placeholder="URL de la carta" onchange="setUrlComparativa(${idx}, this.value)">
+    </div>`;
   });
   h += `</div></div>`;
 
   h += `<div class="table-container"><table><thead><tr><th>Plato</th><th class="right">FARDA</th>`;
   competencia.locations.forEach((loc, idx) => {
-    h += `<th class="right">${cap(loc || ('Local ' + (idx+1)))}</th>`;
+    const nombreLocal = cap(loc || ('Local ' + (idx+1)));
+    const url = competencia.urls[idx];
+    h += `<th class="right">${url ? `<a href="${url}" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:underline;">${nombreLocal} ↗</a>` : nombreLocal}</th>`;
   });
   h += `<th class="right">Diferencia prom.</th></tr></thead><tbody>`;
 
@@ -1869,6 +1875,15 @@ function renderComparativa() {
 function renombrarLocalComparativa(idx, valor) {
   if (blockIfViewer()) return;
   competencia.locations[idx] = valor;
+  saveStateDebounced();
+  renderComparativa();
+}
+
+function setUrlComparativa(idx, valor) {
+  if (blockIfViewer()) return;
+  let url = valor.trim();
+  if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
+  competencia.urls[idx] = url;
   saveStateDebounced();
   renderComparativa();
 }
