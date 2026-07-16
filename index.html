@@ -126,6 +126,7 @@
   <button class="tab-btn" data-tab="insumos" onclick="switchTab('insumos')">INSUMOS</button>
   <button class="tab-btn" data-tab="exportar" onclick="switchTab('exportar')">EXPORTAR</button>
   <button class="tab-btn" data-tab="historial" onclick="switchTab('historial')">HISTORIAL</button>
+  <button class="tab-btn" data-tab="comparativa" onclick="switchTab('comparativa')">COMPARATIVA</button>
 </div>
 <div class="main">
   <div id="platos-section" class="section active"></div>
@@ -135,6 +136,7 @@
   <div id="insumos-section" class="section"></div>
   <div id="exportar-section" class="section"></div>
   <div id="historial-section" class="section"></div>
+  <div id="comparativa-section" class="section"></div>
 </div>
 </div>
 
@@ -214,6 +216,7 @@
       insumos_deleted: state.insumosDeleted,
       venta_overrides: state.ventaOverrides,
       categoria_overrides: state.categoriaOverrides,
+      competencia: state.competencia,
       updated_at: new Date().toISOString()
     };
     const { data: saved, error } = await supabase
@@ -279,7 +282,7 @@
   }
 
   async function loadAndStart() {
-    const res = await supabase.from('pricing_state').select('insumos, rendimientos, recetas, prod_rinde, platos_extra, producciones_extra, receta_rendimientos, platos_deleted, producciones_deleted, insumos_extra, insumos_deleted, venta_overrides, categoria_overrides, updated_at').eq('id', 1).maybeSingle();
+    const res = await supabase.from('pricing_state').select('insumos, rendimientos, recetas, prod_rinde, platos_extra, producciones_extra, receta_rendimientos, platos_deleted, producciones_deleted, insumos_extra, insumos_deleted, venta_overrides, categoria_overrides, competencia, updated_at').eq('id', 1).maybeSingle();
     if (res.error) {
       console.error('No se pudo leer de la nube', res.error);
       loadedOk = false;
@@ -302,7 +305,8 @@
       insumosExtra: data.insumos_extra || [],
       insumosDeleted: data.insumos_deleted || [],
       ventaOverrides: data.venta_overrides || {},
-      categoriaOverrides: data.categoria_overrides || {}
+      categoriaOverrides: data.categoria_overrides || {},
+      competencia: data.competencia || {}
     });
   }
 
@@ -360,6 +364,7 @@ let insumosExtra = [];
 let insumosDeleted = [];
 let ventaOverrides = {};
 let categoriaOverrides = {};
+let competencia = { locations: ['Local A', 'Local B', 'Local C', 'Local D'], prices: {} };
 
 function normName(s) { return (s || '').trim().toUpperCase(); }
 
@@ -380,7 +385,8 @@ function saveStateDebounced() {
       insumosExtra,
       insumosDeleted,
       ventaOverrides,
-      categoriaOverrides
+      categoriaOverrides,
+      competencia
     });
   }, 600);
 }
@@ -656,6 +662,7 @@ function switchTab(tabName) {
   else if (tabName === 'insumos') renderInsumos();
   else if (tabName === 'exportar') renderExportar();
   else if (tabName === 'historial') renderHistorial();
+  else if (tabName === 'comparativa') renderComparativa();
 }
 
 // ──── PLATOS ─────────────────────────────────────────────────────────────────
@@ -1458,6 +1465,7 @@ function applyState(state) {
   produccionesDeleted = state.produccionesDeleted || [];
   ventaOverrides = state.ventaOverrides || {};
   categoriaOverrides = state.categoriaOverrides || {};
+  competencia = state.competencia && state.competencia.locations ? state.competencia : { locations: ['Local A', 'Local B', 'Local C', 'Local D'], prices: {} };
   produccionesExtra.forEach(nm => { if (!prodMapCI[normName(nm)]) prodMapCI[normName(nm)] = nm; });
   produccionesDeleted.forEach(nm => removeProdFromMap(nm));
   insumoDatalistHTML = null;
@@ -1814,6 +1822,64 @@ async function restaurarVersion(id) {
   saveStateDebounced();
   alert('Versión restaurada y guardada como el estado actual.');
   switchTab('platos');
+}
+
+// ──── COMPARATIVA ────────────────────────────────────────────────────────────
+function renderComparativa() {
+  const el = document.getElementById('comparativa-section');
+  let h = `<div class="header"><div class="title">Comparativa de Precios</div><div class="subtitle">Comparación de tus precios de venta contra otros locales. Solo para referencia, no afecta el pricing de FARDA.</div></div>`;
+
+  h += `<div class="detail-panel" style="margin-bottom:20px;max-width:640px;">
+    <div class="detail-title" style="font-size:14px;margin-bottom:10px;">Nombres de los locales a comparar</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">`;
+  competencia.locations.forEach((loc, idx) => {
+    h += `<input class="ins-input" style="width:140px;" value="${(loc||'').replace(/"/g,'&quot;')}" ${isViewer?'disabled':''} onchange="renombrarLocalComparativa(${idx}, this.value)">`;
+  });
+  h += `</div></div>`;
+
+  h += `<div class="table-container"><table><thead><tr><th>Plato</th><th class="right">FARDA</th>`;
+  competencia.locations.forEach((loc, idx) => {
+    h += `<th class="right">${cap(loc || ('Local ' + (idx+1)))}</th>`;
+  });
+  h += `<th class="right">Diferencia prom.</th></tr></thead><tbody>`;
+
+  Object.entries(getAllCategorias()).forEach(([cat, nombres]) => {
+    if (!nombres.length) return;
+    h += `<tr><td colspan="${3 + competencia.locations.length}" style="background:var(--bg-alt);font-weight:700;font-size:11px;letter-spacing:1px;color:var(--text-sec);padding:8px 12px;">${cap(cat)}</td></tr>`;
+    nombres.forEach(nm => {
+      const p = getPlatoMeta(nm);
+      if (!p) return;
+      const preciosComp = (competencia.prices[nm] || []);
+      h += `<tr><td class="td-name">${nm}</td><td class="td-num">${fmt(p.venta)}</td>`;
+      let sumDiff = 0, countDiff = 0;
+      competencia.locations.forEach((loc, idx) => {
+        const val = preciosComp[idx];
+        if (val != null && p.venta) { sumDiff += (p.venta - val) / val; countDiff++; }
+        h += `<td class="td-num"><input class="sim-input" style="width:100px;" type="number" value="${val != null ? val : ''}" placeholder="—" ${isViewer?'disabled':''} onchange="setPrecioComparativa('${nm.replace(/'/g,"\\'")}', ${idx}, this.value)"></td>`;
+      });
+      const diffPct = countDiff ? Math.round((sumDiff / countDiff) * 1000) / 10 : null;
+      const diffColor = diffPct == null ? 'var(--text-ter)' : (diffPct > 0 ? 'var(--red)' : 'var(--green)');
+      h += `<td class="td-num" style="color:${diffColor};font-weight:600;">${diffPct != null ? (diffPct > 0 ? '+' : '') + diffPct + '%' : '—'}</td></tr>`;
+    });
+  });
+  h += `</tbody></table></div>`;
+  el.innerHTML = h;
+}
+
+function renombrarLocalComparativa(idx, valor) {
+  if (blockIfViewer()) return;
+  competencia.locations[idx] = valor;
+  saveStateDebounced();
+  renderComparativa();
+}
+
+function setPrecioComparativa(nombre, idx, valor) {
+  if (blockIfViewer()) return;
+  if (!competencia.prices[nombre]) competencia.prices[nombre] = [];
+  const v = valor === '' ? null : parseFloat(valor);
+  competencia.prices[nombre][idx] = (v != null && !isNaN(v)) ? v : null;
+  saveStateDebounced();
+  renderComparativa();
 }
 </script>
 </body>
