@@ -113,10 +113,11 @@
     <input type="email" id="login-email" placeholder="Email" autocomplete="username">
     <input type="password" id="login-password" placeholder="Contraseña" autocomplete="current-password">
     <button class="btn" onclick="window.__doLogin(document.getElementById('login-email').value, document.getElementById('login-password').value)">Ingresar</button>
+    <button class="btn" style="margin-top:8px;background:transparent;" onclick="window.__doGuestLogin()">Entrar solo para ver</button>
   </div>
 </div>
 <div class="app" style="display:none;">
-<div class="topbar"><div class="logo">FARDA</div><div><span class="save-status" id="save-status"></span><button class="logout-btn" onclick="window.__doLogout()">Cerrar sesión</button></div></div>
+<div class="topbar"><div class="logo">FARDA</div><div><span class="viewer-badge" id="viewer-badge" style="display:none;color:var(--amber);font-size:12px;font-weight:600;margin-right:12px;">👁 MODO SOLO LECTURA</span><span class="save-status" id="save-status"></span><button class="logout-btn" onclick="window.__doLogout()">Cerrar sesión</button></div></div>
 <div class="tabs">
   <button class="tab-btn active" data-tab="platos" onclick="switchTab('platos')">PLATOS</button>
   <button class="tab-btn" data-tab="recetas" onclick="switchTab('recetas')">RECETAS</button>
@@ -147,7 +148,16 @@
 
   // TODO: volver a poner en `true` cuando el login de Supabase esté andando
   // (ver supabase_temp_disable_login.sql para revertir el acceso sin login).
-  const REQUIRE_LOGIN = false;
+  const REQUIRE_LOGIN = true;
+  const VIEWER_EMAIL = "fardapuertomadero@gmail.com";
+  const VIEWER_PASSWORD = "12345678";
+
+  window.__doGuestLogin = async function () {
+    const errEl = document.getElementById('login-error');
+    errEl.textContent = '';
+    const { error } = await supabase.auth.signInWithPassword({ email: VIEWER_EMAIL, password: VIEWER_PASSWORD });
+    if (error) errEl.textContent = 'No se pudo entrar en modo visualización. Avisale a Juan Diego.';
+  };
 
   window.__doLogin = async function (email, password) {
     const errEl = document.getElementById('login-error');
@@ -275,6 +285,9 @@
       if (session) {
         loginScreen.style.display = 'none';
         appEl.style.display = 'grid';
+        window.__isViewerSession = session.user.email === VIEWER_EMAIL;
+        const badge = document.getElementById('viewer-badge');
+        if (badge) badge.style.display = window.__isViewerSession ? 'inline' : 'none';
         await loadAndStart();
       } else {
         loginScreen.style.display = 'flex';
@@ -298,6 +311,14 @@ let prodBaseCost = {};
 const prodFractionCache = new WeakMap();
 let saveTimer = null;
 let recetas = {};
+let isViewer = false;
+function blockIfViewer() {
+  if (isViewer) {
+    alert('Estás en modo solo lectura. Para hacer cambios, pedile a comprasfardafuego@gmail.com que entre con su cuenta.');
+    return true;
+  }
+  return false;
+}
 let prodRinde = {};
 let platosExtra = [];
 let produccionesExtra = [];
@@ -346,6 +367,7 @@ function insumoExists(nombre) {
   return getAllInsumos().some(i => normName(i.nombre) === n);
 }
 function eliminarInsumo(nombre) {
+  if (blockIfViewer()) return;
   const refs = findReferencesToProd(nombre);
   if (refs.length) {
     alert(`No se puede eliminar: lo usan en ${refs.join(', ')}. Sacalo de esas recetas primero.`);
@@ -436,6 +458,7 @@ function findReferencesToProd(nombre) {
   return refs;
 }
 function eliminarPlato(nombre) {
+  if (blockIfViewer()) return;
   if (!confirm(`¿Eliminar el plato "${nombre}"? Esta acción no se puede deshacer.`)) return;
   const idx = platosExtra.findIndex(p => p.nombre === nombre);
   if (idx >= 0) platosExtra.splice(idx, 1);
@@ -449,6 +472,7 @@ function eliminarPlato(nombre) {
   switchTab('platos');
 }
 function eliminarProduccion(nombre) {
+  if (blockIfViewer()) return;
   const refs = findReferencesToProd(nombre);
   if (refs.length) {
     alert(`No se puede eliminar: la usan como ingrediente en ${refs.join(', ')}. Sacala de esas recetas primero.`);
@@ -675,6 +699,7 @@ function renderPlatosList() {
 }
 
 function cambiarCategoriaPlato(sel) {
+  if (blockIfViewer()) return;
   const nombre = sel.dataset.nombre;
   const nuevaCat = sel.value;
   categoriaOverrides[nombre] = nuevaCat;
@@ -684,6 +709,7 @@ function cambiarCategoriaPlato(sel) {
 }
 
 function guardarPrecioPlato(inputId) {
+  if (blockIfViewer()) return;
   const el = document.getElementById(inputId);
   const nombre = el.dataset.nombre;
   const v = parseFloat(el.value);
@@ -694,6 +720,7 @@ function guardarPrecioPlato(inputId) {
 }
 
 function crearPlato() {
+  if (blockIfViewer()) return;
   const nombreEl = document.getElementById('new-plato-nombre');
   const nombre = nombreEl.value.trim();
   if (!nombre) return;
@@ -707,6 +734,7 @@ function crearPlato() {
 }
 
 function crearProduccion() {
+  if (blockIfViewer()) return;
   const nombreEl = document.getElementById('new-prod-nombre');
   const nombre = nombreEl.value.trim();
   if (!nombre) return;
@@ -942,6 +970,7 @@ function renderDetail(nm, type) {
 }
 
 function toggleRend(nombre, enabled, ctx) {
+  if (blockIfViewer()) return;
   if (!rendimientos[nombre]) rendimientos[nombre] = { enabled: false, factor: 1 };
   rendimientos[nombre].enabled = enabled;
   if (enabled && (!rendimientos[nombre].factor || rendimientos[nombre].factor >= 1)) rendimientos[nombre].factor = 1;
@@ -950,6 +979,7 @@ function toggleRend(nombre, enabled, ctx) {
 }
 
 function setRend(nombre, val, ctx) {
+  if (blockIfViewer()) return;
   if (!rendimientos[nombre]) rendimientos[nombre] = { enabled: true, factor: 1 };
   const f = parseFloat(val) / 100;
   rendimientos[nombre].factor = (f > 0 && f <= 1) ? f : 1;
@@ -968,6 +998,7 @@ function entityKind(ctx) { return ctx === 'plato' ? 'plato' : 'prod'; }
 
 // Rendimiento específico de una receta/producción (no toca el general del insumo).
 function toggleRecetaRend(receta, nombre, enabled, ctx) {
+  if (blockIfViewer()) return;
   if (!recetaRendimientos[receta]) recetaRendimientos[receta] = {};
   const cur = { ...getEffectiveRend(receta, nombre) };
   cur.enabled = enabled;
@@ -978,6 +1009,7 @@ function toggleRecetaRend(receta, nombre, enabled, ctx) {
 }
 
 function setRecetaRend(receta, nombre, val, ctx) {
+  if (blockIfViewer()) return;
   if (!recetaRendimientos[receta]) recetaRendimientos[receta] = {};
   const cur = recetaRendimientos[receta][nombre] || { enabled: true, factor: 1 };
   const f = parseFloat(val) / 100;
@@ -990,12 +1022,14 @@ function setRecetaRend(receta, nombre, val, ctx) {
 }
 
 function clearRecetaRend(receta, nombre, ctx) {
+  if (blockIfViewer()) return;
   if (recetaRendimientos[receta]) delete recetaRendimientos[receta][nombre];
   rerender(ctx);
   saveStateDebounced();
 }
 
 function updateIngCantidad(nombre, idx, val, ctx) {
+  if (blockIfViewer()) return;
   const arr = ensureRecetaOverride(nombre, entityKind(ctx));
   if (!arr[idx]) return;
   const v = parseFloat(val);
@@ -1006,6 +1040,7 @@ function updateIngCantidad(nombre, idx, val, ctx) {
 }
 
 function updateIngUnidad(nombre, idx, val, ctx) {
+  if (blockIfViewer()) return;
   const arr = ensureRecetaOverride(nombre, entityKind(ctx));
   if (!arr[idx]) return;
   arr[idx].unidad = val;
@@ -1014,6 +1049,7 @@ function updateIngUnidad(nombre, idx, val, ctx) {
 }
 
 function removeIngLine(nombre, idx, ctx) {
+  if (blockIfViewer()) return;
   const arr = ensureRecetaOverride(nombre, entityKind(ctx));
   arr.splice(idx, 1);
   rerender(ctx);
@@ -1032,6 +1068,7 @@ function autofillUnidad(aid) {
 }
 
 function addIngLine(nombre, ctx) {
+  if (blockIfViewer()) return;
   const prefix = 'addln_' + safeid(nombre);
   const insumoEl = document.getElementById(prefix + '_insumo');
   const cantEl = document.getElementById(prefix + '_cant');
@@ -1051,6 +1088,7 @@ function addIngLine(nombre, ctx) {
 }
 
 function setProdRinde(nombre, cantidadVal, unidad) {
+  if (blockIfViewer()) return;
   const v = parseFloat(cantidadVal);
   if (isNaN(v) || v <= 0) delete prodRinde[nombre];
   else prodRinde[nombre] = { cantidad: v, unidad };
@@ -1272,6 +1310,7 @@ function renderInsumos() {
 }
 
 function crearInsumo() {
+  if (blockIfViewer()) return;
   const nombreEl = document.getElementById('new-insumo-nombre');
   const nombre = nombreEl.value.trim();
   if (!nombre) return;
@@ -1338,6 +1377,7 @@ function renderInsumosTable() {
 }
 
 function setInsumoUnidad(nombre, unidad) {
+  if (blockIfViewer()) return;
   if (!insumosPrices[nombre]) return;
   insumosPrices[nombre].unidad = unidad;
   saveStateDebounced();
@@ -1351,6 +1391,7 @@ function setIVA(inputId, ivaVal, finalId) {
 }
 
 function calcFinal(costoId, finalId, ivaVal) {
+  if (blockIfViewer()) return;
   const inp = document.getElementById(costoId);
   const c = parseFloat(inp.value) || 0;
   const nombre = inp && inp.dataset.nombre;
@@ -1366,6 +1407,7 @@ function calcFinal(costoId, finalId, ivaVal) {
 
 window.startApp = function (state) {
   state = state || {};
+  isViewer = !!window.__isViewerSession;
   insumosExtra = state.insumosExtra || [];
   insumosDeleted = state.insumosDeleted || [];
   insumosPrices = {};
