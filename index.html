@@ -643,6 +643,42 @@ function costoActualPlato(nombre, meta) {
   return meta ? meta.costo : null;
 }
 
+function ivaLineaIng(ing, recetaNombre) {
+  const prodKey = getProdKey(ing.insumo);
+  if (prodKey) {
+    const rinde = prodRinde[prodKey];
+    if (rinde && rinde.cantidad > 0) {
+      const unitIva = ivaProduccion(prodKey) / rinde.cantidad;
+      return (ing.cantidad || 0) * unitIva * rendRatio(recetaNombre, ing.insumo);
+    }
+    const frac = getProdFraction(ing, prodKey);
+    if (frac != null) return frac * ivaProduccion(prodKey) * rendRatio(recetaNombre, ing.insumo);
+    return 0;
+  }
+  const liveKey = insumosPricesCI[normName(ing.insumo)];
+  const ivaRate = liveKey ? (insumosPrices[liveKey].iva || 0) : 0;
+  const costoBase = liveKey ? insumosPrices[liveKey].costo : ((ing.cantidad && ing.costo) ? (ing.costo / ing.cantidad) : 0);
+  const cantB = cantidadBruta(recetaNombre, ing.insumo, ing.cantidad || 0);
+  return cantB * costoBase * ivaRate;
+}
+
+function ivaProduccion(nombre) {
+  const ings = getProdIngredients(nombre) || [];
+  return ings.reduce((a, ing) => a + ivaLineaIng(ing, nombre), 0);
+}
+
+function ivaPlato(nombre) {
+  const ings = getPlatoIngredients(nombre) || [];
+  return ings.reduce((a, ing) => a + ivaLineaIng(ing, nombre), 0);
+}
+
+function ivaActualPlato(nombre) {
+  if (getPlatoIngredients(nombre)) return ivaPlato(nombre);
+  const liveKey = insumosPricesCI[normName(nombre)];
+  if (liveKey && insumosPrices[liveKey]) return insumosPrices[liveKey].costo * (insumosPrices[liveKey].iva || 0);
+  return 0;
+}
+
 function costoProduccion(nombre) {
   const prod = getProdIngredients(nombre);
   if (!prod) return 0;
@@ -866,8 +902,9 @@ function renderDetail(nm, type) {
     metaText = 'Producción';
   }
 
-  let tc = 0, ir = '';
+  let tc = 0, ivaTotal = 0, ir = '';
   ings.forEach((ing, idx) => {
+    ivaTotal += ivaLineaIng(ing, nm);
     const prodKey = getProdKey(ing.insumo);
     const isProd = prodKey != null;
     const liveKey = insumosPricesCI[normName(ing.insumo)];
@@ -948,6 +985,8 @@ function renderDetail(nm, type) {
 
   const fc = venta ? tc / venta : null;
   let summary = `<div class="cost-summary"><div><div class="cost-item-label">Costo total</div><div class="cost-item-value teal">${fmt(tc)}</div></div>`;
+  summary += `<div><div class="cost-item-label">IVA contenido</div><div class="cost-item-value" style="color:var(--text-sec);">${fmt(ivaTotal)}</div></div>`;
+  summary += `<div><div class="cost-item-label">Total c/IVA</div><div class="cost-item-value">${fmt(tc + ivaTotal)}</div></div>`;
   if (venta != null) summary += `<div><div class="cost-item-label">Precio venta</div><div class="cost-item-value">${fmt(venta)}</div></div>`;
   if (fc != null) summary += `<div><div class="cost-item-label">Food Cost</div><div class="cost-item-value">${fcBadge(fc)}</div></div>`;
   if (type === 'prod' && prodRinde[nm] && prodRinde[nm].cantidad > 0) {
@@ -1192,8 +1231,9 @@ function renderProdDetailTab(nm) {
   const prod = getProdIngredients(nm);
   if (!prod) return '<div style="padding:20px;">Producción no encontrada</div>';
   const ctx = 'prod-producciones';
-  let tc=0, ir='';
+  let tc=0, ivaTotal=0, ir='';
   prod.forEach((ing, idx) => {
+    ivaTotal += ivaLineaIng(ing, nm);
     const prodKey = getProdKey(ing.insumo);
     const isSubProd = prodKey != null;
     const liveKey = insumosPricesCI[normName(ing.insumo)];
@@ -1285,6 +1325,8 @@ function renderProdDetailTab(nm) {
   }
 
   let summary = `<div class="cost-summary"><div><div class="cost-item-label">Costo de lote</div><div class="cost-item-value teal">${fmt(tc)}</div></div>`;
+  summary += `<div><div class="cost-item-label">IVA contenido</div><div class="cost-item-value" style="color:var(--text-sec);">${fmt(ivaTotal)}</div></div>`;
+  summary += `<div><div class="cost-item-label">Total lote c/IVA</div><div class="cost-item-value">${fmt(tc + ivaTotal)}</div></div>`;
   if (rinde && rinde.cantidad > 0) {
     summary += `<div><div class="cost-item-label">Costo por 1 ${rinde.unidad}</div><div class="cost-item-value teal">${fmt(tc / rinde.cantidad)}</div></div>`;
   }
@@ -1506,11 +1548,14 @@ function buildExportData() {
       const p = getPlatoMeta(nombre);
       if (!p) return;
       const costoLive = costoActualPlato(nombre, p);
+      const ivaLive = ivaActualPlato(nombre);
       const fcLive = (costoLive != null && p.venta) ? costoLive / p.venta : null;
       platos.push({
         categoria: cat,
         nombre: nombre,
         costo: costoLive != null ? Math.round(costoLive * 100) / 100 : '',
+        iva_contenido: ivaLive != null ? Math.round(ivaLive * 100) / 100 : '',
+        costo_c_iva: costoLive != null ? Math.round((costoLive + (ivaLive || 0)) * 100) / 100 : '',
         venta: p.venta != null ? Math.round(p.venta * 100) / 100 : '',
         fc: fcLive != null ? Math.round(fcLive * 10000) / 100 : ''
       });
@@ -1522,6 +1567,7 @@ function buildExportData() {
     const ings = getPlatoIngredients(p.nombre) || [];
     ings.forEach(ing => {
       const cl = costoLineaIng(ing, p.nombre);
+      const il = ivaLineaIng(ing, p.nombre);
       const isProd = getProdKey(ing.insumo) != null;
       recetasRows.push({
         plato: p.nombre,
@@ -1529,7 +1575,8 @@ function buildExportData() {
         tipo: isProd ? 'Producción' : 'Insumo',
         unidad: ing.unidad || '',
         cantidad: ing.cantidad != null ? ing.cantidad : '',
-        costo_linea: Math.round(cl * 100) / 100
+        costo_linea: Math.round(cl * 100) / 100,
+        iva_linea: Math.round(il * 100) / 100
       });
     });
   });
@@ -1540,6 +1587,7 @@ function buildExportData() {
     const ings = getProdIngredients(pn) || [];
     ings.forEach(ing => {
       const cl = costoLineaIng(ing, pn);
+      const il = ivaLineaIng(ing, pn);
       const isProd = getProdKey(ing.insumo) != null;
       produccionesRows.push({
         produccion: pn,
@@ -1547,7 +1595,8 @@ function buildExportData() {
         tipo: isProd ? 'Producción' : 'Insumo',
         unidad: ing.unidad || '',
         cantidad: ing.cantidad != null ? ing.cantidad : '',
-        costo_linea: Math.round(cl * 100) / 100
+        costo_linea: Math.round(cl * 100) / 100,
+        iva_linea: Math.round(il * 100) / 100
       });
     });
   });
@@ -1578,17 +1627,17 @@ function exportExcel() {
   const wb = XLSX.utils.book_new();
 
   const wsPlatos = XLSX.utils.json_to_sheet(platos.map(p => ({
-    'Categoría': p.categoria, 'Plato': p.nombre, 'Costo sin IVA': p.costo, 'Precio Venta': p.venta, 'Food Cost %': p.fc
+    'Categoría': p.categoria, 'Plato': p.nombre, 'Costo sin IVA': p.costo, 'IVA Contenido': p.iva_contenido, 'Costo c/IVA': p.costo_c_iva, 'Precio Venta': p.venta, 'Food Cost %': p.fc
   })));
   XLSX.utils.book_append_sheet(wb, wsPlatos, 'PLATOS');
 
   const wsRecetas = XLSX.utils.json_to_sheet(recetasRows.map(r => ({
-    'Plato': r.plato, 'Insumo/Producción': r.insumo, 'Tipo': r.tipo, 'Unidad': r.unidad, 'Cantidad': r.cantidad, 'Costo Línea': r.costo_linea
+    'Plato': r.plato, 'Insumo/Producción': r.insumo, 'Tipo': r.tipo, 'Unidad': r.unidad, 'Cantidad': r.cantidad, 'Costo Línea': r.costo_linea, 'IVA Línea': r.iva_linea
   })));
   XLSX.utils.book_append_sheet(wb, wsRecetas, 'RECETAS');
 
   const wsProd = XLSX.utils.json_to_sheet(produccionesRows.map(r => ({
-    'Producción': r.produccion, 'Insumo/Producción': r.insumo, 'Tipo': r.tipo, 'Unidad': r.unidad, 'Cantidad': r.cantidad, 'Costo Línea': r.costo_linea
+    'Producción': r.produccion, 'Insumo/Producción': r.insumo, 'Tipo': r.tipo, 'Unidad': r.unidad, 'Cantidad': r.cantidad, 'Costo Línea': r.costo_linea, 'IVA Línea': r.iva_linea
   })));
   XLSX.utils.book_append_sheet(wb, wsProd, 'PRODUCCIONES');
 
