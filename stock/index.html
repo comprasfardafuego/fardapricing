@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FARDA — Control de Stock</title>
+<style>
+<style>
+  :root { --bg: #0c0b0b; --bg-alt: #17140f; --border: #3a332a; --text-main: #eae6e0; --text-sec: #a8a09a; --text-ter: #7a7167; --teal: #b2a79a; --teal-dark: #665640; --amber: #e67e22; --red: #c0392b; --green: #27ae60; --warn-bg: #fff3cd; --warn-text: #856404; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); color: var(--text-main); min-height: 100vh; line-height: 1.6; }
+  .app { display: grid; grid-template-rows: 60px auto 1fr; height: 100vh; }
+  .topbar { background: var(--bg-alt); display: flex; align-items: center; justify-content: space-between; padding: 0 32px; border-bottom: 1px solid var(--border); }
+  .tabs { background: var(--bg-alt); display: flex; border-bottom: 1px solid var(--border); padding: 0 32px; }
+  .tab-btn { background: transparent; border: none; color: var(--text-sec); padding: 16px 20px; font-size: 13px; font-weight: 600; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.2s; white-space: nowrap; }
+  .tab-btn:hover { color: var(--text-main); border-bottom-color: var(--teal); }
+  .tab-btn.active { color: var(--teal); border-bottom-color: var(--teal); }
+  .main { overflow-y: auto; padding: 32px; }
+  .logo { font-size: 18px; font-weight: 700; letter-spacing: 2px; }
+  .section { display: none; }
+  .section.active { display: block; }
+  .header { margin-bottom: 24px; }
+  .title { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+  .subtitle { font-size: 13px; color: var(--text-sec); }
+  .crumbs { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 16px; flex-wrap: wrap; }
+  .crumb { cursor: pointer; color: var(--teal); }
+  .crumb:hover { text-decoration: underline; }
+  .crumb.active { color: var(--text-main); cursor: default; font-weight: 600; }
+  .crumb-sep { color: var(--text-ter); }
+  .back-btn { background: var(--bg-alt); border: 1px solid var(--border); color: var(--text-main); padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; margin-bottom: 20px; display: inline-flex; align-items: center; gap: 8px; }
+  .back-btn:hover { border-color: var(--teal); color: var(--teal); }
+  .table-container { background: var(--bg-alt); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 24px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-ter); padding: 12px 16px; text-align: left; background: var(--bg-alt); border-bottom: 1px solid var(--border); font-weight: 600; }
+  th.right { text-align: right; }
+  th.center { text-align: center; }
+  td { padding: 14px 16px; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover { background: rgba(255,255,255,0.02); }
+  .td-name { color: var(--teal); cursor: pointer; font-weight: 500; }
+  .td-name:hover { text-decoration: underline; }
+  .td-name.disabled { color: var(--text-sec); cursor: default; }
+  .td-name.disabled:hover { text-decoration: none; }
+  .td-num { text-align: right; font-variant-numeric: tabular-nums; color: var(--text-main); }
+  .td-center { text-align: center; }
+  .fc-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 700; }
+  .fc-ok { background: rgba(39,174,96,0.15); color: #2ecc71; }
+  .fc-warn { background: rgba(230,126,34,0.15); color: var(--amber); }
+  .fc-bad { background: rgba(192,57,43,0.15); color: var(--red); }
+  .fc-none { background: rgba(120,120,120,0.2); color: var(--text-sec); }
+  .sim-cell { display: flex; gap: 8px; align-items: center; }
+  .sim-input { background: var(--border); border: 1px solid var(--border); color: var(--text-main); padding: 6px 10px; border-radius: 4px; font-size: 12px; width: 110px; text-align: right; outline: none; }
+  .sim-input:focus { border-color: var(--teal); }
+  .sim-fc { font-size: 12px; font-weight: 700; min-width: 60px; text-align: right; }
+  .detail-panel { background: var(--bg-alt); border: 1px solid var(--border); border-radius: 8px; padding: 24px; margin-bottom: 20px; }
+  .detail-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; color: var(--text-main); }
+  .detail-meta { font-size: 12px; color: var(--text-sec); margin-bottom: 16px; }
+  .cost-summary { display: flex; gap: 24px; flex-wrap: wrap; padding: 16px; background: var(--bg); border-radius: 6px; margin-bottom: 20px; }
+  .cost-item-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-ter); margin-bottom: 4px; }
+  .cost-item-value { font-size: 20px; font-weight: 700; color: var(--text-main); }
+  .cost-item-value.teal { color: var(--teal); }
+  .ing-table { width: 100%; margin-top: 12px; }
+  .ing-table th { padding: 10px 14px; font-size: 10px; border-bottom: 1px solid var(--border); }
+  .ing-table td { padding: 10px 14px; font-size: 12px; border-bottom: 1px solid rgba(255,255,255,0.03); vertical-align: middle; }
+  .ing-name { color: var(--text-main); }
+  .ing-name.clickable { color: var(--teal); cursor: pointer; }
+  .ing-name.clickable:hover { text-decoration: underline; }
+  .ing-qty { text-align: right; color: var(--text-sec); }
+  .ing-cost { text-align: right; color: var(--text-main); font-weight: 500; }
+  .ing-prod-tag { display: inline-block; background: rgba(178,167,154,0.2); color: var(--teal); padding: 1px 6px; border-radius: 3px; font-size: 9px; margin-left: 6px; vertical-align: middle; }
+  .qty-bruta { font-size: 10px; color: var(--amber); display: block; }
+  .usable-price { font-size: 10px; color: var(--amber); display: block; margin-top: 2px; }
+  .rend-toggle { display: flex; align-items: center; gap: 6px; justify-content: center; }
+  .switch { position: relative; display: inline-block; width: 34px; height: 18px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border); transition: .2s; border-radius: 18px; }
+  .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 2px; bottom: 2px; background-color: var(--text-sec); transition: .2s; border-radius: 50%; }
+  input:checked + .slider { background-color: var(--teal); }
+  input:checked + .slider:before { transform: translateX(16px); background-color: white; }
+  .rend-input-inline { background: var(--border); border: 1px solid var(--border); color: var(--text-main); padding: 4px 6px; border-radius: 4px; font-size: 11px; width: 50px; text-align: right; outline: none; }
+  .rend-input-inline:focus { border-color: var(--teal); }
+  .rend-input-inline:disabled { opacity: 0.3; }
+  .cat-header { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--teal); margin: 24px 0 16px; display: flex; align-items: center; gap: 12px; }
+  .cat-header::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .btn { background: var(--teal); color: var(--bg); border: none; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: 700; cursor: pointer; outline: none; }
+  .btn:hover { opacity: 0.9; }
+  .iva-buttons { display: flex; gap: 8px; }
+  .iva-btn { background: transparent; border: 1px solid var(--border); color: var(--text-sec); padding: 5px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; transition: all 0.15s; }
+  .iva-btn:hover { border-color: var(--teal); color: var(--teal); }
+  .iva-btn.active { background: var(--teal); border-color: var(--teal); color: var(--bg); }
+  .ins-input { background: var(--border); border: 1px solid var(--border); color: var(--text-main); padding: 5px 8px; border-radius: 4px; font-size: 11px; width: 110px; text-align: right; outline: none; }
+  .ins-input:focus { border-color: var(--teal); }
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  #login-screen { display: flex; align-items: center; justify-content: center; height: 100vh; }
+  .login-box { background: var(--bg-alt); border: 1px solid var(--border); border-radius: 8px; padding: 32px; width: 300px; }
+  .login-box .logo { margin-bottom: 20px; text-align: center; color: var(--teal); }
+  .login-box input { width: 100%; background: var(--border); border: 1px solid var(--border); color: var(--text-main); padding: 10px 12px; border-radius: 4px; font-size: 13px; margin-bottom: 12px; outline: none; }
+  .login-box input:focus { border-color: var(--teal); }
+  .login-box .btn { width: 100%; padding: 10px; font-size: 13px; }
+  .login-error { color: var(--red); font-size: 12px; margin-bottom: 12px; min-height: 16px; }
+  .logout-btn { background: transparent; border: 1px solid var(--border); color: var(--text-sec); padding: 6px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+  .logout-btn:hover { border-color: var(--red); color: var(--red); }
+  .save-status { font-size: 11px; color: var(--text-ter); margin-right: 12px; }
+</style>
+
+  #login-screen { display: flex; align-items: center; justify-content: center; height: 100vh; }
+  .login-box { background: var(--bg-alt); border: 1px solid var(--border); border-radius: 12px; padding: 40px; width: 340px; text-align: center; }
+  .login-box h1 { font-size: 20px; margin-bottom: 24px; letter-spacing: 2px; }
+  .login-box input { width: 100%; margin-bottom: 12px; }
+  #login-error { color: var(--red); font-size: 12px; margin-bottom: 12px; min-height: 16px; }
+  .mov-badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700; }
+  .mov-entrada { background: rgba(39,174,96,0.15); color: var(--green); }
+  .mov-salida { background: rgba(192,57,43,0.15); color: var(--red); }
+  .mov-ajuste { background: rgba(230,126,34,0.15); color: var(--amber); }
+  .stock-low { color: var(--red); font-weight: 700; }
+  .modal-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:100; }
+  .modal-box { background: var(--bg-alt); border:1px solid var(--border); border-radius:12px; padding:24px; width:380px; }
+  .modal-box h3 { margin-bottom:16px; font-size:16px; }
+  .modal-box label { display:block; font-size:11px; text-transform:uppercase; color:var(--text-sec); margin:12px 0 4px; }
+  .modal-box input, .modal-box select, .modal-box textarea { width:100%; }
+  .modal-actions { display:flex; gap:10px; margin-top:20px; }
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-box">
+    <h1>FARDA — STOCK</h1>
+    <input class="ins-input" type="email" id="login-email" placeholder="Email">
+    <input class="ins-input" type="password" id="login-password" placeholder="Contraseña">
+    <div id="login-error"></div>
+    <button class="btn" style="width:100%;" onclick="window.__doLogin(document.getElementById('login-email').value, document.getElementById('login-password').value)">Ingresar</button>
+    <button class="btn" style="width:100%;margin-top:8px;background:transparent;" onclick="window.__doGuestLogin()">Entrar solo para ver</button>
+    <div style="margin-top:16px;"><a href="index.html" style="color:var(--text-sec);font-size:12px;">← Volver a Pricing</a></div>
+  </div>
+</div>
+
+<div class="app" style="display:none;">
+  <div class="topbar">
+    <div class="logo">FARDA — STOCK</div>
+    <div style="display:flex;align-items:center;gap:14px;">
+      <a href="index.html" style="color:var(--text-sec);font-size:12px;">← Pricing</a>
+      <span class="viewer-badge" id="viewer-badge" style="display:none;color:var(--amber);font-size:12px;font-weight:600;">👁 SOLO LECTURA</span>
+      <span class="save-status" id="save-status"></span>
+      <button class="logout-btn" onclick="window.__doLogout()">Cerrar sesión</button>
+    </div>
+  </div>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="stock" onclick="switchTab('stock')">STOCK</button>
+    <button class="tab-btn" data-tab="movimientos" onclick="switchTab('movimientos')">MOVIMIENTOS</button>
+  </div>
+  <div class="main">
+    <div id="stock-section" class="section active"></div>
+    <div id="movimientos-section" class="section"></div>
+  </div>
+</div>
+
+<div id="modal-root"></div>
+
+<script type="module">
+  import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+  const SUPABASE_URL = "https://snwuddryxaehunxbyflp.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNud3VkZHJ5eGFlaHVueGJ5ZmxwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5MDU0ODMsImV4cCI6MjA5ODQ4MTQ4M30.8OO53huAHhFBcLe07aMiA7RWTZ2igQ8r2NfTTH7yFcM";
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const VIEWER_EMAIL = "fardapuertomadero@gmail.com";
+  const VIEWER_PASSWORD = "12345678";
+
+  window.__doGuestLogin = async function () {
+    const errEl = document.getElementById('login-error');
+    errEl.textContent = '';
+    const { error } = await supabase.auth.signInWithPassword({ email: VIEWER_EMAIL, password: VIEWER_PASSWORD });
+    if (error) errEl.textContent = 'No se pudo entrar en modo visualización.';
+  };
+
+  window.__doLogin = async function (email, password) {
+    const errEl = document.getElementById('login-error');
+    errEl.textContent = '';
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) errEl.textContent = 'Email o contraseña incorrectos.';
+  };
+
+  window.__doLogout = function () { supabase.auth.signOut(); };
+
+  window.__getStock = async function () {
+    const { data, error } = await supabase.from('inventario_stock').select('*');
+    return { data, error };
+  };
+
+  window.__getMovimientos = async function (insumo, limit) {
+    let q = supabase.from('inventario_movimientos').select('*').order('created_at', { ascending: false }).limit(limit || 300);
+    if (insumo) q = q.eq('insumo', insumo);
+    const { data, error } = await q;
+    return { data, error };
+  };
+
+  window.__registrarMovimiento = async function (insumo, tipo, cantidad, nota, unidad) {
+    const email = window.__currentUserEmail || null;
+    const { error: errMov } = await supabase.from('inventario_movimientos').insert({
+      insumo, tipo, cantidad, nota, changed_by: email
+    });
+    if (errMov) return { error: errMov };
+
+    const { data: actual } = await supabase.from('inventario_stock').select('cantidad_actual').eq('nombre', insumo).maybeSingle();
+    let nuevaCantidad = actual ? Number(actual.cantidad_actual) : 0;
+    if (tipo === 'entrada') nuevaCantidad += Number(cantidad);
+    else if (tipo === 'salida') nuevaCantidad -= Number(cantidad);
+    else if (tipo === 'ajuste') nuevaCantidad = Number(cantidad);
+
+    const { error: errStock } = await supabase.from('inventario_stock').upsert({
+      nombre: insumo, cantidad_actual: nuevaCantidad, unidad, updated_at: new Date().toISOString()
+    });
+    return { error: errStock, nuevaCantidad };
+  };
+
+  supabase.auth.onAuthStateChange(async (_event, session) => {
+    const loginScreen = document.getElementById('login-screen');
+    const appEl = document.querySelector('.app');
+    if (session) {
+      loginScreen.style.display = 'none';
+      appEl.style.display = 'grid';
+      window.__isViewerSession = session.user.email === VIEWER_EMAIL;
+      window.__currentUserEmail = session.user.email;
+      const badge = document.getElementById('viewer-badge');
+      if (badge) badge.style.display = window.__isViewerSession ? 'inline' : 'none';
+      window.startApp();
+    } else {
+      loginScreen.style.display = 'flex';
+      appEl.style.display = 'none';
+    }
+  });
+
+  document.getElementById('login-password').addEventListener('keydown', e => {
+    if (e.key === 'Enter') window.__doLogin(document.getElementById('login-email').value, document.getElementById('login-password').value);
+  });
+</script>
+
+<script>
+const INSUMOS_BASE = [{"nombre": "ACEITE DE GIRASOL", "unidad": "LT"}, {"nombre": "ACEITE DE OLIVA", "unidad": "LT"}, {"nombre": "ACELGA", "unidad": "KG"}, {"nombre": "ACETO BALSAMICO", "unidad": "LT"}, {"nombre": "AJI JALAPEÑO ROJO", "unidad": "KG"}, {"nombre": "AJI MOLIDO", "unidad": "KG"}, {"nombre": "AJIES VINAGREROS", "unidad": "KG"}, {"nombre": "AJO", "unidad": "KG"}, {"nombre": "AJO EN POLVO", "unidad": "KG"}, {"nombre": "ALBAHACA", "unidad": "KG"}, {"nombre": "ALCAPARRAS", "unidad": "KG"}, {"nombre": "ANCHOAS", "unidad": "KG"}, {"nombre": "ASADO BANDERITA", "unidad": "KG"}, {"nombre": "AVELLANA", "unidad": "KG"}, {"nombre": "AZUCAR", "unidad": "KG"}, {"nombre": "AZUCAR IMPALPABLE", "unidad": "KG"}, {"nombre": "BIFE DE CHORIZO", "unidad": "KG"}, {"nombre": "BONIATO", "unidad": "KG"}, {"nombre": "CACAO EN POLVO", "unidad": "KG"}, {"nombre": "CAFÉ", "unidad": "KG"}, {"nombre": "CEBOLLA", "unidad": "KG"}, {"nombre": "CEBOLLA MORADA", "unidad": "KG"}, {"nombre": "CEBOLLA DE VERDEO", "unidad": "KG"}, {"nombre": "QUESO CHEDDAR INGLES", "unidad": "KG"}, {"nombre": "CHOCLO AMARILLO EN GRANO", "unidad": "KG"}, {"nombre": "CHOCOLATE SEMI AMARGO", "unidad": "KG"}, {"nombre": "CHORIZO", "unidad": "KG"}, {"nombre": "CIBOULETTE", "unidad": "KG"}, {"nombre": "CILANTRO", "unidad": "KG"}, {"nombre": "COMINO", "unidad": "KG"}, {"nombre": "CREMA DE LECHE", "unidad": "LT"}, {"nombre": "DULCE DE LECHE", "unidad": "KG"}, {"nombre": "DULCE DE LECHE REPOSTERO", "unidad": "KG"}, {"nombre": "ENELDO", "unidad": "KG"}, {"nombre": "ENTRAÑA", "unidad": "KG"}, {"nombre": "ESCAROLA", "unidad": "KG"}, {"nombre": "ESPINACA", "unidad": "KG"}, {"nombre": "EXTRACTO DE MALTA LÍQUIDO", "unidad": "KG"}, {"nombre": "EXTRACTO DE TOMATE", "unidad": "KG"}, {"nombre": "FECULA DE MAIZ", "unidad": "KG"}, {"nombre": "GRASA VACUNA", "unidad": "KG"}, {"nombre": "HARINA 000", "unidad": "KG"}, {"nombre": "HARINA 0000", "unidad": "KG"}, {"nombre": "HUEVO", "unidad": "UNIDAD"}, {"nombre": "JAMÓN CRUDO IMPORTADO BELLOTA", "unidad": "KG"}, {"nombre": "JAMÓN CRUDO NACIONAL", "unidad": "KG"}, {"nombre": "LANGOSTINOS ENTEROS", "unidad": "KG"}, {"nombre": "LAUREL", "unidad": "KG"}, {"nombre": "LECHE", "unidad": "LT"}, {"nombre": "LECHE EN POLVO", "unidad": "KG"}, {"nombre": "LECHUGA MORADA", "unidad": "KG"}, {"nombre": "LECHUGA VERDE", "unidad": "KG"}, {"nombre": "LEVADURA FRESCA", "unidad": "KG"}, {"nombre": "LICOR AMARULA", "unidad": "LT"}, {"nombre": "LIMON", "unidad": "KG"}, {"nombre": "LOMO DE VACA", "unidad": "KG"}, {"nombre": "MANI", "unidad": "KG"}, {"nombre": "MANTECA", "unidad": "KG"}, {"nombre": "MATAMBRE DE CERDO", "unidad": "KG"}, {"nombre": "MEJILLONES", "unidad": "KG"}, {"nombre": "MENTA", "unidad": "KG"}, {"nombre": "MIEL", "unidad": "KG"}, {"nombre": "MOLLEJAS", "unidad": "KG"}, {"nombre": "MORCILLA", "unidad": "KG"}, {"nombre": "MORRON AMARILLO", "unidad": "KG"}, {"nombre": "MORRON ROJO", "unidad": "KG"}, {"nombre": "MORRON VERDE", "unidad": "KG"}, {"nombre": "MOSTAZA DIJON", "unidad": "KG"}, {"nombre": "MOSTAZA EN GRANO", "unidad": "KG"}, {"nombre": "NARANJA", "unidad": "KG"}, {"nombre": "NUECES", "unidad": "KG"}, {"nombre": "NUEZ MOSCADA", "unidad": "KG"}, {"nombre": "OJO DE BIFE", "unidad": "KG"}, {"nombre": "OREGANO", "unidad": "KG"}, {"nombre": "PAN SOBRANTE", "unidad": "KG"}, {"nombre": "PANKO", "unidad": "KG"}, {"nombre": "PAPA BLANCA", "unidad": "KG"}, {"nombre": "PATAMUSLO POLLO", "unidad": "KG"}, {"nombre": "PEPINO", "unidad": "KG"}, {"nombre": "PEREJIL", "unidad": "KG"}, {"nombre": "PIMENTON", "unidad": "KG"}, {"nombre": "PIMIENTA NEGRA", "unidad": "KG"}, {"nombre": "POLVO DE HORNEAR", "unidad": "KG"}, {"nombre": "PURE DE TOMATE", "unidad": "KG"}, {"nombre": "QUESO AZUL", "unidad": "KG"}, {"nombre": "QUESO CREMA", "unidad": "KG"}, {"nombre": "QUESO MARCARPONE", "unidad": "KG"}, {"nombre": "QUESO MOZZARELLA", "unidad": "KG"}, {"nombre": "QUESO PROVOLETA", "unidad": "KG"}, {"nombre": "QUESO PROVOLONE", "unidad": "KG"}, {"nombre": "QUESO SBRINZ", "unidad": "KG"}, {"nombre": "QUESO SEMIDURO", "unidad": "KG"}, {"nombre": "REMOLACHA", "unidad": "KG"}, {"nombre": "RICOTA", "unidad": "KG"}, {"nombre": "RUCULA", "unidad": "KG"}, {"nombre": "SAL FINA", "unidad": "KG"}, {"nombre": "SALSA DE OSTRAS", "unidad": "KG"}, {"nombre": "SALSA DE SOJA", "unidad": "LT"}, {"nombre": "SALSA worcestershire", "unidad": "LT"}, {"nombre": "SALVIA", "unidad": "KG"}, {"nombre": "SEMILLA DE HINOJO", "unidad": "KG"}, {"nombre": "SEMOLIN", "unidad": "KG"}, {"nombre": "SETA DE CARDO", "unidad": "KG"}, {"nombre": "STRACCIATELLA", "unidad": "KG"}, {"nombre": "SUPREMA DE POLLO", "unidad": "KG"}, {"nombre": "TAPA DE EMPANADA", "unidad": "UNIDAD"}, {"nombre": "TOMILLO", "unidad": "KG"}, {"nombre": "TRUCHA PATAGONICA", "unidad": "KG"}, {"nombre": "VAINILLAS", "unidad": "KG"}, {"nombre": "VENTANA DE ASADO (COSTILLAR)", "unidad": "KG"}, {"nombre": "VINAGRE DE VINO TINTO", "unidad": "LT"}, {"nombre": "VINO BLANCO", "unidad": "LT"}, {"nombre": "ROMERO", "unidad": "KG"}, {"nombre": "ESPINACA EN POLVO", "unidad": "KG"}, {"nombre": "AGUA", "unidad": "LT"}, {"nombre": "VINAGRE ALCOHOL", "unidad": "LT"}, {"nombre": "CEBOLLA EN POLVO", "unidad": "KG"}, {"nombre": "DESECHO LANGOSTINO", "unidad": "KG"}, {"nombre": "ZANAHORIA", "unidad": "KG"}, {"nombre": "APIO", "unidad": "KG"}, {"nombre": "PUERRO", "unidad": "KG"}, {"nombre": "VERDEO", "unidad": "KG"}, {"nombre": "LICOR TRIPLE SEC", "unidad": "LT"}, {"nombre": "ARANDANOS", "unidad": "KG"}, {"nombre": "ESENCIA DE VAINILLA", "unidad": "LT"}, {"nombre": "QUINOTOS", "unidad": "KG"}, {"nombre": "BICARBONATO", "unidad": "KG"}, {"nombre": "CLAVO DE OLOR", "unidad": "KG"}, {"nombre": "CANELA EN RAMA", "unidad": "KG"}, {"nombre": "AVELLANAS PELADAS", "unidad": "KG"}, {"nombre": "QUESO CREMA CREMATTO", "unidad": "KG"}, {"nombre": "PASTA DE PISTACHO", "unidad": "KG"}, {"nombre": "AGAR AGAR", "unidad": "KG"}, {"nombre": "CAFE ESPRESSO MOLIDO", "unidad": "KG"}, {"nombre": "CACAO AMARGO", "unidad": "KG"}, {"nombre": "EXTRACTO DE MALTA", "unidad": "KG"}, {"nombre": "FECULA DE MANDIOCA", "unidad": "KG"}, {"nombre": "MANTECA AHUMADA PORCION", "unidad": "UNIDAD"}, {"nombre": "HIELO", "unidad": "KG"}, {"nombre": "MASA PASTA SIMPLE KILO", "unidad": "KG"}, {"nombre": "TAPA HOJALDRE EMPANADA", "unidad": "UNIDAD"}, {"nombre": "PAN DE CAMPO UNIDAD", "unidad": "UNIDAD"}, {"nombre": "Catena Zapata Mundus Bascilus Terrae", "unidad": "BOTELLA"}, {"nombre": "Bodega Monteviejo La Violeta 2016", "unidad": "BOTELLA"}, {"nombre": "Escorihuela Gascon Miguel Escorihuela Gascon Single Vineyard 2020", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata River", "unidad": "BOTELLA"}, {"nombre": "Bodega Rolland Val de Flores 2021", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata Malbec Argentino", "unidad": "BOTELLA"}, {"nombre": "Escorihuela Gascon DON", "unidad": "BOTELLA"}, {"nombre": "Escorihuela Gascon MEG", "unidad": "BOTELLA"}, {"nombre": "Trapiche Gran Medalla Malbec", "unidad": "BOTELLA"}, {"nombre": "Bodega del Fin del Mundo FIN Single Vineyard Malbec", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata Angelica Zapata Malbec Alta", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata Appelation Malbec Vistaflores", "unidad": "BOTELLA"}, {"nombre": "El Enemigo Enemigo Malbec", "unidad": "BOTELLA"}, {"nombre": "Bodega Rolland Mariflor Malbec", "unidad": "BOTELLA"}, {"nombre": "Bodega del Fin del Mundo Organic Malbec", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata Estiba Reservada", "unidad": "BOTELLA"}, {"nombre": "Bemberg Estate Wines Pionero", "unidad": "BOTELLA"}, {"nombre": "Cheval des Andes Cheval des Andes 2022", "unidad": "BOTELLA"}, {"nombre": "Cupra Cupra Gran Corte", "unidad": "BOTELLA"}, {"nombre": "Bodega Monteviejo Lindaflor Blend 2018", "unidad": "BOTELLA"}, {"nombre": "Bodega del Fin del Mundo Special Blend", "unidad": "BOTELLA"}, {"nombre": "El Enemigo Gran Enemigo Corte", "unidad": "BOTELLA"}, {"nombre": "Cuvelier de los Andes Grand Vins 2021", "unidad": "BOTELLA"}, {"nombre": "Escorihuela Gascon President´s Blend", "unidad": "BOTELLA"}, {"nombre": "Mascota Vineyards Unanime Blend", "unidad": "BOTELLA"}, {"nombre": "Cuvelier de los Andes Coleccion", "unidad": "BOTELLA"}, {"nombre": "Clos de los 7 Clos de los Siete 2022", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata Nicolas Catena Zapata", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata The Birth of Cabernet", "unidad": "BOTELLA"}, {"nombre": "Terrazas de los Andes Terranzas de los Andes Grand Cabernet Sauvignon", "unidad": "BOTELLA"}, {"nombre": "Bodega Rolland Mariflor Cabernet Sauvignon", "unidad": "BOTELLA"}, {"nombre": "Trapiche Trapiche Gran Medalla Cabernet Sauvignon", "unidad": "BOTELLA"}, {"nombre": "Bodega del Fin del Mundo Reserva Cabernet Sauvignon", "unidad": "BOTELLA"}, {"nombre": "Bemberg Estate WInes La Linterna Pinot Noir", "unidad": "BOTELLA"}, {"nombre": "Cloudy Bay Cloudy Bay Pinot Noir", "unidad": "BOTELLA"}, {"nombre": "Bodega del Fin del Mundo FIN Single Vineyard Pinot Noir", "unidad": "BOTELLA"}, {"nombre": "Bodega Rolland Mariflor Pinot Noir", "unidad": "BOTELLA"}, {"nombre": "Trapiche Costa y Pampa Pinot Noir", "unidad": "BOTELLA"}, {"nombre": "Cupra Cupra Pinot Noir", "unidad": "BOTELLA"}, {"nombre": "El Enemigo Gran Enemigo Single Vineyard Cabernet Franc Gualtallary", "unidad": "BOTELLA"}, {"nombre": "Bodega del Fin del Mundo FIN Single Vineyard Cabernet Franc", "unidad": "BOTELLA"}, {"nombre": "Escorihuela Gascon Pequeñas Producciones Cabernet Franc", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata Angelica Zapata Cabernet Franc", "unidad": "BOTELLA"}, {"nombre": "El Enemigo Enemigo Cabernet Franc", "unidad": "BOTELLA"}, {"nombre": "Pulenta Estate Wines Gran Cabernet Franc", "unidad": "BOTELLA"}, {"nombre": "Bemberg Estate Wines La Linterna Chardonnay", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata Angelica Zapata Chardonnay", "unidad": "BOTELLA"}, {"nombre": "Bodega Monteviejo Lindaflor Chadronnay 2023", "unidad": "BOTELLA"}, {"nombre": "Trapiche Costa y Pampa Chardonnay", "unidad": "BOTELLA"}, {"nombre": "Cloudy Bay Cloudy Bay Sauvignon Blanc", "unidad": "BOTELLA"}, {"nombre": "Escorihuela Gascon Pequeñas Producciones Sauvignon Blanc", "unidad": "BOTELLA"}, {"nombre": "Bodega Rolland Mariflor Sauvignon Blanc", "unidad": "BOTELLA"}, {"nombre": "Terrazas de los Andes Terrazas Origen Gualtallary", "unidad": "BOTELLA"}, {"nombre": "Pulenta Estate Wines Palma Carola White Blend", "unidad": "BOTELLA"}, {"nombre": "Bodega del Fin del Mundo FIN Single Vineyard Semillon", "unidad": "BOTELLA"}, {"nombre": "El Esteco Blanc de Blancs", "unidad": "BOTELLA"}, {"nombre": "Cupra Cupra Incoronata Rose", "unidad": "BOTELLA"}, {"nombre": "El Esteco Blanc de Noir", "unidad": "BOTELLA"}, {"nombre": "La Mascota La Mascote Rose", "unidad": "BOTELLA"}, {"nombre": "Monteviejo Lindaflor Tardio 500cc", "unidad": "BOTELLA"}, {"nombre": "Bodega del Fin del Mundo Brut Nature", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata EdeM Rosé 0% Alcohol", "unidad": "BOTELLA"}, {"nombre": "Baron B Baron B Heritage - Cuvee Prestige 004", "unidad": "BOTELLA"}, {"nombre": "Baron B Baron B Brut Rose", "unidad": "BOTELLA"}, {"nombre": "Baron B Baron B Brut Nature", "unidad": "BOTELLA"}, {"nombre": "Dom Perignon Dom Pérignon Blanc Vintage 2015", "unidad": "BOTELLA"}, {"nombre": "Veuve Cliquot Veuve Clicquot Yellow Label Brut", "unidad": "BOTELLA"}, {"nombre": "Moet et Chandon Moet & Chandon Brut Imperial", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata Appelation Malbec Lunlunta", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata Appelation Cabernet Franc San Carlos", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata Appelation Chardonnay Tupungato", "unidad": "BOTELLA"}, {"nombre": "Chandon Chandon Cuvée Blanc de Noirs", "unidad": "BOTELLA"}];
+let isViewer = false;
+let stockData = {};
+let stockSearch = '';
+
+function blockIfViewer() {
+  if (isViewer) {
+    alert('Estás en modo solo lectura. Pedile al editor que registre este movimiento.');
+    return true;
+  }
+  return false;
+}
+
+function fmt(n) { return n == null ? '—' : Math.round(n * 100) / 100; }
+function fmtFechaHora(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('es-AR') + ' ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+}
+function normName(s) { return (s || '').toLowerCase().trim(); }
+function cap(s) { return (s || '').replace(/\w\S*/g, t => t.charAt(0).toUpperCase() + t.substr(1).toLowerCase()); }
+
+function switchTab(tabName) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(tabName + '-section').classList.add('active');
+  document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+  if (tabName === 'stock') renderStock();
+  else if (tabName === 'movimientos') renderMovimientos();
+}
+
+window.startApp = async function () {
+  isViewer = !!window.__isViewerSession;
+  await cargarStock();
+  renderStock();
+};
+
+async function cargarStock() {
+  const { data, error } = await window.__getStock();
+  stockData = {};
+  if (!error && data) {
+    data.forEach(row => { stockData[row.nombre] = row; });
+  }
+}
+
+function filterStock(val) { stockSearch = val; renderStock(); }
+
+function renderStock() {
+  const el = document.getElementById('stock-section');
+  const term = normName(stockSearch);
+  let h = `<div class="header"><div class="title">Control de Stock</div><div class="subtitle">Cantidad actual de cada insumo. Total: ${INSUMOS_BASE.length} insumos.</div></div>`;
+  h += `<div class="sim-cell" style="margin-bottom:16px;"><input class="ins-input" style="width:280px;" type="text" placeholder="Buscar insumo..." value="${stockSearch}" oninput="filterStock(this.value)"></div>`;
+  h += `<div class="table-container"><table><thead><tr><th>Insumo</th><th class="right">Unidad</th><th class="right">Cantidad actual</th><th class="right">Última actualización</th><th class="right">Acción</th></tr></thead><tbody>`;
+  INSUMOS_BASE
+    .filter(i => !term || normName(i.nombre).includes(term))
+    .forEach(i => {
+      const row = stockData[i.nombre];
+      const cantidad = row ? Number(row.cantidad_actual) : 0;
+      const bajo = cantidad <= 0;
+      h += `<tr>
+        <td class="td-name" onclick="verHistorialInsumo('${i.nombre.replace(/'/g, "\\'")}')">${i.nombre}</td>
+        <td class="td-num">${i.unidad}</td>
+        <td class="td-num ${bajo ? 'stock-low' : ''}">${fmt(cantidad)}</td>
+        <td class="td-num" style="color:var(--text-ter);font-size:12px;">${row ? fmtFechaHora(row.updated_at) : '—'}</td>
+        <td class="td-num">${isViewer ? '' : `<button class="btn" style="padding:6px 12px;font-size:12px;" onclick="abrirModalMovimiento('${i.nombre.replace(/'/g, "\\'")}', '${i.unidad}')">+ Movimiento</button>`}</td>
+      </tr>`;
+    });
+  h += `</tbody></table></div>`;
+  el.innerHTML = h;
+}
+
+function abrirModalMovimiento(nombre, unidad) {
+  if (blockIfViewer()) return;
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)cerrarModal()">
+    <div class="modal-box">
+      <h3>${nombre}</h3>
+      <label>Tipo de movimiento</label>
+      <select class="ins-input" id="mov-tipo">
+        <option value="entrada">Entrada (compra / ingreso)</option>
+        <option value="salida">Salida (consumo / merma)</option>
+        <option value="ajuste">Ajuste (fijar cantidad exacta)</option>
+      </select>
+      <label>Cantidad (${unidad})</label>
+      <input class="ins-input" type="number" step="any" id="mov-cantidad" placeholder="0">
+      <label>Nota (opcional)</label>
+      <textarea class="ins-input" id="mov-nota" rows="2" placeholder="Ej: compra a proveedor X"></textarea>
+      <div class="modal-actions">
+        <button class="btn" style="flex:1;" onclick="cerrarModal()">Cancelar</button>
+        <button class="btn" style="flex:1;" onclick="confirmarMovimiento('${nombre.replace(/'/g, "\\'")}', '${unidad}')">Guardar</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function cerrarModal() { document.getElementById('modal-root').innerHTML = ''; }
+
+async function confirmarMovimiento(nombre, unidad) {
+  if (blockIfViewer()) return;
+  const tipo = document.getElementById('mov-tipo').value;
+  const cantidad = parseFloat(document.getElementById('mov-cantidad').value);
+  const nota = document.getElementById('mov-nota').value;
+  if (isNaN(cantidad) || cantidad < 0) { alert('Ingresá una cantidad válida.'); return; }
+  const { error } = await window.__registrarMovimiento(nombre, tipo, cantidad, nota, unidad);
+  if (error) { alert('Error al guardar: ' + error.message); return; }
+  cerrarModal();
+  await cargarStock();
+  renderStock();
+}
+
+async function verHistorialInsumo(nombre) {
+  switchTab('movimientos');
+  document.getElementById('mov-filtro-insumo').value = nombre;
+  await renderMovimientos(nombre);
+}
+
+async function renderMovimientos(filtroInsumo) {
+  const el = document.getElementById('movimientos-section');
+  const filtroActual = filtroInsumo != null ? filtroInsumo : (document.getElementById('mov-filtro-insumo') ? document.getElementById('mov-filtro-insumo').value : '');
+  let h = `<div class="header"><div class="title">Historial de Movimientos</div><div class="subtitle">Últimos 300 movimientos registrados.</div></div>`;
+  h += `<div class="sim-cell" style="margin-bottom:16px;"><input class="ins-input" style="width:280px;" type="text" id="mov-filtro-insumo" placeholder="Filtrar por insumo..." value="${filtroActual || ''}" oninput="renderMovimientos(this.value)"></div>`;
+  h += `<div id="mov-tabla-container">Cargando…</div>`;
+  el.innerHTML = h;
+
+  const { data, error } = await window.__getMovimientos(filtroActual || null, 300);
+  const cont = document.getElementById('mov-tabla-container');
+  if (error) { cont.innerHTML = `<div style="color:var(--red);">Error al cargar el historial.</div>`; return; }
+  if (!data || !data.length) { cont.innerHTML = `<div style="color:var(--text-sec);">Sin movimientos registrados.</div>`; return; }
+
+  let t = `<div class="table-container"><table><thead><tr><th>Fecha</th><th>Insumo</th><th>Tipo</th><th class="right">Cantidad</th><th>Nota</th><th>Quién</th></tr></thead><tbody>`;
+  data.forEach(m => {
+    const badgeClass = m.tipo === 'entrada' ? 'mov-entrada' : (m.tipo === 'salida' ? 'mov-salida' : 'mov-ajuste');
+    t += `<tr><td>${fmtFechaHora(m.created_at)}</td><td>${m.insumo}</td><td><span class="mov-badge ${badgeClass}">${cap(m.tipo)}</span></td><td class="td-num">${fmt(m.cantidad)}</td><td style="color:var(--text-sec);font-size:12px;">${m.nota || ''}</td><td style="color:var(--text-ter);font-size:12px;">${m.changed_by || '—'}</td></tr>`;
+  });
+  t += `</tbody></table></div>`;
+  cont.innerHTML = t;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.section').forEach((s,i) => { if(i>0) s.classList.remove('active'); });
+});
+</script>
+</body>
+</html>
