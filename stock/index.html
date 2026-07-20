@@ -2,381 +2,434 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FARDA — Control de Stock</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>FARDA · Stock</title>
 <style>
-<style>
-  :root { --bg: #0c0b0b; --bg-alt: #17140f; --border: #3a332a; --text-main: #eae6e0; --text-sec: #a8a09a; --text-ter: #7a7167; --teal: #b2a79a; --teal-dark: #665640; --amber: #e67e22; --red: #c0392b; --green: #27ae60; --warn-bg: #fff3cd; --warn-text: #856404; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); color: var(--text-main); min-height: 100vh; line-height: 1.6; }
-  .app { display: grid; grid-template-rows: 60px auto 1fr; height: 100vh; }
-  .topbar { background: var(--bg-alt); display: flex; align-items: center; justify-content: space-between; padding: 0 32px; border-bottom: 1px solid var(--border); }
-  .tabs { background: var(--bg-alt); display: flex; border-bottom: 1px solid var(--border); padding: 0 32px; }
-  .tab-btn { background: transparent; border: none; color: var(--text-sec); padding: 16px 20px; font-size: 13px; font-weight: 600; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.2s; white-space: nowrap; }
-  .tab-btn:hover { color: var(--text-main); border-bottom-color: var(--teal); }
-  .tab-btn.active { color: var(--teal); border-bottom-color: var(--teal); }
-  .main { overflow-y: auto; padding: 32px; }
-  .logo { font-size: 18px; font-weight: 700; letter-spacing: 2px; }
-  .section { display: none; }
-  .section.active { display: block; }
-  .header { margin-bottom: 24px; }
-  .title { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
-  .subtitle { font-size: 13px; color: var(--text-sec); }
-  .crumbs { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 16px; flex-wrap: wrap; }
-  .crumb { cursor: pointer; color: var(--teal); }
-  .crumb:hover { text-decoration: underline; }
-  .crumb.active { color: var(--text-main); cursor: default; font-weight: 600; }
-  .crumb-sep { color: var(--text-ter); }
-  .back-btn { background: var(--bg-alt); border: 1px solid var(--border); color: var(--text-main); padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; margin-bottom: 20px; display: inline-flex; align-items: center; gap: 8px; }
-  .back-btn:hover { border-color: var(--teal); color: var(--teal); }
-  .table-container { background: var(--bg-alt); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 24px; }
-  table { width: 100%; border-collapse: collapse; }
-  th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-ter); padding: 12px 16px; text-align: left; background: var(--bg-alt); border-bottom: 1px solid var(--border); font-weight: 600; }
-  th.right { text-align: right; }
-  th.center { text-align: center; }
-  td { padding: 14px 16px; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.03); }
-  tr:last-child td { border-bottom: none; }
-  tr:hover { background: rgba(255,255,255,0.02); }
-  .td-name { color: var(--teal); cursor: pointer; font-weight: 500; }
-  .td-name:hover { text-decoration: underline; }
-  .td-name.disabled { color: var(--text-sec); cursor: default; }
-  .td-name.disabled:hover { text-decoration: none; }
-  .td-num { text-align: right; font-variant-numeric: tabular-nums; color: var(--text-main); }
-  .td-center { text-align: center; }
-  .fc-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 700; }
-  .fc-ok { background: rgba(39,174,96,0.15); color: #2ecc71; }
-  .fc-warn { background: rgba(230,126,34,0.15); color: var(--amber); }
-  .fc-bad { background: rgba(192,57,43,0.15); color: var(--red); }
-  .fc-none { background: rgba(120,120,120,0.2); color: var(--text-sec); }
-  .sim-cell { display: flex; gap: 8px; align-items: center; }
-  .sim-input { background: var(--border); border: 1px solid var(--border); color: var(--text-main); padding: 6px 10px; border-radius: 4px; font-size: 12px; width: 110px; text-align: right; outline: none; }
-  .sim-input:focus { border-color: var(--teal); }
-  .sim-fc { font-size: 12px; font-weight: 700; min-width: 60px; text-align: right; }
-  .detail-panel { background: var(--bg-alt); border: 1px solid var(--border); border-radius: 8px; padding: 24px; margin-bottom: 20px; }
-  .detail-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; color: var(--text-main); }
-  .detail-meta { font-size: 12px; color: var(--text-sec); margin-bottom: 16px; }
-  .cost-summary { display: flex; gap: 24px; flex-wrap: wrap; padding: 16px; background: var(--bg); border-radius: 6px; margin-bottom: 20px; }
-  .cost-item-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-ter); margin-bottom: 4px; }
-  .cost-item-value { font-size: 20px; font-weight: 700; color: var(--text-main); }
-  .cost-item-value.teal { color: var(--teal); }
-  .ing-table { width: 100%; margin-top: 12px; }
-  .ing-table th { padding: 10px 14px; font-size: 10px; border-bottom: 1px solid var(--border); }
-  .ing-table td { padding: 10px 14px; font-size: 12px; border-bottom: 1px solid rgba(255,255,255,0.03); vertical-align: middle; }
-  .ing-name { color: var(--text-main); }
-  .ing-name.clickable { color: var(--teal); cursor: pointer; }
-  .ing-name.clickable:hover { text-decoration: underline; }
-  .ing-qty { text-align: right; color: var(--text-sec); }
-  .ing-cost { text-align: right; color: var(--text-main); font-weight: 500; }
-  .ing-prod-tag { display: inline-block; background: rgba(178,167,154,0.2); color: var(--teal); padding: 1px 6px; border-radius: 3px; font-size: 9px; margin-left: 6px; vertical-align: middle; }
-  .qty-bruta { font-size: 10px; color: var(--amber); display: block; }
-  .usable-price { font-size: 10px; color: var(--amber); display: block; margin-top: 2px; }
-  .rend-toggle { display: flex; align-items: center; gap: 6px; justify-content: center; }
-  .switch { position: relative; display: inline-block; width: 34px; height: 18px; flex-shrink: 0; }
-  .switch input { opacity: 0; width: 0; height: 0; }
-  .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border); transition: .2s; border-radius: 18px; }
-  .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 2px; bottom: 2px; background-color: var(--text-sec); transition: .2s; border-radius: 50%; }
-  input:checked + .slider { background-color: var(--teal); }
-  input:checked + .slider:before { transform: translateX(16px); background-color: white; }
-  .rend-input-inline { background: var(--border); border: 1px solid var(--border); color: var(--text-main); padding: 4px 6px; border-radius: 4px; font-size: 11px; width: 50px; text-align: right; outline: none; }
-  .rend-input-inline:focus { border-color: var(--teal); }
-  .rend-input-inline:disabled { opacity: 0.3; }
-  .cat-header { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--teal); margin: 24px 0 16px; display: flex; align-items: center; gap: 12px; }
-  .cat-header::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-  .btn { background: var(--teal); color: var(--bg); border: none; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: 700; cursor: pointer; outline: none; }
-  .btn:hover { opacity: 0.9; }
-  .iva-buttons { display: flex; gap: 8px; }
-  .iva-btn { background: transparent; border: 1px solid var(--border); color: var(--text-sec); padding: 5px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; transition: all 0.15s; }
-  .iva-btn:hover { border-color: var(--teal); color: var(--teal); }
-  .iva-btn.active { background: var(--teal); border-color: var(--teal); color: var(--bg); }
-  .ins-input { background: var(--border); border: 1px solid var(--border); color: var(--text-main); padding: 5px 8px; border-radius: 4px; font-size: 11px; width: 110px; text-align: right; outline: none; }
-  .ins-input:focus { border-color: var(--teal); }
-  ::-webkit-scrollbar { width: 8px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-  #login-screen { display: flex; align-items: center; justify-content: center; height: 100vh; }
-  .login-box { background: var(--bg-alt); border: 1px solid var(--border); border-radius: 8px; padding: 32px; width: 300px; }
-  .login-box .logo { margin-bottom: 20px; text-align: center; color: var(--teal); }
-  .login-box input { width: 100%; background: var(--border); border: 1px solid var(--border); color: var(--text-main); padding: 10px 12px; border-radius: 4px; font-size: 13px; margin-bottom: 12px; outline: none; }
-  .login-box input:focus { border-color: var(--teal); }
-  .login-box .btn { width: 100%; padding: 10px; font-size: 13px; }
-  .login-error { color: var(--red); font-size: 12px; margin-bottom: 12px; min-height: 16px; }
-  .logout-btn { background: transparent; border: 1px solid var(--border); color: var(--text-sec); padding: 6px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; }
-  .logout-btn:hover { border-color: var(--red); color: var(--red); }
-  .save-status { font-size: 11px; color: var(--text-ter); margin-right: 12px; }
-</style>
-
-  #login-screen { display: flex; align-items: center; justify-content: center; height: 100vh; }
-  .login-box { background: var(--bg-alt); border: 1px solid var(--border); border-radius: 12px; padding: 40px; width: 340px; text-align: center; }
-  .login-box h1 { font-size: 20px; margin-bottom: 24px; letter-spacing: 2px; }
-  .login-box input { width: 100%; margin-bottom: 12px; }
-  #login-error { color: var(--red); font-size: 12px; margin-bottom: 12px; min-height: 16px; }
-  .mov-badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700; }
-  .mov-entrada { background: rgba(39,174,96,0.15); color: var(--green); }
-  .mov-salida { background: rgba(192,57,43,0.15); color: var(--red); }
-  .mov-ajuste { background: rgba(230,126,34,0.15); color: var(--amber); }
-  .stock-low { color: var(--red); font-weight: 700; }
-  .modal-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:100; }
-  .modal-box { background: var(--bg-alt); border:1px solid var(--border); border-radius:12px; padding:24px; width:380px; }
-  .modal-box h3 { margin-bottom:16px; font-size:16px; }
-  .modal-box label { display:block; font-size:11px; text-transform:uppercase; color:var(--text-sec); margin:12px 0 4px; }
-  .modal-box input, .modal-box select, .modal-box textarea { width:100%; }
-  .modal-actions { display:flex; gap:10px; margin-top:20px; }
+  :root{
+    --navy:#1a2b45; --navy-dark:#101c2e; --rust:#b5502e; --rust-dark:#8f3d21;
+    --cream:#f6f1e7; --cream-dark:#eae2d0; --ink:#1f2733; --ok:#2f7a4f; --bad:#b5502e;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--cream);color:var(--ink);}
+  header{background:var(--navy);color:var(--cream);padding:14px 16px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10;}
+  header .brand{font-weight:700;letter-spacing:0.5px;font-size:1.05rem;}
+  header .user{font-size:0.85rem;opacity:0.85;display:flex;gap:10px;align-items:center;}
+  header button.logout{background:transparent;border:1px solid var(--cream);color:var(--cream);border-radius:6px;padding:4px 10px;font-size:0.8rem;}
+  nav{display:flex;gap:6px;padding:10px;overflow-x:auto;background:var(--cream-dark);border-bottom:1px solid #ddd3ba;}
+  nav button{background:#fff;border:1px solid #d8cdb0;color:var(--navy);padding:8px 14px;border-radius:20px;font-size:0.85rem;white-space:nowrap;font-weight:600;}
+  nav button.active{background:var(--rust);color:#fff;border-color:var(--rust);}
+  main{padding:16px;max-width:900px;margin:0 auto 60px;}
+  .card{background:#fff;border-radius:12px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.08);}
+  h2{font-size:1.1rem;color:var(--navy);margin:0 0 10px;}
+  h3{font-size:0.95rem;color:var(--navy);margin:14px 0 8px;}
+  label{font-size:0.8rem;color:#555;display:block;margin-bottom:4px;}
+  select,input[type=text],input[type=number],input[type=date]{
+    width:100%;padding:9px 10px;border:1px solid #d8cdb0;border-radius:8px;font-size:0.95rem;background:#fffdf9;margin-bottom:10px;
+  }
+  .row{display:flex;gap:8px;align-items:flex-end;margin-bottom:8px;flex-wrap:wrap;}
+  .row > div{flex:1;min-width:120px;}
+  button.primary{background:var(--rust);color:#fff;border:none;padding:11px 16px;border-radius:8px;font-weight:700;font-size:0.95rem;width:100%;}
+  button.secondary{background:var(--navy);color:#fff;border:none;padding:9px 14px;border-radius:8px;font-size:0.85rem;}
+  button.ghost{background:transparent;border:1px dashed #b8ab88;color:var(--navy);padding:8px;border-radius:8px;width:100%;font-size:0.85rem;}
+  button.del{background:#fff;border:1px solid var(--bad);color:var(--bad);border-radius:6px;padding:6px 10px;font-size:0.8rem;}
+  table{width:100%;border-collapse:collapse;font-size:0.85rem;}
+  th,td{text-align:left;padding:7px 6px;border-bottom:1px solid #eee3cd;}
+  th{color:#777;font-weight:600;font-size:0.75rem;text-transform:uppercase;}
+  .pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.72rem;font-weight:700;}
+  .pill.entrada{background:#e3f1e8;color:var(--ok);}
+  .pill.salida{background:#fbe6df;color:var(--rust-dark);}
+  .msg{padding:10px 12px;border-radius:8px;font-size:0.85rem;margin-bottom:10px;}
+  .msg.ok{background:#e3f1e8;color:var(--ok);}
+  .msg.err{background:#fbe6df;color:var(--rust-dark);}
+  .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;}
+  .login-wrap .logo{color:var(--navy);font-weight:800;font-size:1.4rem;letter-spacing:1px;}
+  .pin-box{background:#fff;padding:26px;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,0.1);width:280px;text-align:center;}
+  .pin-box input{text-align:center;font-size:1.4rem;letter-spacing:6px;}
+  .right{text-align:right;}
+  .muted{color:#888;font-size:0.8rem;}
+  .hide{display:none !important;}
 </style>
 </head>
 <body>
 
-<div id="login-screen">
-  <div class="login-box">
-    <h1>FARDA — STOCK</h1>
-    <input class="ins-input" type="email" id="login-email" placeholder="Email">
-    <input class="ins-input" type="password" id="login-password" placeholder="Contraseña">
-    <div id="login-error"></div>
-    <button class="btn" style="width:100%;" onclick="window.__doLogin(document.getElementById('login-email').value, document.getElementById('login-password').value)">Ingresar</button>
-    <button class="btn" style="width:100%;margin-top:8px;background:transparent;" onclick="window.__doGuestLogin()">Entrar solo para ver</button>
-    <div style="margin-top:16px;"><a href="https://fardapricing.vercel.app/" style="color:var(--text-sec);font-size:12px;">← Volver a Pricing</a></div>
+<div id="login-screen" class="login-wrap">
+  <div class="logo">FARDA · STOCK</div>
+  <div class="pin-box">
+    <label>Ingresá tu PIN</label>
+    <input type="text" id="pin-input" inputmode="numeric" maxlength="8" placeholder="••••">
+    <button class="primary" onclick="doLogin()">Entrar</button>
+    <div id="login-msg" class="muted" style="margin-top:8px;"></div>
   </div>
 </div>
 
-<div class="app" style="display:none;">
-  <div class="topbar">
-    <div class="logo">FARDA — STOCK</div>
-    <div style="display:flex;align-items:center;gap:14px;">
-      <a href="https://fardapricing.vercel.app/" style="color:var(--text-sec);font-size:12px;">← Pricing</a>
-      <span class="viewer-badge" id="viewer-badge" style="display:none;color:var(--amber);font-size:12px;font-weight:600;">👁 SOLO LECTURA</span>
-      <span class="save-status" id="save-status"></span>
-      <button class="logout-btn" onclick="window.__doLogout()">Cerrar sesión</button>
-    </div>
-  </div>
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="stock" onclick="switchTab('stock')">STOCK</button>
-    <button class="tab-btn" data-tab="movimientos" onclick="switchTab('movimientos')">MOVIMIENTOS</button>
-  </div>
-  <div class="main">
-    <div id="stock-section" class="section active"></div>
-    <div id="movimientos-section" class="section"></div>
-  </div>
+<div id="app" class="hide">
+  <header>
+    <div class="brand">FARDA · STOCK</div>
+    <div class="user"><span id="user-label"></span><button class="logout" onclick="logout()">Salir</button></div>
+  </header>
+  <nav id="nav"></nav>
+  <main id="main"></main>
 </div>
-
-<div id="modal-root"></div>
 
 <script type="module">
-  import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-  const SUPABASE_URL = "https://snwuddryxaehunxbyflp.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNud3VkZHJ5eGFlaHVueGJ5ZmxwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5MDU0ODMsImV4cCI6MjA5ODQ4MTQ4M30.8OO53huAHhFBcLe07aMiA7RWTZ2igQ8r2NfTTH7yFcM";
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  const VIEWER_EMAIL = "fardapuertomadero@gmail.com";
-  const VIEWER_PASSWORD = "12345678";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-  window.__doGuestLogin = async function () {
-    const errEl = document.getElementById('login-error');
-    errEl.textContent = '';
-    const { error } = await supabase.auth.signInWithPassword({ email: VIEWER_EMAIL, password: VIEWER_PASSWORD });
-    if (error) errEl.textContent = 'No se pudo entrar en modo visualización.';
-  };
+const SUPABASE_URL = "https://snwuddryxaehunxbyflp.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNud3VkZHJ5eGFlaHVueGJ5ZmxwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5MDU0ODMsImV4cCI6MjA5ODQ4MTQ4M30.8OO53huAHhFBcLe07aMiA7RWTZ2igQ8r2NfTTH7yFcM";
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  window.__doLogin = async function (email, password) {
-    const errEl = document.getElementById('login-error');
-    errEl.textContent = '';
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) errEl.textContent = 'Email o contraseña incorrectos.';
-  };
+// Fallback base de insumos (nombre, unidad, costo) - se pisa con overrides de pricing_state si existen
+const INSUMOS_BASE = [{"nombre": "ACEITE DE GIRASOL", "unidad": "LT", "costo": 2686.8}, {"nombre": "ACEITE DE OLIVA", "unidad": "LT", "costo": 12190.0}, {"nombre": "ACELGA", "unidad": "KG", "costo": 2200.0}, {"nombre": "ACETO BALSAMICO", "unidad": "LT", "costo": 7218.0}, {"nombre": "AJI JALAPEÑO ROJO", "unidad": "KG", "costo": 8000.0}, {"nombre": "AJI MOLIDO", "unidad": "KG", "costo": 7027.0}, {"nombre": "AJIES VINAGREROS", "unidad": "KG", "costo": 6560.0}, {"nombre": "AJO", "unidad": "KG", "costo": 11500.0}, {"nombre": "AJO EN POLVO", "unidad": "KG", "costo": 4000.0}, {"nombre": "ALBAHACA", "unidad": "KG", "costo": 37250.0}, {"nombre": "ALCAPARRAS", "unidad": "KG", "costo": 25000.0}, {"nombre": "ANCHOAS", "unidad": "KG", "costo": 70000.0}, {"nombre": "ASADO BANDERITA", "unidad": "KG", "costo": 20350.0}, {"nombre": "AVELLANA", "unidad": "KG", "costo": 18000.0}, {"nombre": "AZUCAR", "unidad": "KG", "costo": 984.0}, {"nombre": "AZUCAR IMPALPABLE", "unidad": "KG", "costo": 1200.0}, {"nombre": "BIFE DE CHORIZO", "unidad": "KG", "costo": 28600.0}, {"nombre": "BONIATO", "unidad": "KG", "costo": 6112.5}, {"nombre": "CACAO EN POLVO", "unidad": "KG", "costo": 12000.0}, {"nombre": "CAFÉ", "unidad": "KG", "costo": 14000.0}, {"nombre": "CEBOLLA", "unidad": "KG", "costo": 1200.0}, {"nombre": "CEBOLLA MORADA", "unidad": "KG", "costo": 1490.0}, {"nombre": "CEBOLLA DE VERDEO", "unidad": "KG", "costo": 5280.0}, {"nombre": "QUESO CHEDDAR INGLES", "unidad": "KG", "costo": 70000.0}, {"nombre": "CHOCLO AMARILLO EN GRANO", "unidad": "KG", "costo": 5500.0}, {"nombre": "CHOCOLATE SEMI AMARGO", "unidad": "KG", "costo": 15000.0}, {"nombre": "CHORIZO", "unidad": "KG", "costo": 9900.0}, {"nombre": "CIBOULETTE", "unidad": "KG", "costo": 2250.0}, {"nombre": "CILANTRO", "unidad": "KG", "costo": 2250.0}, {"nombre": "COMINO", "unidad": "KG", "costo": 6000.0}, {"nombre": "CREMA DE LECHE", "unidad": "LT", "costo": 7831.2}, {"nombre": "DULCE DE LECHE", "unidad": "KG", "costo": 3316.8}, {"nombre": "DULCE DE LECHE REPOSTERO", "unidad": "KG", "costo": 3316.8}, {"nombre": "ENELDO", "unidad": "KG", "costo": 2250.0}, {"nombre": "ENTRAÑA", "unidad": "KG", "costo": 29700.0}, {"nombre": "ESCAROLA", "unidad": "KG", "costo": 3000.0}, {"nombre": "ESPINACA", "unidad": "KG", "costo": 4500.0}, {"nombre": "EXTRACTO DE MALTA LÍQUIDO", "unidad": "KG", "costo": 7000.0}, {"nombre": "EXTRACTO DE TOMATE", "unidad": "KG", "costo": 3500.0}, {"nombre": "FECULA DE MAIZ", "unidad": "KG", "costo": 1800.0}, {"nombre": "GRASA VACUNA", "unidad": "KG", "costo": 3000.0}, {"nombre": "HARINA 000", "unidad": "KG", "costo": 700.0}, {"nombre": "HARINA 0000", "unidad": "KG", "costo": 890.0}, {"nombre": "HUEVO", "unidad": "UNIDAD", "costo": 220.0}, {"nombre": "JAMÓN CRUDO IMPORTADO BELLOTA", "unidad": "KG", "costo": 130000.0}, {"nombre": "JAMÓN CRUDO NACIONAL", "unidad": "KG", "costo": 30000.0}, {"nombre": "LANGOSTINOS ENTEROS", "unidad": "KG", "costo": 13580.0}, {"nombre": "LAUREL", "unidad": "KG", "costo": 8000.0}, {"nombre": "LECHE", "unidad": "LT", "costo": 1383.65}, {"nombre": "LECHE EN POLVO", "unidad": "KG", "costo": 8000.0}, {"nombre": "LECHUGA MORADA", "unidad": "KG", "costo": 2900.0}, {"nombre": "LECHUGA VERDE", "unidad": "KG", "costo": 2900.0}, {"nombre": "LEVADURA FRESCA", "unidad": "KG", "costo": 3500.0}, {"nombre": "LICOR AMARULA", "unidad": "LT", "costo": 35422.0}, {"nombre": "LIMON", "unidad": "KG", "costo": 2300.0}, {"nombre": "LOMO DE VACA", "unidad": "KG", "costo": 31900.0}, {"nombre": "MANI", "unidad": "KG", "costo": 5000.0}, {"nombre": "MANTECA", "unidad": "KG", "costo": 6000.0}, {"nombre": "MATAMBRE DE CERDO", "unidad": "KG", "costo": 10890.0}, {"nombre": "MEJILLONES", "unidad": "KG", "costo": 11200.0}, {"nombre": "MENTA", "unidad": "KG", "costo": 3790.0}, {"nombre": "MIEL", "unidad": "KG", "costo": 15000.0}, {"nombre": "MOLLEJAS", "unidad": "KG", "costo": 26400.0}, {"nombre": "MORCILLA", "unidad": "KG", "costo": 8250.0}, {"nombre": "MORRON AMARILLO", "unidad": "KG", "costo": 3200.0}, {"nombre": "MORRON ROJO", "unidad": "KG", "costo": 3900.0}, {"nombre": "MORRON VERDE", "unidad": "KG", "costo": 2300.0}, {"nombre": "MOSTAZA DIJON", "unidad": "KG", "costo": 22000.0}, {"nombre": "MOSTAZA EN GRANO", "unidad": "KG", "costo": 4000.0}, {"nombre": "NARANJA", "unidad": "KG", "costo": 1950.0}, {"nombre": "NUECES", "unidad": "KG", "costo": 18924.0}, {"nombre": "NUEZ MOSCADA", "unidad": "KG", "costo": 20000.0}, {"nombre": "OJO DE BIFE", "unidad": "KG", "costo": 29700.0}, {"nombre": "OREGANO", "unidad": "KG", "costo": 5000.0}, {"nombre": "PAN SOBRANTE", "unidad": "KG", "costo": 0.01}, {"nombre": "PANKO", "unidad": "KG", "costo": 6000.0}, {"nombre": "PAPA BLANCA", "unidad": "KG", "costo": 2490.0}, {"nombre": "PATAMUSLO POLLO", "unidad": "KG", "costo": 5290.0}, {"nombre": "PEPINO", "unidad": "KG", "costo": 1900.0}, {"nombre": "PEREJIL", "unidad": "KG", "costo": 3900.0}, {"nombre": "PIMENTON", "unidad": "KG", "costo": 7076.0}, {"nombre": "PIMIENTA NEGRA", "unidad": "KG", "costo": 18000.0}, {"nombre": "POLVO DE HORNEAR", "unidad": "KG", "costo": 4000.0}, {"nombre": "PURE DE TOMATE", "unidad": "KG", "costo": 2800.0}, {"nombre": "QUESO AZUL", "unidad": "KG", "costo": 14368.82}, {"nombre": "QUESO CREMA", "unidad": "KG", "costo": 7500.0}, {"nombre": "QUESO MARCARPONE", "unidad": "KG", "costo": 21693.0}, {"nombre": "QUESO MOZZARELLA", "unidad": "KG", "costo": 8140.0}, {"nombre": "QUESO PROVOLETA", "unidad": "KG", "costo": 20201.0}, {"nombre": "QUESO PROVOLONE", "unidad": "KG", "costo": 23389.0}, {"nombre": "QUESO SBRINZ", "unidad": "KG", "costo": 30998.0}, {"nombre": "QUESO SEMIDURO", "unidad": "KG", "costo": 18000.0}, {"nombre": "REMOLACHA", "unidad": "KG", "costo": 2000.0}, {"nombre": "RICOTA", "unidad": "KG", "costo": 7000.0}, {"nombre": "RUCULA", "unidad": "KG", "costo": 3250.0}, {"nombre": "SAL FINA", "unidad": "KG", "costo": 825.0}, {"nombre": "SALSA DE OSTRAS", "unidad": "KG", "costo": 29904.0}, {"nombre": "SALSA DE SOJA", "unidad": "LT", "costo": 8000.0}, {"nombre": "SALSA worcestershire", "unidad": "LT", "costo": 14000.0}, {"nombre": "SALVIA", "unidad": "KG", "costo": 15000.0}, {"nombre": "SEMILLA DE HINOJO", "unidad": "KG", "costo": 9000.0}, {"nombre": "SEMOLIN", "unidad": "KG", "costo": 768.0}, {"nombre": "SETA DE CARDO", "unidad": "KG", "costo": 19652.0}, {"nombre": "STRACCIATELLA", "unidad": "KG", "costo": 26963.0}, {"nombre": "SUPREMA DE POLLO", "unidad": "KG", "costo": 9900.0}, {"nombre": "TAPA DE EMPANADA", "unidad": "UNIDAD", "costo": 149.83}, {"nombre": "TOMILLO", "unidad": "KG", "costo": 3790.0}, {"nombre": "TRUCHA PATAGONICA", "unidad": "KG", "costo": 19500.0}, {"nombre": "VAINILLAS", "unidad": "KG", "costo": 14568.0}, {"nombre": "VENTANA DE ASADO (COSTILLAR)", "unidad": "KG", "costo": 29700.0}, {"nombre": "VINAGRE DE VINO TINTO", "unidad": "LT", "costo": 5890.0}, {"nombre": "VINO BLANCO", "unidad": "LT", "costo": 7690.0}, {"nombre": "ROMERO", "unidad": "KG", "costo": 15000.0}, {"nombre": "ESPINACA EN POLVO", "unidad": "KG", "costo": 7896.0}, {"nombre": "AGUA", "unidad": "LT", "costo": 0.01}, {"nombre": "VINAGRE ALCOHOL", "unidad": "LT", "costo": 4963.0}, {"nombre": "CEBOLLA EN POLVO", "unidad": "KG", "costo": 8625.0}, {"nombre": "DESECHO LANGOSTINO", "unidad": "KG", "costo": 0.01}, {"nombre": "ZANAHORIA", "unidad": "KG", "costo": 1900.0}, {"nombre": "APIO", "unidad": "KG", "costo": 2190.0}, {"nombre": "PUERRO", "unidad": "KG", "costo": 5280.0}, {"nombre": "VERDEO", "unidad": "KG", "costo": 5280.0}, {"nombre": "EXTRACTO DE TOMATE", "unidad": "KG", "costo": 4297.52}, {"nombre": "LICOR TRIPLE SEC", "unidad": "LT", "costo": 9884.28}, {"nombre": "ARANDANOS", "unidad": "KG", "costo": 32520.0}, {"nombre": "ESENCIA DE VAINILLA", "unidad": "LT", "costo": 4535.53}, {"nombre": "QUINOTOS", "unidad": "KG", "costo": 5800.0}, {"nombre": "BICARBONATO", "unidad": "KG", "costo": 14678.0}, {"nombre": "CLAVO DE OLOR", "unidad": "KG", "costo": 46589.0}, {"nombre": "CANELA EN RAMA", "unidad": "KG", "costo": 63890.0}, {"nombre": "AVELLANAS PELADAS", "unidad": "KG", "costo": 51300.0}, {"nombre": "QUESO CREMA CREMATTO", "unidad": "KG", "costo": 10251.64}, {"nombre": "PASTA DE PISTACHO", "unidad": "KG", "costo": 61471.0}, {"nombre": "AGAR AGAR", "unidad": "KG", "costo": 72892.56}, {"nombre": "CAFE ESPRESSO MOLIDO", "unidad": "KG", "costo": 65984.0}, {"nombre": "CACAO AMARGO", "unidad": "KG", "costo": 35357.0}, {"nombre": "EXTRACTO DE MALTA", "unidad": "KG", "costo": 6165.0}, {"nombre": "FECULA DE MANDIOCA", "unidad": "KG", "costo": 3223.0}, {"nombre": "MANTECA AHUMADA PORCION", "unidad": "UNIDAD", "costo": 150.0}, {"nombre": "HIELO", "unidad": "KG", "costo": 0.01}, {"nombre": "MASA PASTA SIMPLE KILO", "unidad": "KG", "costo": 1061.00165}, {"nombre": "TAPA DE EMPANADA", "unidad": "UNIDAD", "costo": 244.95}, {"nombre": "TAPA HOJALDRE EMPANADA", "unidad": "UNIDAD", "costo": 244.0}, {"nombre": "PAN DE CAMPO UNIDAD", "unidad": "UNIDAD", "costo": 446.122125}, {"nombre": "Catena Zapata Mundus Bascilus Terrae", "unidad": "BOTELLA", "costo": 246600.0}, {"nombre": "Bodega Monteviejo La Violeta 2016", "unidad": "BOTELLA", "costo": 155120.0}, {"nombre": "Escorihuela Gascon Miguel Escorihuela Gascon Single Vineyard 2020", "unidad": "BOTELLA", "costo": 121500.0}, {"nombre": "Catena Zapata River", "unidad": "BOTELLA", "costo": 116400.0}, {"nombre": "Bodega Rolland Val de Flores 2021", "unidad": "BOTELLA", "costo": 67194.44}, {"nombre": "Catena Zapata Malbec Argentino", "unidad": "BOTELLA", "costo": 53625.0}, {"nombre": "Escorihuela Gascon DON", "unidad": "BOTELLA", "costo": 48500.0}, {"nombre": "Escorihuela Gascon MEG", "unidad": "BOTELLA", "costo": 30750.0}, {"nombre": "Trapiche Gran Medalla Malbec", "unidad": "BOTELLA", "costo": 23435.0}, {"nombre": "Bodega del Fin del Mundo FIN Single Vineyard Malbec", "unidad": "BOTELLA", "costo": 22900.0}, {"nombre": "Catena Zapata Angelica Zapata Malbec Alta", "unidad": "BOTELLA", "costo": 22400.0}, {"nombre": "Catena Zapata Appelation Malbec Vistaflores", "unidad": "BOTELLA", "costo": 17000.0}, {"nombre": "El Enemigo Enemigo Malbec", "unidad": "BOTELLA", "costo": 16267.5}, {"nombre": "Bodega Rolland Mariflor Malbec", "unidad": "BOTELLA", "costo": 15555.56}, {"nombre": "Bodega del Fin del Mundo Organic Malbec", "unidad": "BOTELLA", "costo": 10000.0}, {"nombre": "Catena Zapata Estiba Reservada", "unidad": "BOTELLA", "costo": 341634.0}, {"nombre": "Bemberg Estate Wines Pionero", "unidad": "BOTELLA", "costo": 90000.0}, {"nombre": "Cheval des Andes Cheval des Andes 2022", "unidad": "BOTELLA", "costo": 119250.0}, {"nombre": "Cupra Cupra Gran Corte", "unidad": "BOTELLA", "costo": 36000.0}, {"nombre": "Bodega Monteviejo Lindaflor Blend 2018", "unidad": "BOTELLA", "costo": 57300.0}, {"nombre": "Bodega del Fin del Mundo Special Blend", "unidad": "BOTELLA", "costo": 51850.0}, {"nombre": "El Enemigo Gran Enemigo Corte", "unidad": "BOTELLA", "costo": 34750.0}, {"nombre": "Cuvelier de los Andes Grand Vins 2021", "unidad": "BOTELLA", "costo": 29442.22}, {"nombre": "Escorihuela Gascon President´s Blend", "unidad": "BOTELLA", "costo": 24250.0}, {"nombre": "Mascota Vineyards Unanime Blend", "unidad": "BOTELLA", "costo": 18333.72}, {"nombre": "Cuvelier de los Andes Coleccion", "unidad": "BOTELLA", "costo": 15942.36}, {"nombre": "Clos de los 7 Clos de los Siete 2022", "unidad": "BOTELLA", "costo": 13333.19}, {"nombre": "Catena Zapata Nicolas Catena Zapata", "unidad": "BOTELLA", "costo": 60500.0}, {"nombre": "Catena Zapata The Birth of Cabernet", "unidad": "BOTELLA", "costo": 53625.0}, {"nombre": "Terrazas de los Andes Terranzas de los Andes Grand Cabernet Sauvignon", "unidad": "BOTELLA", "costo": 27770.0}, {"nombre": "Bodega Rolland Mariflor Cabernet Sauvignon", "unidad": "BOTELLA", "costo": 27611.11}, {"nombre": "Trapiche Trapiche Gran Medalla Cabernet Sauvignon", "unidad": "BOTELLA", "costo": 23435.0}, {"nombre": "Bodega del Fin del Mundo Reserva Cabernet Sauvignon", "unidad": "BOTELLA", "costo": 7.55}, {"nombre": "Bemberg Estate WInes La Linterna Pinot Noir", "unidad": "BOTELLA", "costo": 57500.0}, {"nombre": "Cloudy Bay Cloudy Bay Pinot Noir", "unidad": "BOTELLA", "costo": 56625.0}, {"nombre": "Bodega del Fin del Mundo FIN Single Vineyard Pinot Noir", "unidad": "BOTELLA", "costo": 22900.0}, {"nombre": "Bodega Rolland Mariflor Pinot Noir", "unidad": "BOTELLA", "costo": 20944.44}, {"nombre": "Trapiche Costa y Pampa Pinot Noir", "unidad": "BOTELLA", "costo": 13000.0}, {"nombre": "Cupra Cupra Pinot Noir", "unidad": "BOTELLA", "costo": 36000.0}, {"nombre": "El Enemigo Gran Enemigo Single Vineyard Cabernet Franc Gualtallary", "unidad": "BOTELLA", "costo": 34750.0}, {"nombre": "Bodega del Fin del Mundo FIN Single Vineyard Cabernet Franc", "unidad": "BOTELLA", "costo": 22900.0}, {"nombre": "Escorihuela Gascon Pequeñas Producciones Cabernet Franc", "unidad": "BOTELLA", "costo": 20000.0}, {"nombre": "Catena Zapata Angelica Zapata Cabernet Franc", "unidad": "BOTELLA", "costo": 19850.0}, {"nombre": "El Enemigo Enemigo Cabernet Franc", "unidad": "BOTELLA", "costo": 15500.0}, {"nombre": "Pulenta Estate Wines Gran Cabernet Franc", "unidad": "BOTELLA", "costo": 62500.0}, {"nombre": "Bemberg Estate Wines La Linterna Chardonnay", "unidad": "BOTELLA", "costo": 57500.0}, {"nombre": "Catena Zapata Angelica Zapata Chardonnay", "unidad": "BOTELLA", "costo": 19850.0}, {"nombre": "Bodega Monteviejo Lindaflor Chadronnay 2023", "unidad": "BOTELLA", "costo": 23700.0}, {"nombre": "Trapiche Costa y Pampa Chardonnay", "unidad": "BOTELLA", "costo": 13000.0}, {"nombre": "Cloudy Bay Cloudy Bay Sauvignon Blanc", "unidad": "BOTELLA", "costo": 56625.0}, {"nombre": "Escorihuela Gascon Pequeñas Producciones Sauvignon Blanc", "unidad": "BOTELLA", "costo": 20000.0}, {"nombre": "Bodega Rolland Mariflor Sauvignon Blanc", "unidad": "BOTELLA", "costo": 19166.67}, {"nombre": "Terrazas de los Andes Terrazas Origen Gualtallary", "unidad": "BOTELLA", "costo": 11775.0}, {"nombre": "Pulenta Estate Wines Palma Carola White Blend", "unidad": "BOTELLA", "costo": 65625.0}, {"nombre": "Bodega del Fin del Mundo FIN Single Vineyard Semillon", "unidad": "BOTELLA", "costo": 22900.0}, {"nombre": "El Esteco Blanc de Blancs", "unidad": "BOTELLA", "costo": 12725.0}, {"nombre": "Cupra Cupra Incoronata Rose", "unidad": "BOTELLA", "costo": 33000.0}, {"nombre": "El Esteco Blanc de Noir", "unidad": "BOTELLA", "costo": 12725.0}, {"nombre": "La Mascota La Mascote Rose", "unidad": "BOTELLA", "costo": 8000.0}, {"nombre": "Monteviejo Lindaflor Tardio 500cc", "unidad": "BOTELLA", "costo": 23700.0}, {"nombre": "Bodega del Fin del Mundo Brut Nature", "unidad": "BOTELLA", "costo": 26250.0}, {"nombre": "Catena Zapata EdeM Rosé 0% Alcohol", "unidad": "BOTELLA", "costo": 15370.0}, {"nombre": "Baron B Baron B Heritage - Cuvee Prestige 004", "unidad": "BOTELLA", "costo": 98464}, {"nombre": "Baron B Baron B Brut Rose", "unidad": "BOTELLA", "costo": 23495.0}, {"nombre": "Baron B Baron B Brut Nature", "unidad": "BOTELLA", "costo": 31483}, {"nombre": "Dom Perignon Dom Pérignon Blanc Vintage 2015", "unidad": "BOTELLA", "costo": 424150}, {"nombre": "Veuve Cliquot Veuve Clicquot Yellow Label Brut", "unidad": "BOTELLA", "costo": 142800}, {"nombre": "Moet et Chandon Moet & Chandon Brut Imperial", "unidad": "BOTELLA", "costo": 131325}, {"nombre": "Catena Zapata Appelation Malbec Lunlunta", "unidad": "BOTELLA", "costo": 3991.6}, {"nombre": "Catena Zapata Appelation Cabernet Franc San Carlos", "unidad": "BOTELLA", "costo": 3991.6}, {"nombre": "Catena Zapata Appelation Chardonnay Tupungato", "unidad": "BOTELLA", "costo": 3991.6}, {"nombre": "Chandon Chandon Cuvée Blanc de Noirs", "unidad": "BOTELLA", "costo": 14480}];
 
-  window.__doLogout = function () { supabase.auth.signOut(); };
-
-  window.__getStock = async function () {
-    const { data, error } = await supabase.from('inventario_stock').select('*');
-    return { data, error };
-  };
-
-  window.__getMovimientos = async function (insumo, limit) {
-    let q = supabase.from('inventario_movimientos').select('*').order('created_at', { ascending: false }).limit(limit || 300);
-    if (insumo) q = q.eq('insumo', insumo);
-    const { data, error } = await q;
-    return { data, error };
-  };
-
-  window.__registrarMovimiento = async function (insumo, tipo, cantidad, nota, unidad) {
-    const email = window.__currentUserEmail || null;
-    const { error: errMov } = await supabase.from('inventario_movimientos').insert({
-      insumo, tipo, cantidad, nota, changed_by: email
-    });
-    if (errMov) return { error: errMov };
-
-    const { data: actual } = await supabase.from('inventario_stock').select('cantidad_actual').eq('nombre', insumo).maybeSingle();
-    let nuevaCantidad = actual ? Number(actual.cantidad_actual) : 0;
-    if (tipo === 'entrada') nuevaCantidad += Number(cantidad);
-    else if (tipo === 'salida') nuevaCantidad -= Number(cantidad);
-    else if (tipo === 'ajuste') nuevaCantidad = Number(cantidad);
-
-    const { error: errStock } = await supabase.from('inventario_stock').upsert({
-      nombre: insumo, cantidad_actual: nuevaCantidad, unidad, updated_at: new Date().toISOString()
-    });
-    return { error: errStock, nuevaCantidad };
-  };
-
-  supabase.auth.onAuthStateChange(async (_event, session) => {
-    const loginScreen = document.getElementById('login-screen');
-    const appEl = document.querySelector('.app');
-    if (session) {
-      loginScreen.style.display = 'none';
-      appEl.style.display = 'grid';
-      window.__isViewerSession = session.user.email === VIEWER_EMAIL;
-      window.__currentUserEmail = session.user.email;
-      const badge = document.getElementById('viewer-badge');
-      if (badge) badge.style.display = window.__isViewerSession ? 'inline' : 'none';
-      window.startApp();
-    } else {
-      loginScreen.style.display = 'flex';
-      appEl.style.display = 'none';
-    }
-  });
-
-  document.getElementById('login-password').addEventListener('keydown', e => {
-    if (e.key === 'Enter') window.__doLogin(document.getElementById('login-email').value, document.getElementById('login-password').value);
-  });
-</script>
-
-<script>
-const INSUMOS_BASE = [{"nombre": "ACEITE DE GIRASOL", "unidad": "LT"}, {"nombre": "ACEITE DE OLIVA", "unidad": "LT"}, {"nombre": "ACELGA", "unidad": "KG"}, {"nombre": "ACETO BALSAMICO", "unidad": "LT"}, {"nombre": "AJI JALAPEÑO ROJO", "unidad": "KG"}, {"nombre": "AJI MOLIDO", "unidad": "KG"}, {"nombre": "AJIES VINAGREROS", "unidad": "KG"}, {"nombre": "AJO", "unidad": "KG"}, {"nombre": "AJO EN POLVO", "unidad": "KG"}, {"nombre": "ALBAHACA", "unidad": "KG"}, {"nombre": "ALCAPARRAS", "unidad": "KG"}, {"nombre": "ANCHOAS", "unidad": "KG"}, {"nombre": "ASADO BANDERITA", "unidad": "KG"}, {"nombre": "AVELLANA", "unidad": "KG"}, {"nombre": "AZUCAR", "unidad": "KG"}, {"nombre": "AZUCAR IMPALPABLE", "unidad": "KG"}, {"nombre": "BIFE DE CHORIZO", "unidad": "KG"}, {"nombre": "BONIATO", "unidad": "KG"}, {"nombre": "CACAO EN POLVO", "unidad": "KG"}, {"nombre": "CAFÉ", "unidad": "KG"}, {"nombre": "CEBOLLA", "unidad": "KG"}, {"nombre": "CEBOLLA MORADA", "unidad": "KG"}, {"nombre": "CEBOLLA DE VERDEO", "unidad": "KG"}, {"nombre": "QUESO CHEDDAR INGLES", "unidad": "KG"}, {"nombre": "CHOCLO AMARILLO EN GRANO", "unidad": "KG"}, {"nombre": "CHOCOLATE SEMI AMARGO", "unidad": "KG"}, {"nombre": "CHORIZO", "unidad": "KG"}, {"nombre": "CIBOULETTE", "unidad": "KG"}, {"nombre": "CILANTRO", "unidad": "KG"}, {"nombre": "COMINO", "unidad": "KG"}, {"nombre": "CREMA DE LECHE", "unidad": "LT"}, {"nombre": "DULCE DE LECHE", "unidad": "KG"}, {"nombre": "DULCE DE LECHE REPOSTERO", "unidad": "KG"}, {"nombre": "ENELDO", "unidad": "KG"}, {"nombre": "ENTRAÑA", "unidad": "KG"}, {"nombre": "ESCAROLA", "unidad": "KG"}, {"nombre": "ESPINACA", "unidad": "KG"}, {"nombre": "EXTRACTO DE MALTA LÍQUIDO", "unidad": "KG"}, {"nombre": "EXTRACTO DE TOMATE", "unidad": "KG"}, {"nombre": "FECULA DE MAIZ", "unidad": "KG"}, {"nombre": "GRASA VACUNA", "unidad": "KG"}, {"nombre": "HARINA 000", "unidad": "KG"}, {"nombre": "HARINA 0000", "unidad": "KG"}, {"nombre": "HUEVO", "unidad": "UNIDAD"}, {"nombre": "JAMÓN CRUDO IMPORTADO BELLOTA", "unidad": "KG"}, {"nombre": "JAMÓN CRUDO NACIONAL", "unidad": "KG"}, {"nombre": "LANGOSTINOS ENTEROS", "unidad": "KG"}, {"nombre": "LAUREL", "unidad": "KG"}, {"nombre": "LECHE", "unidad": "LT"}, {"nombre": "LECHE EN POLVO", "unidad": "KG"}, {"nombre": "LECHUGA MORADA", "unidad": "KG"}, {"nombre": "LECHUGA VERDE", "unidad": "KG"}, {"nombre": "LEVADURA FRESCA", "unidad": "KG"}, {"nombre": "LICOR AMARULA", "unidad": "LT"}, {"nombre": "LIMON", "unidad": "KG"}, {"nombre": "LOMO DE VACA", "unidad": "KG"}, {"nombre": "MANI", "unidad": "KG"}, {"nombre": "MANTECA", "unidad": "KG"}, {"nombre": "MATAMBRE DE CERDO", "unidad": "KG"}, {"nombre": "MEJILLONES", "unidad": "KG"}, {"nombre": "MENTA", "unidad": "KG"}, {"nombre": "MIEL", "unidad": "KG"}, {"nombre": "MOLLEJAS", "unidad": "KG"}, {"nombre": "MORCILLA", "unidad": "KG"}, {"nombre": "MORRON AMARILLO", "unidad": "KG"}, {"nombre": "MORRON ROJO", "unidad": "KG"}, {"nombre": "MORRON VERDE", "unidad": "KG"}, {"nombre": "MOSTAZA DIJON", "unidad": "KG"}, {"nombre": "MOSTAZA EN GRANO", "unidad": "KG"}, {"nombre": "NARANJA", "unidad": "KG"}, {"nombre": "NUECES", "unidad": "KG"}, {"nombre": "NUEZ MOSCADA", "unidad": "KG"}, {"nombre": "OJO DE BIFE", "unidad": "KG"}, {"nombre": "OREGANO", "unidad": "KG"}, {"nombre": "PAN SOBRANTE", "unidad": "KG"}, {"nombre": "PANKO", "unidad": "KG"}, {"nombre": "PAPA BLANCA", "unidad": "KG"}, {"nombre": "PATAMUSLO POLLO", "unidad": "KG"}, {"nombre": "PEPINO", "unidad": "KG"}, {"nombre": "PEREJIL", "unidad": "KG"}, {"nombre": "PIMENTON", "unidad": "KG"}, {"nombre": "PIMIENTA NEGRA", "unidad": "KG"}, {"nombre": "POLVO DE HORNEAR", "unidad": "KG"}, {"nombre": "PURE DE TOMATE", "unidad": "KG"}, {"nombre": "QUESO AZUL", "unidad": "KG"}, {"nombre": "QUESO CREMA", "unidad": "KG"}, {"nombre": "QUESO MARCARPONE", "unidad": "KG"}, {"nombre": "QUESO MOZZARELLA", "unidad": "KG"}, {"nombre": "QUESO PROVOLETA", "unidad": "KG"}, {"nombre": "QUESO PROVOLONE", "unidad": "KG"}, {"nombre": "QUESO SBRINZ", "unidad": "KG"}, {"nombre": "QUESO SEMIDURO", "unidad": "KG"}, {"nombre": "REMOLACHA", "unidad": "KG"}, {"nombre": "RICOTA", "unidad": "KG"}, {"nombre": "RUCULA", "unidad": "KG"}, {"nombre": "SAL FINA", "unidad": "KG"}, {"nombre": "SALSA DE OSTRAS", "unidad": "KG"}, {"nombre": "SALSA DE SOJA", "unidad": "LT"}, {"nombre": "SALSA worcestershire", "unidad": "LT"}, {"nombre": "SALVIA", "unidad": "KG"}, {"nombre": "SEMILLA DE HINOJO", "unidad": "KG"}, {"nombre": "SEMOLIN", "unidad": "KG"}, {"nombre": "SETA DE CARDO", "unidad": "KG"}, {"nombre": "STRACCIATELLA", "unidad": "KG"}, {"nombre": "SUPREMA DE POLLO", "unidad": "KG"}, {"nombre": "TAPA DE EMPANADA", "unidad": "UNIDAD"}, {"nombre": "TOMILLO", "unidad": "KG"}, {"nombre": "TRUCHA PATAGONICA", "unidad": "KG"}, {"nombre": "VAINILLAS", "unidad": "KG"}, {"nombre": "VENTANA DE ASADO (COSTILLAR)", "unidad": "KG"}, {"nombre": "VINAGRE DE VINO TINTO", "unidad": "LT"}, {"nombre": "VINO BLANCO", "unidad": "LT"}, {"nombre": "ROMERO", "unidad": "KG"}, {"nombre": "ESPINACA EN POLVO", "unidad": "KG"}, {"nombre": "AGUA", "unidad": "LT"}, {"nombre": "VINAGRE ALCOHOL", "unidad": "LT"}, {"nombre": "CEBOLLA EN POLVO", "unidad": "KG"}, {"nombre": "DESECHO LANGOSTINO", "unidad": "KG"}, {"nombre": "ZANAHORIA", "unidad": "KG"}, {"nombre": "APIO", "unidad": "KG"}, {"nombre": "PUERRO", "unidad": "KG"}, {"nombre": "VERDEO", "unidad": "KG"}, {"nombre": "LICOR TRIPLE SEC", "unidad": "LT"}, {"nombre": "ARANDANOS", "unidad": "KG"}, {"nombre": "ESENCIA DE VAINILLA", "unidad": "LT"}, {"nombre": "QUINOTOS", "unidad": "KG"}, {"nombre": "BICARBONATO", "unidad": "KG"}, {"nombre": "CLAVO DE OLOR", "unidad": "KG"}, {"nombre": "CANELA EN RAMA", "unidad": "KG"}, {"nombre": "AVELLANAS PELADAS", "unidad": "KG"}, {"nombre": "QUESO CREMA CREMATTO", "unidad": "KG"}, {"nombre": "PASTA DE PISTACHO", "unidad": "KG"}, {"nombre": "AGAR AGAR", "unidad": "KG"}, {"nombre": "CAFE ESPRESSO MOLIDO", "unidad": "KG"}, {"nombre": "CACAO AMARGO", "unidad": "KG"}, {"nombre": "EXTRACTO DE MALTA", "unidad": "KG"}, {"nombre": "FECULA DE MANDIOCA", "unidad": "KG"}, {"nombre": "MANTECA AHUMADA PORCION", "unidad": "UNIDAD"}, {"nombre": "HIELO", "unidad": "KG"}, {"nombre": "MASA PASTA SIMPLE KILO", "unidad": "KG"}, {"nombre": "TAPA HOJALDRE EMPANADA", "unidad": "UNIDAD"}, {"nombre": "PAN DE CAMPO UNIDAD", "unidad": "UNIDAD"}, {"nombre": "Catena Zapata Mundus Bascilus Terrae", "unidad": "BOTELLA"}, {"nombre": "Bodega Monteviejo La Violeta 2016", "unidad": "BOTELLA"}, {"nombre": "Escorihuela Gascon Miguel Escorihuela Gascon Single Vineyard 2020", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata River", "unidad": "BOTELLA"}, {"nombre": "Bodega Rolland Val de Flores 2021", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata Malbec Argentino", "unidad": "BOTELLA"}, {"nombre": "Escorihuela Gascon DON", "unidad": "BOTELLA"}, {"nombre": "Escorihuela Gascon MEG", "unidad": "BOTELLA"}, {"nombre": "Trapiche Gran Medalla Malbec", "unidad": "BOTELLA"}, {"nombre": "Bodega del Fin del Mundo FIN Single Vineyard Malbec", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata Angelica Zapata Malbec Alta", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata Appelation Malbec Vistaflores", "unidad": "BOTELLA"}, {"nombre": "El Enemigo Enemigo Malbec", "unidad": "BOTELLA"}, {"nombre": "Bodega Rolland Mariflor Malbec", "unidad": "BOTELLA"}, {"nombre": "Bodega del Fin del Mundo Organic Malbec", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata Estiba Reservada", "unidad": "BOTELLA"}, {"nombre": "Bemberg Estate Wines Pionero", "unidad": "BOTELLA"}, {"nombre": "Cheval des Andes Cheval des Andes 2022", "unidad": "BOTELLA"}, {"nombre": "Cupra Cupra Gran Corte", "unidad": "BOTELLA"}, {"nombre": "Bodega Monteviejo Lindaflor Blend 2018", "unidad": "BOTELLA"}, {"nombre": "Bodega del Fin del Mundo Special Blend", "unidad": "BOTELLA"}, {"nombre": "El Enemigo Gran Enemigo Corte", "unidad": "BOTELLA"}, {"nombre": "Cuvelier de los Andes Grand Vins 2021", "unidad": "BOTELLA"}, {"nombre": "Escorihuela Gascon President´s Blend", "unidad": "BOTELLA"}, {"nombre": "Mascota Vineyards Unanime Blend", "unidad": "BOTELLA"}, {"nombre": "Cuvelier de los Andes Coleccion", "unidad": "BOTELLA"}, {"nombre": "Clos de los 7 Clos de los Siete 2022", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata Nicolas Catena Zapata", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata The Birth of Cabernet", "unidad": "BOTELLA"}, {"nombre": "Terrazas de los Andes Terranzas de los Andes Grand Cabernet Sauvignon", "unidad": "BOTELLA"}, {"nombre": "Bodega Rolland Mariflor Cabernet Sauvignon", "unidad": "BOTELLA"}, {"nombre": "Trapiche Trapiche Gran Medalla Cabernet Sauvignon", "unidad": "BOTELLA"}, {"nombre": "Bodega del Fin del Mundo Reserva Cabernet Sauvignon", "unidad": "BOTELLA"}, {"nombre": "Bemberg Estate WInes La Linterna Pinot Noir", "unidad": "BOTELLA"}, {"nombre": "Cloudy Bay Cloudy Bay Pinot Noir", "unidad": "BOTELLA"}, {"nombre": "Bodega del Fin del Mundo FIN Single Vineyard Pinot Noir", "unidad": "BOTELLA"}, {"nombre": "Bodega Rolland Mariflor Pinot Noir", "unidad": "BOTELLA"}, {"nombre": "Trapiche Costa y Pampa Pinot Noir", "unidad": "BOTELLA"}, {"nombre": "Cupra Cupra Pinot Noir", "unidad": "BOTELLA"}, {"nombre": "El Enemigo Gran Enemigo Single Vineyard Cabernet Franc Gualtallary", "unidad": "BOTELLA"}, {"nombre": "Bodega del Fin del Mundo FIN Single Vineyard Cabernet Franc", "unidad": "BOTELLA"}, {"nombre": "Escorihuela Gascon Pequeñas Producciones Cabernet Franc", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata Angelica Zapata Cabernet Franc", "unidad": "BOTELLA"}, {"nombre": "El Enemigo Enemigo Cabernet Franc", "unidad": "BOTELLA"}, {"nombre": "Pulenta Estate Wines Gran Cabernet Franc", "unidad": "BOTELLA"}, {"nombre": "Bemberg Estate Wines La Linterna Chardonnay", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata Angelica Zapata Chardonnay", "unidad": "BOTELLA"}, {"nombre": "Bodega Monteviejo Lindaflor Chadronnay 2023", "unidad": "BOTELLA"}, {"nombre": "Trapiche Costa y Pampa Chardonnay", "unidad": "BOTELLA"}, {"nombre": "Cloudy Bay Cloudy Bay Sauvignon Blanc", "unidad": "BOTELLA"}, {"nombre": "Escorihuela Gascon Pequeñas Producciones Sauvignon Blanc", "unidad": "BOTELLA"}, {"nombre": "Bodega Rolland Mariflor Sauvignon Blanc", "unidad": "BOTELLA"}, {"nombre": "Terrazas de los Andes Terrazas Origen Gualtallary", "unidad": "BOTELLA"}, {"nombre": "Pulenta Estate Wines Palma Carola White Blend", "unidad": "BOTELLA"}, {"nombre": "Bodega del Fin del Mundo FIN Single Vineyard Semillon", "unidad": "BOTELLA"}, {"nombre": "El Esteco Blanc de Blancs", "unidad": "BOTELLA"}, {"nombre": "Cupra Cupra Incoronata Rose", "unidad": "BOTELLA"}, {"nombre": "El Esteco Blanc de Noir", "unidad": "BOTELLA"}, {"nombre": "La Mascota La Mascote Rose", "unidad": "BOTELLA"}, {"nombre": "Monteviejo Lindaflor Tardio 500cc", "unidad": "BOTELLA"}, {"nombre": "Bodega del Fin del Mundo Brut Nature", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata EdeM Rosé 0% Alcohol", "unidad": "BOTELLA"}, {"nombre": "Baron B Baron B Heritage - Cuvee Prestige 004", "unidad": "BOTELLA"}, {"nombre": "Baron B Baron B Brut Rose", "unidad": "BOTELLA"}, {"nombre": "Baron B Baron B Brut Nature", "unidad": "BOTELLA"}, {"nombre": "Dom Perignon Dom Pérignon Blanc Vintage 2015", "unidad": "BOTELLA"}, {"nombre": "Veuve Cliquot Veuve Clicquot Yellow Label Brut", "unidad": "BOTELLA"}, {"nombre": "Moet et Chandon Moet & Chandon Brut Imperial", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata Appelation Malbec Lunlunta", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata Appelation Cabernet Franc San Carlos", "unidad": "BOTELLA"}, {"nombre": "Catena Zapata Appelation Chardonnay Tupungato", "unidad": "BOTELLA"}, {"nombre": "Chandon Chandon Cuvée Blanc de Noirs", "unidad": "BOTELLA"}];
-let isViewer = false;
-let stockData = {};
-let stockSearch = '';
-
-function blockIfViewer() {
-  if (isViewer) {
-    alert('Estás en modo solo lectura. Pedile al editor que registre este movimiento.');
-    return true;
-  }
-  return false;
-}
-
-function fmt(n) { return n == null ? '—' : Math.round(n * 100) / 100; }
-function fmtFechaHora(iso) {
-  const d = new Date(iso);
-  return d.toLocaleDateString('es-AR') + ' ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-}
-function normName(s) { return (s || '').toLowerCase().trim(); }
-function cap(s) { return (s || '').replace(/\w\S*/g, t => t.charAt(0).toUpperCase() + t.substr(1).toLowerCase()); }
-
-function switchTab(tabName) {
-  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById(tabName + '-section').classList.add('active');
-  document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-  if (tabName === 'stock') renderStock();
-  else if (tabName === 'movimientos') renderMovimientos();
-}
-
-window.startApp = async function () {
-  isViewer = !!window.__isViewerSession;
-  await cargarStock();
-  renderStock();
+let state = {
+  user: null,
+  depositos: [],
+  insumoDeposito: {}, // nombre -> {deposito_id, unidad_presentacion}
+  insumos: {},        // nombre -> {unidad, costo}
+  movimientos: [],
+  usuarios: [],
+  tab: 'stock'
 };
 
-async function cargarStock() {
-  const { data, error } = await window.__getStock();
-  stockData = {};
-  if (!error && data) {
-    data.forEach(row => { stockData[row.nombre] = row; });
-  }
+window.doLogin = async function(){
+  const pin = document.getElementById('pin-input').value.trim();
+  const msg = document.getElementById('login-msg');
+  if(!pin){ msg.textContent='Ingresá un PIN'; return; }
+  msg.textContent = 'Verificando...';
+  const { data, error } = await supabase.from('stock_usuarios').select('*').eq('pin', pin).maybeSingle();
+  if(error || !data){ msg.textContent='PIN incorrecto'; return; }
+  state.user = data;
+  document.getElementById('login-screen').classList.add('hide');
+  document.getElementById('app').classList.remove('hide');
+  document.getElementById('user-label').textContent = `${data.nombre} · ${data.rol}`;
+  await loadAll();
+  renderNav();
+  setTab(data.rol === 'cocina' ? 'movimiento' : 'stock');
 }
 
-function filterStock(val) { stockSearch = val; renderStock(); }
-
-function renderStock() {
-  const el = document.getElementById('stock-section');
-  const term = normName(stockSearch);
-  let h = `<div class="header"><div class="title">Control de Stock</div><div class="subtitle">Cantidad actual de cada insumo. Total: ${INSUMOS_BASE.length} insumos.</div></div>`;
-  h += `<div class="sim-cell" style="margin-bottom:16px;"><input class="ins-input" style="width:280px;" type="text" placeholder="Buscar insumo..." value="${stockSearch}" oninput="filterStock(this.value)"></div>`;
-  h += `<div class="table-container"><table><thead><tr><th>Insumo</th><th class="right">Unidad</th><th class="right">Cantidad actual</th><th class="right">Última actualización</th><th class="right">Acción</th></tr></thead><tbody>`;
-  INSUMOS_BASE
-    .filter(i => !term || normName(i.nombre).includes(term))
-    .forEach(i => {
-      const row = stockData[i.nombre];
-      const cantidad = row ? Number(row.cantidad_actual) : 0;
-      const bajo = cantidad <= 0;
-      h += `<tr>
-        <td class="td-name" onclick="verHistorialInsumo('${i.nombre.replace(/'/g, "\\'")}')">${i.nombre}</td>
-        <td class="td-num">${i.unidad}</td>
-        <td class="td-num ${bajo ? 'stock-low' : ''}">${fmt(cantidad)}</td>
-        <td class="td-num" style="color:var(--text-ter);font-size:12px;">${row ? fmtFechaHora(row.updated_at) : '—'}</td>
-        <td class="td-num">${isViewer ? '' : `<button class="btn" style="padding:6px 12px;font-size:12px;" onclick="abrirModalMovimiento('${i.nombre.replace(/'/g, "\\'")}', '${i.unidad}')">+ Movimiento</button>`}</td>
-      </tr>`;
-    });
-  h += `</tbody></table></div>`;
-  el.innerHTML = h;
+window.logout = function(){
+  state.user = null;
+  document.getElementById('app').classList.add('hide');
+  document.getElementById('login-screen').classList.remove('hide');
+  document.getElementById('pin-input').value='';
 }
 
-function abrirModalMovimiento(nombre, unidad) {
-  if (blockIfViewer()) return;
-  const root = document.getElementById('modal-root');
-  root.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)cerrarModal()">
-    <div class="modal-box">
-      <h3>${nombre}</h3>
-      <label>Tipo de movimiento</label>
-      <select class="ins-input" id="mov-tipo">
-        <option value="entrada">Entrada (compra / ingreso)</option>
-        <option value="salida">Salida (consumo / merma)</option>
-        <option value="ajuste">Ajuste (fijar cantidad exacta)</option>
-      </select>
-      <label>Cantidad (${unidad})</label>
-      <input class="ins-input" type="number" step="any" id="mov-cantidad" placeholder="0">
-      <label>Nota (opcional)</label>
-      <textarea class="ins-input" id="mov-nota" rows="2" placeholder="Ej: compra a proveedor X"></textarea>
-      <div class="modal-actions">
-        <button class="btn" style="flex:1;" onclick="cerrarModal()">Cancelar</button>
-        <button class="btn" style="flex:1;" onclick="confirmarMovimiento('${nombre.replace(/'/g, "\\'")}', '${unidad}')">Guardar</button>
-      </div>
+async function loadAll(){
+  const [depR, insDepR, movR, usrR, pricingR] = await Promise.all([
+    supabase.from('stock_depositos').select('*').order('id'),
+    supabase.from('stock_insumo_deposito').select('*'),
+    supabase.from('stock_movimientos').select('*').order('fecha', {ascending:false}),
+    supabase.from('stock_usuarios').select('*').order('nombre'),
+    supabase.from('pricing_state').select('insumos').eq('id',1).maybeSingle()
+  ]);
+  state.depositos = depR.data || [];
+  state.insumoDeposito = {};
+  (insDepR.data||[]).forEach(r => state.insumoDeposito[r.insumo_nombre] = r);
+  state.movimientos = movR.data || [];
+  state.usuarios = usrR.data || [];
+
+  // merge insumos: base + overrides de pricing_state
+  state.insumos = {};
+  INSUMOS_BASE.forEach(i => state.insumos[i.nombre] = {unidad:i.unidad, costo:i.costo});
+  const overrides = (pricingR.data && pricingR.data.insumos) || {};
+  Object.entries(overrides).forEach(([nombre, v]) => {
+    if(state.insumos[nombre]) state.insumos[nombre] = {unidad: v.unidad || state.insumos[nombre].unidad, costo: v.costo != null ? v.costo : state.insumos[nombre].costo};
+    else state.insumos[nombre] = {unidad: v.unidad || 'UNIDAD', costo: v.costo};
+  });
+}
+
+function stockDe(insumoNombre, depositoId){
+  let s = 0;
+  state.movimientos.forEach(m => {
+    if(m.insumo_nombre === insumoNombre && m.deposito_id === depositoId){
+      s += m.tipo === 'entrada' ? Number(m.cantidad) : -Number(m.cantidad);
+    }
+  });
+  return s;
+}
+
+function insumosDeDeposito(depositoId){
+  return Object.entries(state.insumoDeposito)
+    .filter(([nombre, r]) => r.deposito_id === depositoId)
+    .map(([nombre]) => nombre)
+    .sort();
+}
+
+function fmtMoney(n){
+  if(n==null) return '-';
+  return '$' + Number(n).toLocaleString('es-AR', {maximumFractionDigits:0});
+}
+
+function renderNav(){
+  const rol = state.user.rol;
+  const tabs = [];
+  if(rol === 'admin') tabs.push(['stock','Stock'],['movimiento','Cargar'],['transferencia','Transferencia'],['conteo','Conteo mensual'],['asignar','Depósitos'],['usuarios','Usuarios']);
+  else if(rol === 'recepcion') tabs.push(['movimiento','Cargar entrada'],['historial','Historial']);
+  else tabs.push(['movimiento','Cargar salida'],['historial','Historial']);
+  const nav = document.getElementById('nav');
+  nav.innerHTML = tabs.map(([id,label]) => `<button data-tab="${id}" onclick="setTab('${id}')">${label}</button>`).join('');
+}
+
+window.setTab = function(tab){
+  state.tab = tab;
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  render();
+}
+
+function render(){
+  const main = document.getElementById('main');
+  const rol = state.user.rol;
+  if(state.tab === 'stock') main.innerHTML = viewStock();
+  else if(state.tab === 'movimiento') main.innerHTML = viewMovimiento(rol);
+  else if(state.tab === 'transferencia') main.innerHTML = viewTransferencia();
+  else if(state.tab === 'conteo') main.innerHTML = viewConteo();
+  else if(state.tab === 'asignar') main.innerHTML = viewAsignar();
+  else if(state.tab === 'usuarios') main.innerHTML = viewUsuarios();
+  else if(state.tab === 'historial') main.innerHTML = viewHistorial();
+}
+
+// ---------- VISTA: STOCK ACTUAL ----------
+function viewStock(){
+  let html = '';
+  state.depositos.forEach(dep => {
+    const nombres = insumosDeDeposito(dep.id);
+    let totalValor = 0;
+    let rows = nombres.map(nombre => {
+      const cant = stockDe(nombre, dep.id);
+      const costo = (state.insumos[nombre] && state.insumos[nombre].costo) || 0;
+      const valor = cant * costo;
+      totalValor += valor;
+      const unidad = (state.insumoDeposito[nombre] && state.insumoDeposito[nombre].unidad_presentacion) || (state.insumos[nombre]?.unidad||'').toLowerCase();
+      return `<tr><td>${nombre}</td><td class="right">${cant} ${unidad}</td><td class="right">${fmtMoney(costo)}</td><td class="right">${fmtMoney(valor)}</td></tr>`;
+    }).join('');
+    if(!rows) rows = `<tr><td colspan="4" class="muted">Sin insumos asignados a este depósito todavía</td></tr>`;
+    html += `<div class="card"><h2>${dep.nombre}</h2>
+      <table><thead><tr><th>Insumo</th><th class="right">Stock</th><th class="right">Costo unit.</th><th class="right">Valor</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+      <div class="right" style="margin-top:8px;font-weight:700;color:var(--navy)">Total: ${fmtMoney(totalValor)}</div>
+      </div>`;
+  });
+  return html;
+}
+
+// ---------- VISTA: CARGAR MOVIMIENTO (por lotes) ----------
+let batchRows = [{insumo:'', cantidad:''}];
+function viewMovimiento(rol){
+  const tipoFijo = rol === 'recepcion' ? 'entrada' : (rol === 'cocina' ? 'salida' : null);
+  const depOptions = state.depositos.map(d => `<option value="${d.id}">${d.nombre}</option>`).join('');
+  const rowsHtml = batchRows.map((r,i) => `
+    <div class="row">
+      <div><label>Insumo</label><input list="ins-list" type="text" value="${r.insumo}" onchange="updateRow(${i},'insumo',this.value)"></div>
+      <div><label>Cantidad</label><input type="number" step="any" value="${r.cantidad}" onchange="updateRow(${i},'cantidad',this.value)"></div>
+      <div style="flex:0 0 auto;"><button class="del" onclick="removeRow(${i})">✕</button></div>
+    </div>`).join('');
+  return `<div class="card">
+    <h2>${tipoFijo === 'entrada' ? 'Cargar entrada' : tipoFijo === 'salida' ? 'Cargar salida' : 'Cargar movimiento'}</h2>
+    <div id="mov-msg"></div>
+    <div class="row">
+      <div><label>Depósito</label><select id="mov-deposito">${depOptions}</select></div>
+      ${tipoFijo ? '' : `<div><label>Tipo</label><select id="mov-tipo"><option value="entrada">Entrada</option><option value="salida">Salida</option></select></div>`}
     </div>
+    ${tipoFijo === 'entrada' ? `<div class="row"><div><label>Proveedor (opcional)</label><input type="text" id="mov-proveedor"></div><div><label>Comprobante (opcional)</label><input type="text" id="mov-comprobante"></div></div>` : ''}
+    <h3>Líneas</h3>
+    <datalist id="ins-list">${Object.keys(state.insumos).sort().map(n=>`<option value="${n}">`).join('')}</datalist>
+    ${rowsHtml}
+    <button class="ghost" onclick="addRow()">+ Agregar línea</button>
+    <div style="height:10px"></div>
+    <button class="primary" onclick="guardarMovimiento('${tipoFijo||''}')">Guardar todo</button>
+  </div>`;
+}
+window.addRow = function(){ batchRows.push({insumo:'',cantidad:''}); render(); }
+window.removeRow = function(i){ batchRows.splice(i,1); if(!batchRows.length) batchRows=[{insumo:'',cantidad:''}]; render(); }
+window.updateRow = function(i,field,val){ batchRows[i][field] = val; }
+window.guardarMovimiento = async function(tipoFijo){
+  const depositoId = parseInt(document.getElementById('mov-deposito').value);
+  const tipo = tipoFijo || document.getElementById('mov-tipo').value;
+  const proveedor = document.getElementById('mov-proveedor')?.value || null;
+  const comprobante = document.getElementById('mov-comprobante')?.value || null;
+  const rows = batchRows.filter(r => r.insumo && r.cantidad);
+  if(!rows.length){ document.getElementById('mov-msg').innerHTML = `<div class="msg err">Cargá al menos una línea</div>`; return; }
+  const inserts = rows.map(r => ({
+    insumo_nombre: r.insumo, deposito_id: depositoId, tipo, cantidad: parseFloat(r.cantidad),
+    usuario_id: state.user.id, proveedor, comprobante
+  }));
+  const { error } = await supabase.from('stock_movimientos').insert(inserts);
+  if(error){ document.getElementById('mov-msg').innerHTML = `<div class="msg err">Error: ${error.message}</div>`; return; }
+  batchRows = [{insumo:'',cantidad:''}];
+  await loadAll();
+  document.getElementById('mov-msg').innerHTML = `<div class="msg ok">${inserts.length} línea(s) guardadas ✓</div>`;
+  render();
+}
+
+// ---------- VISTA: TRANSFERENCIA ----------
+function viewTransferencia(){
+  const depOptions = state.depositos.map(d => `<option value="${d.id}">${d.nombre}</option>`).join('');
+  return `<div class="card">
+    <h2>Transferencia entre depósitos</h2>
+    <div id="tr-msg"></div>
+    <label>Insumo</label>
+    <input list="ins-list2" type="text" id="tr-insumo">
+    <datalist id="ins-list2">${Object.keys(state.insumos).sort().map(n=>`<option value="${n}">`).join('')}</datalist>
+    <div class="row">
+      <div><label>Desde</label><select id="tr-origen">${depOptions}</select></div>
+      <div><label>Hacia</label><select id="tr-destino">${depOptions}</select></div>
+    </div>
+    <label>Cantidad</label>
+    <input type="number" step="any" id="tr-cantidad">
+    <button class="primary" onclick="guardarTransferencia()">Transferir</button>
+  </div>`;
+}
+window.guardarTransferencia = async function(){
+  const insumo = document.getElementById('tr-insumo').value;
+  const origen = parseInt(document.getElementById('tr-origen').value);
+  const destino = parseInt(document.getElementById('tr-destino').value);
+  const cantidad = parseFloat(document.getElementById('tr-cantidad').value);
+  const msg = document.getElementById('tr-msg');
+  if(!insumo || !cantidad || origen === destino){ msg.innerHTML = `<div class="msg err">Revisá los datos (insumo, cantidad, depósitos distintos)</div>`; return; }
+  const transferenciaId = crypto.randomUUID();
+  const { error } = await supabase.from('stock_movimientos').insert([
+    {insumo_nombre:insumo, deposito_id:origen, tipo:'salida', cantidad, usuario_id:state.user.id, transferencia_id:transferenciaId},
+    {insumo_nombre:insumo, deposito_id:destino, tipo:'entrada', cantidad, usuario_id:state.user.id, transferencia_id:transferenciaId}
+  ]);
+  if(error){ msg.innerHTML = `<div class="msg err">Error: ${error.message}</div>`; return; }
+  await loadAll();
+  msg.innerHTML = `<div class="msg ok">Transferencia registrada ✓</div>`;
+}
+
+// ---------- VISTA: CONTEO MENSUAL ----------
+let conteoDepositoId = null;
+let conteoValores = {};
+function viewConteo(){
+  const depOptions = state.depositos.map(d => `<option value="${d.id}">${d.nombre}</option>`).join('');
+  if(conteoDepositoId === null && state.depositos.length) conteoDepositoId = state.depositos[0].id;
+  const nombres = insumosDeDeposito(conteoDepositoId);
+  const rows = nombres.map(nombre => {
+    const teorico = stockDe(nombre, conteoDepositoId);
+    const val = conteoValores[nombre] ?? '';
+    return `<tr><td>${nombre}</td><td class="right muted">${teorico}</td><td class="right"><input type="number" step="any" style="margin:0;" value="${val}" onchange="setConteoValor('${nombre.replace(/'/g,"\\'")}',this.value)"></td></tr>`;
+  }).join('') || `<tr><td colspan="3" class="muted">Sin insumos asignados a este depósito</td></tr>`;
+  return `<div class="card">
+    <h2>Conteo físico mensual</h2>
+    <div id="conteo-msg"></div>
+    <div class="row">
+      <div><label>Depósito</label><select onchange="cambiarDepositoConteo(this.value)">${depOptions}</select></div>
+      <div><label>Fecha del conteo</label><input type="date" id="conteo-fecha" value="${new Date().toISOString().slice(0,10)}"></div>
+    </div>
+    <table><thead><tr><th>Insumo</th><th class="right">Teórico</th><th class="right">Contado</th></tr></thead><tbody>${rows}</tbody></table>
+    <div style="height:10px"></div>
+    <button class="primary" onclick="guardarConteo()">Guardar conteo y ajustar stock</button>
+  </div>`;
+}
+window.cambiarDepositoConteo = function(v){ conteoDepositoId = parseInt(v); conteoValores = {}; render(); }
+window.setConteoValor = function(nombre, val){ conteoValores[nombre] = val; }
+window.guardarConteo = async function(){
+  const fecha = document.getElementById('conteo-fecha').value;
+  const nombres = insumosDeDeposito(conteoDepositoId);
+  const conteoRows = [];
+  const ajusteRows = [];
+  nombres.forEach(nombre => {
+    const contadoRaw = conteoValores[nombre];
+    if(contadoRaw === '' || contadoRaw == null) return;
+    const contado = parseFloat(contadoRaw);
+    const teorico = stockDe(nombre, conteoDepositoId);
+    conteoRows.push({fecha, insumo_nombre:nombre, deposito_id:conteoDepositoId, cantidad_teorica:teorico, cantidad_contada:contado, usuario_id:state.user.id});
+    const diff = contado - teorico;
+    if(diff !== 0){
+      ajusteRows.push({insumo_nombre:nombre, deposito_id:conteoDepositoId, tipo: diff>0?'entrada':'salida', cantidad: Math.abs(diff), usuario_id: state.user.id, comprobante:'Ajuste por conteo físico'});
+    }
+  });
+  const msg = document.getElementById('conteo-msg');
+  if(!conteoRows.length){ msg.innerHTML = `<div class="msg err">Cargá al menos un valor contado</div>`; return; }
+  const r1 = await supabase.from('stock_conteos').insert(conteoRows);
+  if(r1.error){ msg.innerHTML = `<div class="msg err">Error guardando conteo: ${r1.error.message}</div>`; return; }
+  if(ajusteRows.length){
+    const r2 = await supabase.from('stock_movimientos').insert(ajusteRows);
+    if(r2.error){ msg.innerHTML = `<div class="msg err">Conteo guardado, pero error en ajuste: ${r2.error.message}</div>`; return; }
+  }
+  conteoValores = {};
+  await loadAll();
+  msg.innerHTML = `<div class="msg ok">Conteo guardado. ${ajusteRows.length} ajuste(s) de merma/sobrante aplicados ✓</div>`;
+  render();
+}
+
+// ---------- VISTA: ASIGNAR DEPÓSITOS (admin) ----------
+function viewAsignar(){
+  const depOptions = ['<option value="">Sin asignar</option>'].concat(state.depositos.map(d => `<option value="${d.id}">${d.nombre}</option>`)).join('');
+  const nombres = Object.keys(state.insumos).sort();
+  const rows = nombres.map(nombre => {
+    const cur = state.insumoDeposito[nombre];
+    const curDep = cur?.deposito_id ?? (state.insumos[nombre].unidad === 'BOTELLA' ? state.depositos.find(d=>d.nombre==='Vinos')?.id : '');
+    const opts = depOptions.replace(`value="${curDep}"`, `value="${curDep}" selected`);
+    const unidadPres = cur?.unidad_presentacion || '';
+    return `<tr><td>${nombre}</td><td><select onchange="asignarDeposito('${nombre.replace(/'/g,"\\'")}',this.value)">${opts}</select></td>
+      <td><input type="text" placeholder="ej: botella, bolsa" value="${unidadPres}" onchange="asignarUnidadPresentacion('${nombre.replace(/'/g,"\\'")}',this.value)"></td></tr>`;
+  }).join('');
+  return `<div class="card"><h2>Asignar insumos a depósitos</h2>
+    <div id="asig-msg"></div>
+    <p class="muted">Los vinos (unidad BOTELLA) se sugieren en Vinos por defecto. Cambiá lo que corresponda.</p>
+    <table><thead><tr><th>Insumo</th><th>Depósito</th><th>Unidad de presentación</th></tr></thead><tbody>${rows}</tbody></table>
+  </div>`;
+}
+window.asignarDeposito = async function(nombre, depositoId){
+  const unidad_presentacion = state.insumoDeposito[nombre]?.unidad_presentacion || null;
+  const { error } = await supabase.from('stock_insumo_deposito').upsert({insumo_nombre:nombre, deposito_id: depositoId?parseInt(depositoId):null, unidad_presentacion});
+  const msg = document.getElementById('asig-msg');
+  if(error){ msg.innerHTML = `<div class="msg err">Error: ${error.message}</div>`; return; }
+  await loadAll();
+  msg.innerHTML = `<div class="msg ok">Actualizado ✓</div>`;
+}
+window.asignarUnidadPresentacion = async function(nombre, unidad){
+  const deposito_id = state.insumoDeposito[nombre]?.deposito_id ?? null;
+  const { error } = await supabase.from('stock_insumo_deposito').upsert({insumo_nombre:nombre, deposito_id, unidad_presentacion: unidad});
+  await loadAll();
+}
+
+// ---------- VISTA: USUARIOS (admin) ----------
+function viewUsuarios(){
+  const rows = state.usuarios.map(u => `<tr><td>${u.nombre}</td><td>${u.pin}</td><td>${u.rol}</td><td><button class="del" onclick="borrarUsuario(${u.id})">✕</button></td></tr>`).join('');
+  return `<div class="card"><h2>Usuarios y PINs</h2>
+    <div id="usr-msg"></div>
+    <table><thead><tr><th>Nombre</th><th>PIN</th><th>Rol</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    <h3>Nuevo usuario</h3>
+    <div class="row">
+      <div><label>Nombre</label><input type="text" id="new-usr-nombre"></div>
+      <div><label>PIN</label><input type="text" id="new-usr-pin"></div>
+      <div><label>Rol</label><select id="new-usr-rol"><option value="cocina">Cocina</option><option value="recepcion">Recepción</option><option value="admin">Admin</option></select></div>
+    </div>
+    <button class="primary" onclick="crearUsuario()">Agregar</button>
+  </div>`;
+}
+window.crearUsuario = async function(){
+  const nombre = document.getElementById('new-usr-nombre').value.trim();
+  const pin = document.getElementById('new-usr-pin').value.trim();
+  const rol = document.getElementById('new-usr-rol').value;
+  const msg = document.getElementById('usr-msg');
+  if(!nombre || !pin){ msg.innerHTML = `<div class="msg err">Completá nombre y PIN</div>`; return; }
+  const { error } = await supabase.from('stock_usuarios').insert({nombre, pin, rol});
+  if(error){ msg.innerHTML = `<div class="msg err">Error: ${error.message}</div>`; return; }
+  await loadAll();
+  render();
+}
+window.borrarUsuario = async function(id){
+  if(!confirm('¿Borrar este usuario?')) return;
+  await supabase.from('stock_usuarios').delete().eq('id', id);
+  await loadAll();
+  render();
+}
+
+// ---------- VISTA: HISTORIAL (recepción/cocina) ----------
+function viewHistorial(){
+  const mios = state.movimientos.filter(m => m.usuario_id === state.user.id).slice(0,50);
+  const rows = mios.map(m => {
+    const dep = state.depositos.find(d=>d.id===m.deposito_id)?.nombre || '-';
+    return `<tr><td>${new Date(m.fecha).toLocaleString('es-AR')}</td><td>${m.insumo_nombre}</td><td>${dep}</td><td><span class="pill ${m.tipo}">${m.tipo}</span></td><td class="right">${m.cantidad}</td></tr>`;
+  }).join('') || `<tr><td colspan="5" class="muted">Todavía no cargaste movimientos</td></tr>`;
+  return `<div class="card"><h2>Tu historial reciente</h2>
+    <table><thead><tr><th>Fecha</th><th>Insumo</th><th>Depósito</th><th>Tipo</th><th class="right">Cant.</th></tr></thead><tbody>${rows}</tbody></table>
   </div>`;
 }
 
-function cerrarModal() { document.getElementById('modal-root').innerHTML = ''; }
-
-async function confirmarMovimiento(nombre, unidad) {
-  if (blockIfViewer()) return;
-  const tipo = document.getElementById('mov-tipo').value;
-  const cantidad = parseFloat(document.getElementById('mov-cantidad').value);
-  const nota = document.getElementById('mov-nota').value;
-  if (isNaN(cantidad) || cantidad < 0) { alert('Ingresá una cantidad válida.'); return; }
-  const { error } = await window.__registrarMovimiento(nombre, tipo, cantidad, nota, unidad);
-  if (error) { alert('Error al guardar: ' + error.message); return; }
-  cerrarModal();
-  await cargarStock();
-  renderStock();
-}
-
-async function verHistorialInsumo(nombre) {
-  switchTab('movimientos');
-  document.getElementById('mov-filtro-insumo').value = nombre;
-  await renderMovimientos(nombre);
-}
-
-async function renderMovimientos(filtroInsumo) {
-  const el = document.getElementById('movimientos-section');
-  const filtroActual = filtroInsumo != null ? filtroInsumo : (document.getElementById('mov-filtro-insumo') ? document.getElementById('mov-filtro-insumo').value : '');
-  let h = `<div class="header"><div class="title">Historial de Movimientos</div><div class="subtitle">Últimos 300 movimientos registrados.</div></div>`;
-  h += `<div class="sim-cell" style="margin-bottom:16px;"><input class="ins-input" style="width:280px;" type="text" id="mov-filtro-insumo" placeholder="Filtrar por insumo..." value="${filtroActual || ''}" oninput="renderMovimientos(this.value)"></div>`;
-  h += `<div id="mov-tabla-container">Cargando…</div>`;
-  el.innerHTML = h;
-
-  const { data, error } = await window.__getMovimientos(filtroActual || null, 300);
-  const cont = document.getElementById('mov-tabla-container');
-  if (error) { cont.innerHTML = `<div style="color:var(--red);">Error al cargar el historial.</div>`; return; }
-  if (!data || !data.length) { cont.innerHTML = `<div style="color:var(--text-sec);">Sin movimientos registrados.</div>`; return; }
-
-  let t = `<div class="table-container"><table><thead><tr><th>Fecha</th><th>Insumo</th><th>Tipo</th><th class="right">Cantidad</th><th>Nota</th><th>Quién</th></tr></thead><tbody>`;
-  data.forEach(m => {
-    const badgeClass = m.tipo === 'entrada' ? 'mov-entrada' : (m.tipo === 'salida' ? 'mov-salida' : 'mov-ajuste');
-    t += `<tr><td>${fmtFechaHora(m.created_at)}</td><td>${m.insumo}</td><td><span class="mov-badge ${badgeClass}">${cap(m.tipo)}</span></td><td class="td-num">${fmt(m.cantidad)}</td><td style="color:var(--text-sec);font-size:12px;">${m.nota || ''}</td><td style="color:var(--text-ter);font-size:12px;">${m.changed_by || '—'}</td></tr>`;
-  });
-  t += `</tbody></table></div>`;
-  cont.innerHTML = t;
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.section').forEach((s,i) => { if(i>0) s.classList.remove('active'); });
-});
+document.getElementById('pin-input').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 </script>
 </body>
 </html>
