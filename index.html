@@ -966,7 +966,7 @@ function renderDetail(nm, type) {
           ${clearLink}
         </div>
       </td>
-      <td class="ing-cost">${costCell}</td>
+      <td class="ing-cost" style="color:var(--text-sec);font-weight:400;">${fmt(ivaLineaIng(ing, nm))}</td><td class="ing-cost">${costCell}</td>
       ${delCell}
     </tr>`;
   });
@@ -1038,7 +1038,7 @@ function renderDetail(nm, type) {
     ${editBtn}${deleteBtn}
     <datalist id="insumo-datalist">${getInsumoDatalistHTML()}</datalist>
     <table class="ing-table">
-      <thead><tr><th>${colLabel}</th><th class="right">Cant. receta</th><th class="right">Unidad</th><th class="right">Precio unit.</th><th class="center">Rendimiento</th><th class="right">Costo línea</th>${recipeEditMode?'<th></th>':''}</tr></thead>
+      <thead><tr><th>${colLabel}</th><th class="right">Cant. receta</th><th class="right">Unidad</th><th class="right">Precio unit.</th><th class="center">Rendimiento</th><th class="right">IVA línea</th><th class="right">Costo línea</th>${recipeEditMode?'<th></th>':''}</tr></thead>
       <tbody>${ir}${addRow}</tbody>
     </table>
     ${summary}
@@ -1288,7 +1288,7 @@ function renderProdDetailTab(nm) {
           ${clearLink}
         </div>
       </td>
-      <td class="ing-cost">${costCell}</td>
+      <td class="ing-cost" style="color:var(--text-sec);font-weight:400;">${fmt(ivaLineaIng(ing, nm))}</td><td class="ing-cost">${costCell}</td>
       ${delCell}
     </tr>`;
   });
@@ -1331,7 +1331,7 @@ function renderProdDetailTab(nm) {
     summary += `<div><div class="cost-item-label">Costo por 1 ${rinde.unidad}</div><div class="cost-item-value teal">${fmt(tc / rinde.cantidad)}</div></div>`;
   }
   summary += `</div>`;
-  return `<div class="detail-panel"><div class="detail-title">${nm}</div><div class="detail-meta">Producción</div>${rindeBlock}${editBtn}${deleteBtn}<datalist id="insumo-datalist">${getInsumoDatalistHTML()}</datalist><table class="ing-table"><thead><tr><th>Insumo</th><th class="right">Cant. receta</th><th class="right">Unidad</th><th class="right">Precio unit.</th><th class="center">Rendimiento</th><th class="right">Costo línea</th>${recipeEditMode?'<th></th>':''}</tr></thead><tbody>${ir}${addRow}</tbody></table>${summary}</div>`;
+  return `<div class="detail-panel"><div class="detail-title">${nm}</div><div class="detail-meta">Producción</div>${rindeBlock}${editBtn}${deleteBtn}<datalist id="insumo-datalist">${getInsumoDatalistHTML()}</datalist><table class="ing-table"><thead><tr><th>Insumo</th><th class="right">Cant. receta</th><th class="right">Unidad</th><th class="right">Precio unit.</th><th class="center">Rendimiento</th><th class="right">IVA línea</th><th class="right">Costo línea</th>${recipeEditMode?'<th></th>':''}</tr></thead><tbody>${ir}${addRow}</tbody></table>${summary}</div>`;
 }
 
 // ──── RENDIMIENTOS ───────────────────────────────────────────────────────────
