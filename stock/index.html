@@ -133,13 +133,17 @@ window.logout = function(){
 }
 
 async function loadAll(){
-  const [depR, varR, movR, usrR, pricingR] = await Promise.all([
+  const [depR, varR, movR, usrR, pricingR, ingR, linR] = await Promise.all([
     supabase.from('stock_depositos').select('*').order('id'),
     supabase.from('stock_variantes').select('*').order('nombre'),
     supabase.from('stock_movimientos').select('*').order('fecha', {ascending:false}),
     supabase.from('stock_usuarios').select('*').order('nombre'),
-    supabase.from('pricing_state').select('insumos').eq('id',1).maybeSingle()
+    supabase.from('pricing_state').select('insumos').eq('id',1).maybeSingle(),
+    supabase.from('stock_ingresos').select('*').order('creado', {ascending:false}),
+    supabase.from('stock_ingreso_lineas').select('*')
   ]);
+  state.ingresos = ingR.data || [];
+  state.ingresoLineas = linR.data || [];
   state.depositos = depR.data || [];
   state.variantes = varR.data || [];
   state.movimientos = movR.data || [];
@@ -181,8 +185,8 @@ function fmtMoney(n){
 function renderNav(){
   const rol = state.user.rol;
   const tabs = [];
-  if(rol === 'admin') tabs.push(['stock','Stock'],['movimiento','Cargar'],['transferencia','Transferencia'],['conteo','Conteo mensual'],['variantes','Variantes'],['usuarios','Usuarios']);
-  else if(rol === 'recepcion') tabs.push(['movimiento','Cargar entrada'],['historial','Historial']);
+  if(rol === 'admin') tabs.push(['stock','Stock'],['ingresos','Ingresos'],['movimiento','Cargar'],['transferencia','Transferencia'],['conteo','Conteo mensual'],['variantes','Variantes'],['usuarios','Usuarios']);
+  else if(rol === 'recepcion') tabs.push(['ingresos','Ingresos'],['movimiento','Cargar entrada'],['historial','Historial']);
   else tabs.push(['movimiento','Cargar salida'],['historial','Historial']);
   const nav = document.getElementById('nav');
   nav.innerHTML = tabs.map(([id,label]) => `<button data-tab="${id}" onclick="setTab('${id}')">${label}</button>`).join('');
@@ -201,6 +205,7 @@ function render(){
   else if(state.tab === 'movimiento') main.innerHTML = viewMovimiento(rol);
   else if(state.tab === 'transferencia') main.innerHTML = viewTransferencia();
   else if(state.tab === 'conteo') main.innerHTML = viewConteo();
+  else if(state.tab === 'ingresos') main.innerHTML = ingresoDetalleId ? viewIngresoDetalle() : viewIngresos();
   else if(state.tab === 'variantes') main.innerHTML = viewVariantes();
   else if(state.tab === 'usuarios') main.innerHTML = viewUsuarios();
   else if(state.tab === 'historial') main.innerHTML = viewHistorial();
@@ -329,6 +334,194 @@ window.guardarMovimiento = async function(tipoFijo){
   batchRows = [{variante:'',cantidad:''}];
   await loadAll();
   msg.innerHTML = `<div class="msg ok">${inserts.length} línea(s) guardadas ✓</div>`;
+  render();
+}
+
+// ---------- VISTA: INGRESOS (conciliación recibido vs facturado) ----------
+let ingresoDetalleId = null;
+let ingresoNuevoAbierto = false;
+let ingresoRows = [{variante:'', cantidad:''}];
+
+function estadoIngresoPill(estado){
+  const map = {abierto:['#fdf3d8','#8a6d1a','Abierto'], con_diferencias:['#fbe6df','#8f3d21','Con diferencias'], cerrado:['#e3f1e8','#2f7a4f','Cerrado']};
+  const [bg,fg,label] = map[estado] || map.abierto;
+  return `<span class="pill" style="background:${bg};color:${fg}">${label}</span>`;
+}
+
+function viewIngresos(){
+  const depOptions = state.depositos.map(d => `<option value="${d.id}">${d.nombre}</option>`).join('');
+  const nombresVariantes = state.variantes.filter(v=>v.activo!==false).map(v=>v.nombre).sort();
+  const lista = (state.ingresos||[]).map(ing => {
+    const lineas = (state.ingresoLineas||[]).filter(l => l.ingreso_id === ing.id);
+    const totRecibido = lineas.reduce((s,l)=>s+Number(l.cantidad_recibida),0);
+    return `<tr>
+      <td data-label="Fecha">${ing.fecha}</td>
+      <td data-label="Proveedor">${ing.proveedor||'-'}</td>
+      <td data-label="Comprobante">${ing.comprobante||'<span class="muted">sin factura aún</span>'}</td>
+      <td data-label="Unidades" class="right">${totRecibido}</td>
+      <td data-label="Estado">${estadoIngresoPill(ing.estado)}</td>
+      <td data-label=""><button class="secondary" onclick="abrirIngreso(${ing.id})">Ver</button></td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="6" class="muted">Sin ingresos registrados todavía</td></tr>`;
+
+  const rowsHtml = ingresoRows.map((r,i) => `
+    <div class="row">
+      <div><label>Variante</label><input list="ing-var-list" type="text" value="${r.variante}" onchange="updateIngresoRow(${i},'variante',this.value)"></div>
+      <div><label>Cant. recibida (contada)</label><input type="number" step="any" value="${r.cantidad}" onchange="updateIngresoRow(${i},'cantidad',this.value)"></div>
+      <div style="flex:0 0 auto;"><button class="del" onclick="removeIngresoRow(${i})">✕</button></div>
+    </div>`).join('');
+
+  return `<div class="card">
+    <h2>Ingresos de mercadería</h2>
+    <p class="muted">El stock entra por lo <b>contado físicamente</b>. La factura se carga después y se compara contra eso.</p>
+    <div id="ing-msg"></div>
+    <button class="ghost" onclick="toggleNuevoIngreso()">${ingresoNuevoAbierto ? '– Cancelar nuevo ingreso' : '+ Nuevo ingreso'}</button>
+    ${ingresoNuevoAbierto ? `<div class="subcard">
+      <div class="row">
+        <div><label>Proveedor</label><input type="text" id="ing-proveedor"></div>
+        <div><label>Depósito destino</label><select id="ing-deposito">${depOptions}</select></div>
+      </div>
+      <h3>Lo que se contó al recibir (sin mirar el remito)</h3>
+      <datalist id="ing-var-list">${nombresVariantes.map(n=>`<option value="${n}">`).join('')}</datalist>
+      ${rowsHtml}
+      <button class="ghost" onclick="addIngresoRow()">+ Agregar línea</button>
+      <div style="height:8px"></div>
+      <button class="primary" onclick="guardarIngreso()">Guardar ingreso (mueve stock)</button>
+    </div>` : ''}
+    <h3>Historial de ingresos</h3>
+    <table class="responsive"><thead><tr><th>Fecha</th><th>Proveedor</th><th>Comprobante</th><th class="right">Unid.</th><th>Estado</th><th></th></tr></thead><tbody>${lista}</tbody></table>
+  </div>`;
+}
+window.toggleNuevoIngreso = function(){ ingresoNuevoAbierto = !ingresoNuevoAbierto; render(); }
+window.addIngresoRow = function(){ ingresoRows.push({variante:'',cantidad:''}); render(); }
+window.removeIngresoRow = function(i){ ingresoRows.splice(i,1); if(!ingresoRows.length) ingresoRows=[{variante:'',cantidad:''}]; render(); }
+window.updateIngresoRow = function(i,field,val){ ingresoRows[i][field] = val; }
+window.abrirIngreso = function(id){ ingresoDetalleId = id; render(); }
+window.cerrarDetalleIngreso = function(){ ingresoDetalleId = null; render(); }
+
+window.guardarIngreso = async function(){
+  const proveedor = document.getElementById('ing-proveedor').value.trim() || null;
+  const depositoId = parseInt(document.getElementById('ing-deposito').value);
+  const rows = ingresoRows.filter(r => r.variante && r.cantidad);
+  const msg = document.getElementById('ing-msg');
+  if(!rows.length){ msg.innerHTML = `<div class="msg err">Cargá al menos una línea contada</div>`; return; }
+  const lineas = [];
+  for(const r of rows){
+    const v = state.variantes.find(x => x.nombre === r.variante);
+    if(!v){ msg.innerHTML = `<div class="msg err">No encontré la variante "${r.variante}" — creála primero en la pestaña Cargar o Variantes</div>`; return; }
+    lineas.push({variante_id: v.id, cantidad: parseFloat(r.cantidad)});
+  }
+  const { data: ing, error: e1 } = await supabase.from('stock_ingresos').insert({proveedor, usuario_id: state.user.id}).select().maybeSingle();
+  if(e1){ msg.innerHTML = `<div class="msg err">Error: ${e1.message}</div>`; return; }
+  const { error: e2 } = await supabase.from('stock_ingreso_lineas').insert(lineas.map(l => ({ingreso_id: ing.id, variante_id: l.variante_id, cantidad_recibida: l.cantidad})));
+  if(e2){ msg.innerHTML = `<div class="msg err">Error en líneas: ${e2.message}</div>`; return; }
+  const { error: e3 } = await supabase.from('stock_movimientos').insert(lineas.map(l => ({
+    variante_id: l.variante_id, deposito_id: depositoId, tipo: 'entrada', cantidad: l.cantidad,
+    usuario_id: state.user.id, proveedor, comprobante: `Ingreso #${ing.id}`
+  })));
+  if(e3){ msg.innerHTML = `<div class="msg err">Ingreso guardado pero error al mover stock: ${e3.message}</div>`; return; }
+  ingresoRows = [{variante:'',cantidad:''}];
+  ingresoNuevoAbierto = false;
+  await loadAll();
+  msg.innerHTML = `<div class="msg ok">Ingreso #${ing.id} guardado: ${lineas.length} línea(s), stock actualizado ✓</div>`;
+  render();
+}
+
+function viewIngresoDetalle(){
+  const ing = state.ingresos.find(i => i.id === ingresoDetalleId);
+  if(!ing) { ingresoDetalleId = null; return viewIngresos(); }
+  const lineas = (state.ingresoLineas||[]).filter(l => l.ingreso_id === ing.id);
+  const rows = lineas.map(l => {
+    const v = varianteById(l.variante_id);
+    const fact = l.cantidad_facturada;
+    const tieneFact = fact !== null && fact !== undefined;
+    const diff = tieneFact ? Number(fact) - Number(l.cantidad_recibida) : null;
+    const coincide = tieneFact && diff === 0;
+    let estadoCell;
+    if(!tieneFact) estadoCell = `<span class="muted">sin facturar</span>`;
+    else if(coincide) estadoCell = `<span class="pill entrada">Coincide ✓</span>`;
+    else if(l.resolucion) estadoCell = `<span class="pill" style="background:#eee;color:#555">${l.resolucion}</span>`;
+    else estadoCell = `<span class="pill salida">Dif: ${diff>0?'+':''}${diff}</span>
+      <select style="margin:6px 0 0;min-height:38px;" onchange="resolverLinea(${l.id}, this.value)">
+        <option value="">Resolver...</option>
+        <option value="reclamado">Reclamado al proveedor</option>
+        <option value="aceptada">Diferencia aceptada</option>
+        <option value="corregida">Era error de conteo (corrige stock)</option>
+      </select>`;
+    return `<tr>
+      <td data-label="Variante">${v ? v.nombre : '(?)'}</td>
+      <td data-label="Recibido" class="right"><b>${l.cantidad_recibida}</b></td>
+      <td data-label="Facturado" class="right"><input type="number" step="any" style="margin:0;" value="${tieneFact?fact:''}" onchange="setFacturado(${l.id}, this.value)"></td>
+      <td data-label="Estado">${estadoCell}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="card">
+    <button class="ghost" style="width:auto;padding:8px 14px;" onclick="cerrarDetalleIngreso()">← Volver</button>
+    <h2 style="margin-top:12px;">Ingreso #${ing.id} · ${ing.proveedor||'sin proveedor'}</h2>
+    <div class="muted">Fecha: ${ing.fecha} · ${estadoIngresoPill(ing.estado)}</div>
+    <div id="det-msg" style="margin-top:8px;"></div>
+    <div class="row" style="margin-top:10px;">
+      <div><label>N° de factura / remito</label><input type="text" id="det-comprobante" value="${ing.comprobante||''}"></div>
+      <div style="flex:0 0 auto;"><button class="secondary" onclick="guardarComprobante(${ing.id})">Guardar N°</button></div>
+    </div>
+    <h3>Conciliación</h3>
+    <table class="responsive"><thead><tr><th>Variante</th><th class="right">Recibido</th><th class="right">Facturado</th><th>Estado</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="bottom-bar"><button class="primary" onclick="recalcularEstadoIngreso(${ing.id})">Actualizar estado del ingreso</button></div>
+  </div>`;
+}
+window.setFacturado = async function(lineaId, val){
+  const cantidad_facturada = val === '' ? null : parseFloat(val);
+  await supabase.from('stock_ingreso_lineas').update({cantidad_facturada, resolucion: null}).eq('id', lineaId);
+  await loadAll();
+  render();
+}
+window.guardarComprobante = async function(ingresoId){
+  const comprobante = document.getElementById('det-comprobante').value.trim() || null;
+  await supabase.from('stock_ingresos').update({comprobante}).eq('id', ingresoId);
+  // también actualiza los movimientos de stock de este ingreso para trazabilidad
+  if(comprobante) await supabase.from('stock_movimientos').update({comprobante}).eq('comprobante', `Ingreso #${ingresoId}`);
+  await loadAll();
+  document.getElementById('det-msg').innerHTML = `<div class="msg ok">Comprobante guardado ✓</div>`;
+  render();
+}
+window.resolverLinea = async function(lineaId, resolucion){
+  if(!resolucion) return;
+  const linea = state.ingresoLineas.find(l => l.id === lineaId);
+  const ing = state.ingresos.find(i => i.id === linea.ingreso_id);
+  if(resolucion === 'corregida'){
+    // el conteo físico estaba mal: la factura tenía razón -> ajustar stock por la diferencia
+    const diff = Number(linea.cantidad_facturada) - Number(linea.cantidad_recibida);
+    if(diff !== 0){
+      // buscar el depósito del movimiento original de este ingreso
+      const movs = state.movimientos.filter(m => m.variante_id === linea.variante_id && (m.comprobante === `Ingreso #${ing.id}` || m.comprobante === ing.comprobante));
+      const depositoId = movs.length ? movs[0].deposito_id : (varianteById(linea.variante_id)?.deposito_id);
+      await supabase.from('stock_movimientos').insert({
+        variante_id: linea.variante_id, deposito_id: depositoId,
+        tipo: diff > 0 ? 'entrada' : 'salida', cantidad: Math.abs(diff),
+        usuario_id: state.user.id, comprobante: `Corrección conteo Ingreso #${ing.id}`
+      });
+    }
+    await supabase.from('stock_ingreso_lineas').update({resolucion, cantidad_recibida: linea.cantidad_facturada}).eq('id', lineaId);
+  } else {
+    await supabase.from('stock_ingreso_lineas').update({resolucion}).eq('id', lineaId);
+  }
+  await loadAll();
+  render();
+}
+window.recalcularEstadoIngreso = async function(ingresoId){
+  const lineas = state.ingresoLineas.filter(l => l.ingreso_id === ingresoId);
+  const todasFacturadas = lineas.every(l => l.cantidad_facturada !== null && l.cantidad_facturada !== undefined);
+  const pendientes = lineas.filter(l => {
+    const tiene = l.cantidad_facturada !== null && l.cantidad_facturada !== undefined;
+    if(!tiene) return false;
+    return Number(l.cantidad_facturada) !== Number(l.cantidad_recibida) && !l.resolucion;
+  });
+  let estado = 'abierto';
+  if(pendientes.length) estado = 'con_diferencias';
+  else if(todasFacturadas && lineas.length) estado = 'cerrado';
+  await supabase.from('stock_ingresos').update({estado}).eq('id', ingresoId);
+  await loadAll();
+  document.getElementById('det-msg').innerHTML = `<div class="msg ${estado==='con_diferencias'?'err':'ok'}">Estado: ${estado.replace('_',' ')} ${estado==='cerrado'?'✓ Todo conciliado':''}</div>`;
   render();
 }
 
