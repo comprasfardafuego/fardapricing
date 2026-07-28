@@ -56,6 +56,16 @@
   .subcard{background:#faf6ec;border:1px dashed #d8cdb0;border-radius:10px;padding:14px;margin-top:8px;}
   .badge{display:inline-block;background:var(--cream-dark);color:var(--navy);padding:2px 8px;border-radius:8px;font-size:0.72rem;margin-left:6px;}
   .bottom-bar{position:sticky;bottom:0;background:linear-gradient(to top, var(--cream) 70%, transparent);padding:10px 0 calc(6px + env(safe-area-inset-bottom));margin-top:4px;}
+  .accordion-sec{border:1px solid #eee3cd;border-radius:10px;margin-bottom:8px;overflow:hidden;}
+  .accordion-head{width:100%;display:flex;justify-content:space-between;align-items:center;background:var(--cream-dark);border:none;padding:13px 14px;font-weight:700;font-size:0.92rem;color:var(--navy);min-height:48px;}
+  .accordion-arrow{font-size:0.7rem;color:#999;}
+  .qty-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 12px;border-top:1px solid #f2ead9;}
+  .qty-row-activa{background:#faf6ec;}
+  .qty-row-nombre{flex:1;font-size:0.9rem;line-height:1.3;}
+  .qty-stepper{display:flex;align-items:center;gap:0;flex-shrink:0;border:1px solid #d8cdb0;border-radius:10px;overflow:hidden;background:#fff;}
+  .qty-stepper button{width:38px;height:38px;border:none;background:#fff;color:var(--navy);font-size:1.2rem;font-weight:700;line-height:1;}
+  .qty-stepper button:active{background:var(--cream-dark);}
+  .qty-val{min-width:28px;text-align:center;font-weight:700;font-size:0.95rem;color:var(--ink);}
   @media (max-width: 640px){
     table.responsive thead{display:none;}
     table.responsive, table.responsive tbody, table.responsive tr, table.responsive td{display:block;width:100%;}
@@ -533,8 +543,9 @@ window.recalcularEstadoIngreso = async function(ingresoId){
 // ---------- VISTA: SOLICITUDES DE RETIRO (2 turnos: AM/PM) ----------
 let solicitudDetalleId = null;
 let solicitudNuevaAbierta = false;
-let solicitudCantidades = {}; // varianteId -> cantidad (string)
+let solicitudCantidades = {}; // varianteId -> cantidad (number)
 let solicitudFiltro = '';
+let solicitudSeccionAbierta = {}; // depositoId -> bool
 
 function turnoSugerido(){
   return new Date().getHours() < 16 ? 'AM' : 'PM';
@@ -565,21 +576,39 @@ function viewSolicitudes(){
 
   const puedeCrear = rol === 'cocina' || rol === 'admin';
   const filtro = solicitudFiltro.trim().toLowerCase();
-  const variantesVisibles = state.variantes.filter(v => v.activo!==false && (!filtro || v.nombre.toLowerCase().includes(filtro)));
+  const buscando = filtro.length > 0;
 
   let checklist = '';
   state.depositos.forEach(dep => {
-    const vs = variantesVisibles.filter(v => v.deposito_id === dep.id).sort((a,b)=>a.nombre.localeCompare(b.nombre));
-    if(!vs.length) return;
-    checklist += `<h3>${dep.nombre}</h3>`;
-    checklist += vs.map(v => {
-      const val = solicitudCantidades[v.id] ?? '';
-      const activo = val !== '' && Number(val) > 0;
-      return `<div class="row" style="align-items:center;${activo?'background:#faf6ec;border-radius:8px;padding:4px 6px;margin:0 0 6px;':''}">
-        <div style="flex:3;min-width:150px;">${v.nombre}${v.marca?` <span class="badge">${v.marca}</span>`:''}</div>
-        <div style="flex:1;min-width:80px;"><input type="number" step="any" min="0" placeholder="0" style="margin:0;text-align:center;" value="${val}" onchange="setSolicitudCantidad(${v.id}, this.value)"></div>
-      </div>`;
-    }).join('');
+    const todasDelDeposito = state.variantes.filter(v => v.activo!==false && v.deposito_id === dep.id);
+    const vs = todasDelDeposito.filter(v => !filtro || v.nombre.toLowerCase().includes(filtro)).sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    if(!todasDelDeposito.length) return;
+    const seleccionadas = todasDelDeposito.filter(v => Number(solicitudCantidades[v.id]) > 0).length;
+    const abierta = buscando ? vs.length > 0 : !!solicitudSeccionAbierta[dep.id];
+    checklist += `<div class="accordion-sec">
+      <button class="accordion-head" onclick="toggleSeccionSolicitud(${dep.id})">
+        <span>${dep.nombre}${seleccionadas ? ` <span class="badge" style="background:var(--rust);color:#fff;">${seleccionadas}</span>` : ''}</span>
+        <span class="accordion-arrow">${abierta ? '▲' : '▼'}</span>
+      </button>`;
+    if(abierta){
+      if(!vs.length){
+        checklist += `<p class="muted" style="padding:8px 4px;">Sin coincidencias en este depósito.</p>`;
+      } else {
+        checklist += vs.map(v => {
+          const val = Number(solicitudCantidades[v.id]) || 0;
+          const activo = val > 0;
+          return `<div class="qty-row ${activo?'qty-row-activa':''}">
+            <div class="qty-row-nombre">${v.nombre}${v.marca?` <span class="badge">${v.marca}</span>`:''}</div>
+            <div class="qty-stepper">
+              <button type="button" onclick="ajustarCantidad(${v.id}, -1)">−</button>
+              <span class="qty-val">${val || 0}</span>
+              <button type="button" onclick="ajustarCantidad(${v.id}, 1)">+</button>
+            </div>
+          </div>`;
+        }).join('');
+      }
+    }
+    checklist += `</div>`;
   });
 
   return `<div class="card">
@@ -594,8 +623,8 @@ function viewSolicitudes(){
       <button class="secondary" style="width:100%;margin-bottom:10px;" onclick="repetirUltimoPedido()">↻ Repetir el último pedido de este turno</button>
       <label>Buscar producto</label>
       <input type="text" placeholder="Escribí para filtrar la lista..." value="${solicitudFiltro}" oninput="filtrarSolicitud(this.value)">
-      <h3 style="margin-top:4px;">Tocá la cantidad de lo que necesita cocina</h3>
-      ${checklist || '<p class="muted">No hay variantes que coincidan con la búsqueda.</p>'}
+      <h3 style="margin-top:4px;">Tocá + / − en lo que necesita cocina</h3>
+      ${checklist}
       <div class="bottom-bar"><button class="primary" onclick="guardarSolicitud()">Enviar pedido</button></div>
     </div>` : ''}
     <h3>${propias ? 'Tus pedidos' : 'Historial de pedidos'}</h3>
@@ -603,10 +632,17 @@ function viewSolicitudes(){
   </div>`;
 }
 window.toggleNuevaSolicitud = function(){ solicitudNuevaAbierta = !solicitudNuevaAbierta; render(); }
-window.setSolicitudCantidad = function(varianteId, val){ solicitudCantidades[varianteId] = val; }
+window.toggleSeccionSolicitud = function(depId){ solicitudSeccionAbierta[depId] = !solicitudSeccionAbierta[depId]; render(); }
+window.ajustarCantidad = function(varianteId, delta){
+  const actual = Number(solicitudCantidades[varianteId]) || 0;
+  const nuevo = Math.max(0, actual + delta);
+  solicitudCantidades[varianteId] = nuevo;
+  render();
+}
 window.filtrarSolicitud = function(val){ solicitudFiltro = val; render(); }
 window.abrirSolicitud = function(id){ solicitudDetalleId = id; render(); }
 window.cerrarDetalleSolicitud = function(){ solicitudDetalleId = null; render(); }
+
 
 window.repetirUltimoPedido = function(){
   const turno = document.getElementById('sol-turno').value;
