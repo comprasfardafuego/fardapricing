@@ -133,15 +133,19 @@ window.logout = function(){
 }
 
 async function loadAll(){
-  const [depR, varR, movR, usrR, pricingR, ingR, linR] = await Promise.all([
+  const [depR, varR, movR, usrR, pricingR, ingR, linR, solR, solLinR] = await Promise.all([
     supabase.from('stock_depositos').select('*').order('id'),
     supabase.from('stock_variantes').select('*').order('nombre'),
     supabase.from('stock_movimientos').select('*').order('fecha', {ascending:false}),
     supabase.from('stock_usuarios').select('*').order('nombre'),
     supabase.from('pricing_state').select('insumos').eq('id',1).maybeSingle(),
     supabase.from('stock_ingresos').select('*').order('creado', {ascending:false}),
-    supabase.from('stock_ingreso_lineas').select('*')
+    supabase.from('stock_ingreso_lineas').select('*'),
+    supabase.from('stock_solicitudes').select('*').order('creado', {ascending:false}),
+    supabase.from('stock_solicitud_lineas').select('*')
   ]);
+  state.solicitudes = solR.data || [];
+  state.solicitudLineas = solLinR.data || [];
   state.ingresos = ingR.data || [];
   state.ingresoLineas = linR.data || [];
   state.depositos = depR.data || [];
@@ -185,9 +189,9 @@ function fmtMoney(n){
 function renderNav(){
   const rol = state.user.rol;
   const tabs = [];
-  if(rol === 'admin') tabs.push(['stock','Stock'],['ingresos','Ingresos'],['movimiento','Cargar'],['transferencia','Transferencia'],['conteo','Conteo mensual'],['variantes','Variantes'],['usuarios','Usuarios']);
-  else if(rol === 'recepcion') tabs.push(['ingresos','Ingresos'],['movimiento','Cargar entrada'],['historial','Historial']);
-  else tabs.push(['movimiento','Cargar salida'],['historial','Historial']);
+  if(rol === 'admin') tabs.push(['stock','Stock'],['ingresos','Ingresos'],['solicitudes','Solicitudes'],['movimiento','Cargar'],['transferencia','Transferencia'],['conteo','Conteo mensual'],['variantes','Variantes'],['usuarios','Usuarios']);
+  else if(rol === 'recepcion') tabs.push(['ingresos','Ingresos'],['solicitudes','Solicitudes'],['movimiento','Cargar entrada'],['historial','Historial']);
+  else tabs.push(['solicitudes','Solicitudes'],['movimiento','Cargar salida'],['historial','Historial']);
   const nav = document.getElementById('nav');
   nav.innerHTML = tabs.map(([id,label]) => `<button data-tab="${id}" onclick="setTab('${id}')">${label}</button>`).join('');
 }
@@ -205,6 +209,7 @@ function render(){
   else if(state.tab === 'movimiento') main.innerHTML = viewMovimiento(rol);
   else if(state.tab === 'transferencia') main.innerHTML = viewTransferencia();
   else if(state.tab === 'conteo') main.innerHTML = viewConteo();
+  else if(state.tab === 'solicitudes') main.innerHTML = solicitudDetalleId ? viewSolicitudDetalle() : viewSolicitudes();
   else if(state.tab === 'ingresos') main.innerHTML = ingresoDetalleId ? viewIngresoDetalle() : viewIngresos();
   else if(state.tab === 'variantes') main.innerHTML = viewVariantes();
   else if(state.tab === 'usuarios') main.innerHTML = viewUsuarios();
@@ -522,6 +527,154 @@ window.recalcularEstadoIngreso = async function(ingresoId){
   await supabase.from('stock_ingresos').update({estado}).eq('id', ingresoId);
   await loadAll();
   document.getElementById('det-msg').innerHTML = `<div class="msg ${estado==='con_diferencias'?'err':'ok'}">Estado: ${estado.replace('_',' ')} ${estado==='cerrado'?'✓ Todo conciliado':''}</div>`;
+  render();
+}
+
+// ---------- VISTA: SOLICITUDES DE RETIRO (2 turnos: AM/PM) ----------
+let solicitudDetalleId = null;
+let solicitudNuevaAbierta = false;
+let solicitudRows = [{variante:'', cantidad:''}];
+
+function turnoSugerido(){
+  return new Date().getHours() < 16 ? 'AM' : 'PM';
+}
+function estadoSolicitudPill(estado){
+  return estado === 'entregada'
+    ? `<span class="pill entrada">Entregada</span>`
+    : `<span class="pill salida">Pendiente</span>`;
+}
+
+function viewSolicitudes(){
+  const rol = state.user.rol;
+  const nombresVariantes = state.variantes.filter(v=>v.activo!==false).map(v=>v.nombre).sort();
+  const propias = rol === 'cocina';
+  const lista = (state.solicitudes||[])
+    .filter(s => propias ? s.usuario_solicitante_id === state.user.id : true)
+    .map(s => {
+      const lineas = (state.solicitudLineas||[]).filter(l => l.solicitud_id === s.id);
+      const solicitante = state.usuarios.find(u=>u.id===s.usuario_solicitante_id);
+      return `<tr>
+        <td data-label="Fecha">${s.fecha}</td>
+        <td data-label="Turno"><b>${s.turno}</b></td>
+        <td data-label="Pedido por">${solicitante?solicitante.nombre:'-'}</td>
+        <td data-label="Líneas" class="right">${lineas.length}</td>
+        <td data-label="Estado">${estadoSolicitudPill(s.estado)}</td>
+        <td data-label=""><button class="secondary" onclick="abrirSolicitud(${s.id})">Ver</button></td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="6" class="muted">Sin solicitudes todavía</td></tr>`;
+
+  const rowsHtml = solicitudRows.map((r,i) => `
+    <div class="row">
+      <div><label>Variante</label><input list="sol-var-list" type="text" value="${r.variante}" onchange="updateSolicitudRow(${i},'variante',this.value)"></div>
+      <div><label>Cantidad</label><input type="number" step="any" value="${r.cantidad}" onchange="updateSolicitudRow(${i},'cantidad',this.value)"></div>
+      <div style="flex:0 0 auto;"><button class="del" onclick="removeSolicitudRow(${i})">✕</button></div>
+    </div>`).join('');
+
+  const puedeCrear = rol === 'cocina' || rol === 'admin';
+
+  return `<div class="card">
+    <h2>Solicitudes de retiro</h2>
+    <p class="muted">Pedido de cocina para el turno. El depósito prepara y entrega — recién ahí se mueve el stock.</p>
+    <div id="sol-msg"></div>
+    ${puedeCrear ? `<button class="ghost" onclick="toggleNuevaSolicitud()">${solicitudNuevaAbierta ? '– Cancelar' : '+ Nueva solicitud'}</button>` : ''}
+    ${solicitudNuevaAbierta ? `<div class="subcard">
+      <div class="row">
+        <div><label>Turno</label><select id="sol-turno"><option value="AM" ${turnoSugerido()==='AM'?'selected':''}>AM</option><option value="PM" ${turnoSugerido()==='PM'?'selected':''}>PM</option></select></div>
+      </div>
+      <h3>Qué necesita cocina</h3>
+      <datalist id="sol-var-list">${nombresVariantes.map(n=>`<option value="${n}">`).join('')}</datalist>
+      ${rowsHtml}
+      <button class="ghost" onclick="addSolicitudRow()">+ Agregar línea</button>
+      <div style="height:8px"></div>
+      <button class="primary" onclick="guardarSolicitud()">Enviar pedido</button>
+    </div>` : ''}
+    <h3>${propias ? 'Tus pedidos' : 'Historial de pedidos'}</h3>
+    <table class="responsive"><thead><tr><th>Fecha</th><th>Turno</th><th>Pedido por</th><th class="right">Líneas</th><th>Estado</th><th></th></tr></thead><tbody>${lista}</tbody></table>
+  </div>`;
+}
+window.toggleNuevaSolicitud = function(){ solicitudNuevaAbierta = !solicitudNuevaAbierta; render(); }
+window.addSolicitudRow = function(){ solicitudRows.push({variante:'',cantidad:''}); render(); }
+window.removeSolicitudRow = function(i){ solicitudRows.splice(i,1); if(!solicitudRows.length) solicitudRows=[{variante:'',cantidad:''}]; render(); }
+window.updateSolicitudRow = function(i,field,val){ solicitudRows[i][field] = val; }
+window.abrirSolicitud = function(id){ solicitudDetalleId = id; render(); }
+window.cerrarDetalleSolicitud = function(){ solicitudDetalleId = null; render(); }
+
+window.guardarSolicitud = async function(){
+  const turno = document.getElementById('sol-turno').value;
+  const rows = solicitudRows.filter(r => r.variante && r.cantidad);
+  const msg = document.getElementById('sol-msg');
+  if(!rows.length){ msg.innerHTML = `<div class="msg err">Cargá al menos una línea</div>`; return; }
+  const lineas = [];
+  for(const r of rows){
+    const v = state.variantes.find(x => x.nombre === r.variante);
+    if(!v){ msg.innerHTML = `<div class="msg err">No encontré la variante "${r.variante}"</div>`; return; }
+    lineas.push({variante_id: v.id, deposito_id: v.deposito_id, cantidad_solicitada: parseFloat(r.cantidad)});
+  }
+  const { data: sol, error: e1 } = await supabase.from('stock_solicitudes').insert({turno, usuario_solicitante_id: state.user.id}).select().maybeSingle();
+  if(e1){ msg.innerHTML = `<div class="msg err">Error: ${e1.message}</div>`; return; }
+  const { error: e2 } = await supabase.from('stock_solicitud_lineas').insert(lineas.map(l => ({solicitud_id: sol.id, ...l})));
+  if(e2){ msg.innerHTML = `<div class="msg err">Error en líneas: ${e2.message}</div>`; return; }
+  solicitudRows = [{variante:'',cantidad:''}];
+  solicitudNuevaAbierta = false;
+  await loadAll();
+  msg.innerHTML = `<div class="msg ok">Pedido turno ${turno} enviado ✓</div>`;
+  render();
+}
+
+function viewSolicitudDetalle(){
+  const sol = state.solicitudes.find(s => s.id === solicitudDetalleId);
+  if(!sol){ solicitudDetalleId = null; return viewSolicitudes(); }
+  const lineas = (state.solicitudLineas||[]).filter(l => l.solicitud_id === sol.id);
+  const rol = state.user.rol;
+  const puedeEntregar = (rol === 'admin' || rol === 'recepcion') && sol.estado === 'pendiente';
+  const rows = lineas.map(l => {
+    const v = varianteById(l.variante_id);
+    const dep = state.depositos.find(d=>d.id===l.deposito_id);
+    return `<tr>
+      <td data-label="Variante">${v?v.nombre:'(?)'}<div class="muted">${dep?dep.nombre:''}</div></td>
+      <td data-label="Pedido" class="right">${l.cantidad_solicitada}</td>
+      <td data-label="Entregado" class="right">${puedeEntregar
+        ? `<input type="number" step="any" style="margin:0;" value="${l.cantidad_entregada ?? l.cantidad_solicitada}" onchange="setEntregado(${l.id}, this.value)">`
+        : (l.cantidad_entregada ?? '<span class="muted">-</span>')}</td>
+    </tr>`;
+  }).join('');
+  const solicitante = state.usuarios.find(u=>u.id===sol.usuario_solicitante_id);
+  return `<div class="card">
+    <button class="ghost" style="width:auto;padding:8px 14px;" onclick="cerrarDetalleSolicitud()">← Volver</button>
+    <h2 style="margin-top:12px;">Turno ${sol.turno} · ${sol.fecha}</h2>
+    <div class="muted">Pedido por: ${solicitante?solicitante.nombre:'-'} · ${estadoSolicitudPill(sol.estado)}</div>
+    <div id="sold-msg" style="margin-top:8px;"></div>
+    <table class="responsive" style="margin-top:10px;"><thead><tr><th>Variante</th><th class="right">Pedido</th><th class="right">Entregado</th></tr></thead><tbody>${rows}</tbody></table>
+    ${puedeEntregar ? `<div class="bottom-bar"><button class="primary" onclick="confirmarEntrega(${sol.id})">Confirmar entrega (mueve el stock)</button></div>` : ''}
+  </div>`;
+}
+window.setEntregado = function(lineaId, val){
+  const l = state.solicitudLineas.find(x => x.id === lineaId);
+  if(l) l._entregadoPendiente = val;
+}
+window.confirmarEntrega = async function(solicitudId){
+  const lineas = state.solicitudLineas.filter(l => l.solicitud_id === solicitudId);
+  const msg = document.getElementById('sold-msg');
+  const updates = [];
+  const movimientos = [];
+  for(const l of lineas){
+    const cantidad = l._entregadoPendiente != null ? parseFloat(l._entregadoPendiente) : Number(l.cantidad_solicitada);
+    updates.push({id: l.id, cantidad_entregada: cantidad});
+    if(cantidad > 0){
+      movimientos.push({variante_id: l.variante_id, deposito_id: l.deposito_id, tipo: 'salida', cantidad, usuario_id: state.user.id, comprobante: `Solicitud #${solicitudId}`});
+    }
+  }
+  for(const u of updates){
+    const { error } = await supabase.from('stock_solicitud_lineas').update({cantidad_entregada: u.cantidad_entregada}).eq('id', u.id);
+    if(error){ msg.innerHTML = `<div class="msg err">Error: ${error.message}</div>`; return; }
+  }
+  if(movimientos.length){
+    const { error: e2 } = await supabase.from('stock_movimientos').insert(movimientos);
+    if(e2){ msg.innerHTML = `<div class="msg err">Error moviendo stock: ${e2.message}</div>`; return; }
+  }
+  await supabase.from('stock_solicitudes').update({estado:'entregada', usuario_entrega_id: state.user.id, entregado_en: new Date().toISOString()}).eq('id', solicitudId);
+  await loadAll();
+  msg.innerHTML = `<div class="msg ok">Entrega confirmada, stock actualizado ✓</div>`;
   render();
 }
 
