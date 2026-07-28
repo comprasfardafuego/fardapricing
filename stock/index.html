@@ -533,7 +533,8 @@ window.recalcularEstadoIngreso = async function(ingresoId){
 // ---------- VISTA: SOLICITUDES DE RETIRO (2 turnos: AM/PM) ----------
 let solicitudDetalleId = null;
 let solicitudNuevaAbierta = false;
-let solicitudRows = [{variante:'', cantidad:''}];
+let solicitudCantidades = {}; // varianteId -> cantidad (string)
+let solicitudFiltro = '';
 
 function turnoSugerido(){
   return new Date().getHours() < 16 ? 'AM' : 'PM';
@@ -546,7 +547,6 @@ function estadoSolicitudPill(estado){
 
 function viewSolicitudes(){
   const rol = state.user.rol;
-  const nombresVariantes = state.variantes.filter(v=>v.activo!==false).map(v=>v.nombre).sort();
   const propias = rol === 'cocina';
   const lista = (state.solicitudes||[])
     .filter(s => propias ? s.usuario_solicitante_id === state.user.id : true)
@@ -563,14 +563,24 @@ function viewSolicitudes(){
       </tr>`;
     }).join('') || `<tr><td colspan="6" class="muted">Sin solicitudes todavía</td></tr>`;
 
-  const rowsHtml = solicitudRows.map((r,i) => `
-    <div class="row">
-      <div><label>Variante</label><input list="sol-var-list" type="text" value="${r.variante}" onchange="updateSolicitudRow(${i},'variante',this.value)"></div>
-      <div><label>Cantidad</label><input type="number" step="any" value="${r.cantidad}" onchange="updateSolicitudRow(${i},'cantidad',this.value)"></div>
-      <div style="flex:0 0 auto;"><button class="del" onclick="removeSolicitudRow(${i})">✕</button></div>
-    </div>`).join('');
-
   const puedeCrear = rol === 'cocina' || rol === 'admin';
+  const filtro = solicitudFiltro.trim().toLowerCase();
+  const variantesVisibles = state.variantes.filter(v => v.activo!==false && (!filtro || v.nombre.toLowerCase().includes(filtro)));
+
+  let checklist = '';
+  state.depositos.forEach(dep => {
+    const vs = variantesVisibles.filter(v => v.deposito_id === dep.id).sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    if(!vs.length) return;
+    checklist += `<h3>${dep.nombre}</h3>`;
+    checklist += vs.map(v => {
+      const val = solicitudCantidades[v.id] ?? '';
+      const activo = val !== '' && Number(val) > 0;
+      return `<div class="row" style="align-items:center;${activo?'background:#faf6ec;border-radius:8px;padding:4px 6px;margin:0 0 6px;':''}">
+        <div style="flex:3;min-width:150px;">${v.nombre}${v.marca?` <span class="badge">${v.marca}</span>`:''}</div>
+        <div style="flex:1;min-width:80px;"><input type="number" step="any" min="0" placeholder="0" style="margin:0;text-align:center;" value="${val}" onchange="setSolicitudCantidad(${v.id}, this.value)"></div>
+      </div>`;
+    }).join('');
+  });
 
   return `<div class="card">
     <h2>Solicitudes de retiro</h2>
@@ -581,43 +591,57 @@ function viewSolicitudes(){
       <div class="row">
         <div><label>Turno</label><select id="sol-turno"><option value="AM" ${turnoSugerido()==='AM'?'selected':''}>AM</option><option value="PM" ${turnoSugerido()==='PM'?'selected':''}>PM</option></select></div>
       </div>
-      <h3>Qué necesita cocina</h3>
-      <datalist id="sol-var-list">${nombresVariantes.map(n=>`<option value="${n}">`).join('')}</datalist>
-      ${rowsHtml}
-      <button class="ghost" onclick="addSolicitudRow()">+ Agregar línea</button>
-      <div style="height:8px"></div>
-      <button class="primary" onclick="guardarSolicitud()">Enviar pedido</button>
+      <button class="secondary" style="width:100%;margin-bottom:10px;" onclick="repetirUltimoPedido()">↻ Repetir el último pedido de este turno</button>
+      <label>Buscar producto</label>
+      <input type="text" placeholder="Escribí para filtrar la lista..." value="${solicitudFiltro}" oninput="filtrarSolicitud(this.value)">
+      <h3 style="margin-top:4px;">Tocá la cantidad de lo que necesita cocina</h3>
+      ${checklist || '<p class="muted">No hay variantes que coincidan con la búsqueda.</p>'}
+      <div class="bottom-bar"><button class="primary" onclick="guardarSolicitud()">Enviar pedido</button></div>
     </div>` : ''}
     <h3>${propias ? 'Tus pedidos' : 'Historial de pedidos'}</h3>
     <table class="responsive"><thead><tr><th>Fecha</th><th>Turno</th><th>Pedido por</th><th class="right">Líneas</th><th>Estado</th><th></th></tr></thead><tbody>${lista}</tbody></table>
   </div>`;
 }
 window.toggleNuevaSolicitud = function(){ solicitudNuevaAbierta = !solicitudNuevaAbierta; render(); }
-window.addSolicitudRow = function(){ solicitudRows.push({variante:'',cantidad:''}); render(); }
-window.removeSolicitudRow = function(i){ solicitudRows.splice(i,1); if(!solicitudRows.length) solicitudRows=[{variante:'',cantidad:''}]; render(); }
-window.updateSolicitudRow = function(i,field,val){ solicitudRows[i][field] = val; }
+window.setSolicitudCantidad = function(varianteId, val){ solicitudCantidades[varianteId] = val; }
+window.filtrarSolicitud = function(val){ solicitudFiltro = val; render(); }
 window.abrirSolicitud = function(id){ solicitudDetalleId = id; render(); }
 window.cerrarDetalleSolicitud = function(){ solicitudDetalleId = null; render(); }
 
+window.repetirUltimoPedido = function(){
+  const turno = document.getElementById('sol-turno').value;
+  const propio = state.user.rol === 'cocina';
+  const anterior = state.solicitudes
+    .filter(s => s.turno === turno && (!propio || s.usuario_solicitante_id === state.user.id))
+    .sort((a,b) => new Date(b.creado) - new Date(a.creado))[0];
+  const msg = document.getElementById('sol-msg');
+  if(!anterior){ msg.innerHTML = `<div class="msg err">No hay un pedido anterior de turno ${turno} para repetir</div>`; return; }
+  const lineas = state.solicitudLineas.filter(l => l.solicitud_id === anterior.id);
+  solicitudCantidades = {};
+  lineas.forEach(l => { solicitudCantidades[l.variante_id] = l.cantidad_solicitada; });
+  msg.innerHTML = `<div class="msg ok">Se copiaron ${lineas.length} línea(s) del pedido del ${anterior.fecha} — revisá y ajustá antes de enviar</div>`;
+  render();
+}
+
 window.guardarSolicitud = async function(){
   const turno = document.getElementById('sol-turno').value;
-  const rows = solicitudRows.filter(r => r.variante && r.cantidad);
   const msg = document.getElementById('sol-msg');
-  if(!rows.length){ msg.innerHTML = `<div class="msg err">Cargá al menos una línea</div>`; return; }
-  const lineas = [];
-  for(const r of rows){
-    const v = state.variantes.find(x => x.nombre === r.variante);
-    if(!v){ msg.innerHTML = `<div class="msg err">No encontré la variante "${r.variante}"</div>`; return; }
-    lineas.push({variante_id: v.id, deposito_id: v.deposito_id, cantidad_solicitada: parseFloat(r.cantidad)});
-  }
+  const lineas = Object.entries(solicitudCantidades)
+    .filter(([id,val]) => val !== '' && Number(val) > 0)
+    .map(([id,val]) => {
+      const v = varianteById(parseInt(id));
+      return {variante_id: v.id, deposito_id: v.deposito_id, cantidad_solicitada: parseFloat(val)};
+    });
+  if(!lineas.length){ msg.innerHTML = `<div class="msg err">Marcá alguna cantidad antes de enviar</div>`; return; }
   const { data: sol, error: e1 } = await supabase.from('stock_solicitudes').insert({turno, usuario_solicitante_id: state.user.id}).select().maybeSingle();
   if(e1){ msg.innerHTML = `<div class="msg err">Error: ${e1.message}</div>`; return; }
   const { error: e2 } = await supabase.from('stock_solicitud_lineas').insert(lineas.map(l => ({solicitud_id: sol.id, ...l})));
   if(e2){ msg.innerHTML = `<div class="msg err">Error en líneas: ${e2.message}</div>`; return; }
-  solicitudRows = [{variante:'',cantidad:''}];
+  solicitudCantidades = {};
+  solicitudFiltro = '';
   solicitudNuevaAbierta = false;
   await loadAll();
-  msg.innerHTML = `<div class="msg ok">Pedido turno ${turno} enviado ✓</div>`;
+  msg.innerHTML = `<div class="msg ok">Pedido turno ${turno} enviado ✓ (${lineas.length} línea(s))</div>`;
   render();
 }
 
