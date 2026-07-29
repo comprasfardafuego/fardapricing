@@ -659,7 +659,7 @@ function viewSolicitudes(){
       </div>
       <button class="secondary" style="width:100%;margin-bottom:10px;" onclick="repetirUltimoPedido()">↻ Repetir el último pedido de este turno</button>
       <label>Buscar producto</label>
-      <input type="text" placeholder="Escribí para filtrar la lista..." value="${solicitudFiltro}" oninput="filtrarSolicitud(this.value)">
+      <input type="text" id="sol-buscador" placeholder="Escribí para filtrar la lista..." value="${solicitudFiltro}" oninput="filtrarSolicitud(this.value)">
       <h3 style="margin-top:4px;">Tocá + / − en lo que necesita cocina</h3>
       ${checklist}
       <div class="bottom-bar"><button class="primary" onclick="guardarSolicitud()">Enviar pedido</button></div>
@@ -676,7 +676,16 @@ window.ajustarCantidad = function(varianteId, delta){
   solicitudCantidades[varianteId] = nuevo;
   render();
 }
-window.filtrarSolicitud = function(val){ solicitudFiltro = val; render(); }
+window.filtrarSolicitud = function(val){
+  solicitudFiltro = val;
+  render();
+  const inp = document.getElementById('sol-buscador');
+  if(inp){
+    inp.focus();
+    const pos = inp.value.length;
+    inp.setSelectionRange(pos, pos);
+  }
+}
 window.abrirSolicitud = function(id){ solicitudDetalleId = id; render(); }
 window.cerrarDetalleSolicitud = function(){ solicitudDetalleId = null; render(); }
 
