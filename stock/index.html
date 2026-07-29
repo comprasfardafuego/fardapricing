@@ -178,11 +178,21 @@ function costoVariante(v){
   if(!ins || ins.costo == null) return 0;
   return ins.costo * (v.unidad_conversion || 1);
 }
+function unidadBaseTexto(codigo){
+  const map = {KG:'kilos', LT:'litros', UNIDAD:'unidades', BOTELLA:'botellas'};
+  return map[codigo] || (codigo||'unidad').toLowerCase();
+}
 function unidadDeVariante(v){
   if(!v) return '';
-  if(v.unidad_presentacion) return v.unidad_presentacion;
   const ins = state.insumos[v.insumo_nombre];
-  return ins ? ins.unidad.toLowerCase() : 'unidad';
+  const baseTxt = ins ? unidadBaseTexto(ins.unidad) : 'unidades';
+  const conv = Number(v.unidad_conversion) || 1;
+  const pres = (v.presentacion || '').trim();
+  if(conv === 1){
+    return pres || baseTxt;
+  }
+  // ej: "bidón x 5 litros" o "bolsa x 2 kilos"
+  return `${pres || 'presentación'} x ${conv} ${baseTxt}`;
 }
 function stockDe(varianteId, depositoId){
   let s = 0;
@@ -304,17 +314,29 @@ function formNuevaVariante(){
     <label>Nombre completo (ej: Tomate perita La Campagnola lata 400g)</label>
     <input type="text" id="nv-nombre">
     <div class="row">
-      <div><label>Insumo base (de pricing, para costeo)</label><input list="nv-insumo-list" type="text" id="nv-insumo"><datalist id="nv-insumo-list">${nombresInsumos.map(n=>`<option value="${n}">`).join('')}</datalist></div>
+      <div><label>Insumo base (de pricing, para costeo)</label><input list="nv-insumo-list" type="text" id="nv-insumo" oninput="actualizarPreviewVariante()"><datalist id="nv-insumo-list">${nombresInsumos.map(n=>`<option value="${n}">`).join('')}</datalist></div>
       <div><label>Marca</label><input type="text" id="nv-marca"></div>
     </div>
     <div class="row">
-      <div><label>Presentación</label><input type="text" id="nv-presentacion" placeholder="lata, bolsa, caja..."></div>
-      <div><label>Equivale a (en unidad del insumo)</label><input type="number" step="any" id="nv-conversion" value="1"></div>
+      <div><label>Presentación (ej: bidón, bolsa, lata)</label><input type="text" id="nv-presentacion" placeholder="bidón, bolsa, caja..." oninput="actualizarPreviewVariante()"></div>
+      <div><label>Cantidad por presentación <span id="nv-unidad-base" class="muted"></span></label><input type="number" step="any" id="nv-conversion" value="1" oninput="actualizarPreviewVariante()"></div>
       <div><label>Depósito</label><select id="nv-deposito">${depOptions}</select></div>
     </div>
+    <p class="muted">Se va a mostrar como: <b id="nv-preview">-</b></p>
     <div id="nv-msg"></div>
     <button class="secondary" onclick="crearVarianteInline()">Crear variante</button>
   </div>`;
+}
+window.actualizarPreviewVariante = function(){
+  const insumoNombre = document.getElementById('nv-insumo')?.value.trim();
+  const pres = document.getElementById('nv-presentacion')?.value.trim();
+  const conv = Number(document.getElementById('nv-conversion')?.value) || 1;
+  const ins = state.insumos[insumoNombre];
+  const baseTxt = ins ? unidadBaseTexto(ins.unidad) : null;
+  const hint = document.getElementById('nv-unidad-base');
+  if(hint) hint.textContent = baseTxt ? `(en ${baseTxt})` : '';
+  const preview = document.getElementById('nv-preview');
+  if(preview) preview.textContent = conv === 1 ? (pres || baseTxt || '-') : `${pres || 'presentación'} x ${conv} ${baseTxt || 'unidades'}`;
 }
 window.crearVarianteInline = async function(){
   const nombre = document.getElementById('nv-nombre').value.trim();
@@ -859,18 +881,18 @@ function viewVariantes(){
   const rows = state.variantes.map(v => {
     const opts = depOptions.replace(`value="${v.deposito_id}"`, `value="${v.deposito_id}" selected`);
     return `<tr>
-      <td data-label="Variante">${v.nombre}<div class="muted">insumo: ${v.insumo_nombre}</div></td>
+      <td data-label="Variante">${v.nombre}<div class="muted">insumo: ${v.insumo_nombre} · <b>${unidadDeVariante(v)}</b></div></td>
       <td data-label="Marca"><input type="text" value="${v.marca||''}" onchange="editarVariante(${v.id},'marca',this.value)"></td>
       <td data-label="Presentación"><input type="text" value="${v.presentacion||''}" onchange="editarVariante(${v.id},'presentacion',this.value)"></td>
-      <td data-label="Equivalencia"><input type="number" step="any" value="${v.unidad_conversion}" onchange="editarVariante(${v.id},'unidad_conversion',this.value)"></td>
+      <td data-label="Cant. por presentación"><input type="number" step="any" value="${v.unidad_conversion}" onchange="editarVariante(${v.id},'unidad_conversion',this.value)"></td>
       <td data-label="Depósito"><select onchange="editarVariante(${v.id},'deposito_id',this.value)">${opts}</select></td>
       <td data-label=""><button class="del" onclick="borrarVariante(${v.id})">✕</button></td>
     </tr>`;
   }).join('') || `<tr><td colspan="6" class="muted">Todavía no hay variantes creadas</td></tr>`;
   return `<div class="card"><h2>Variantes (marca/presentación)</h2>
     <div id="var-msg"></div>
-    <p class="muted">Cada variante hereda el costo del insumo de pricing indicado, multiplicado por su equivalencia.</p>
-    <table class="responsive"><thead><tr><th>Variante</th><th>Marca</th><th>Presentación</th><th>Equivalencia</th><th>Depósito</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="muted">Cada variante hereda el costo del insumo de pricing indicado, multiplicado por su equivalencia. La columna "unidad" (ej: bidón x 5 litros) se calcula sola a partir de la presentación y la cantidad.</p>
+    <table class="responsive"><thead><tr><th>Variante</th><th>Marca</th><th>Presentación</th><th>Cant. por presentación</th><th>Depósito</th><th></th></tr></thead><tbody>${rows}</tbody></table>
     <h3>Nueva variante</h3>
     ${formNuevaVariante()}
   </div>`;
