@@ -178,6 +178,12 @@ function costoVariante(v){
   if(!ins || ins.costo == null) return 0;
   return ins.costo * (v.unidad_conversion || 1);
 }
+function unidadDeVariante(v){
+  if(!v) return '';
+  if(v.unidad_presentacion) return v.unidad_presentacion;
+  const ins = state.insumos[v.insumo_nombre];
+  return ins ? ins.unidad.toLowerCase() : 'unidad';
+}
 function stockDe(varianteId, depositoId){
   let s = 0;
   state.movimientos.forEach(m => {
@@ -257,12 +263,16 @@ function viewMovimiento(rol){
   const tipoFijo = rol === 'recepcion' ? 'entrada' : (rol === 'cocina' ? 'salida' : null);
   const depOptions = state.depositos.map(d => `<option value="${d.id}">${d.nombre}</option>`).join('');
   const nombresVariantes = state.variantes.filter(v=>v.activo!==false).map(v=>v.nombre).sort();
-  const rowsHtml = batchRows.map((r,i) => `
+  const rowsHtml = batchRows.map((r,i) => {
+    const vMatch = state.variantes.find(x => x.nombre === r.variante);
+    const unidadLabel = vMatch ? ` (${unidadDeVariante(vMatch)})` : '';
+    return `
     <div class="row">
       <div><label>Variante (marca/presentación)</label><input list="var-list" type="text" value="${r.variante}" onchange="updateRow(${i},'variante',this.value)"></div>
-      <div><label>Cantidad</label><input type="number" step="any" value="${r.cantidad}" onchange="updateRow(${i},'cantidad',this.value)"></div>
+      <div><label>Cantidad${unidadLabel}</label><input type="number" step="any" value="${r.cantidad}" onchange="updateRow(${i},'cantidad',this.value)"></div>
       <div style="flex:0 0 auto;"><button class="del" onclick="removeRow(${i})">✕</button></div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   return `<div class="card">
     <h2>${tipoFijo === 'entrada' ? 'Cargar entrada' : tipoFijo === 'salida' ? 'Cargar salida' : 'Cargar movimiento'}</h2>
     <div id="mov-msg"></div>
@@ -283,7 +293,7 @@ function viewMovimiento(rol){
 }
 window.addRow = function(){ batchRows.push({variante:'',cantidad:''}); render(); }
 window.removeRow = function(i){ batchRows.splice(i,1); if(!batchRows.length) batchRows=[{variante:'',cantidad:''}]; render(); }
-window.updateRow = function(i,field,val){ batchRows[i][field] = val; }
+window.updateRow = function(i,field,val){ batchRows[i][field] = val; if(field==='variante') render(); }
 window.toggleNuevaVariante = function(){ nuevaVarianteAbierta = !nuevaVarianteAbierta; render(); }
 
 function formNuevaVariante(){
@@ -379,12 +389,16 @@ function viewIngresos(){
     </tr>`;
   }).join('') || `<tr><td colspan="6" class="muted">Sin ingresos registrados todavía</td></tr>`;
 
-  const rowsHtml = ingresoRows.map((r,i) => `
+  const rowsHtml = ingresoRows.map((r,i) => {
+    const vMatch = state.variantes.find(x => x.nombre === r.variante);
+    const unidadLabel = vMatch ? ` (${unidadDeVariante(vMatch)})` : '';
+    return `
     <div class="row">
       <div><label>Variante</label><input list="ing-var-list" type="text" value="${r.variante}" onchange="updateIngresoRow(${i},'variante',this.value)"></div>
-      <div><label>Cant. recibida (contada)</label><input type="number" step="any" value="${r.cantidad}" onchange="updateIngresoRow(${i},'cantidad',this.value)"></div>
+      <div><label>Cant. recibida${unidadLabel}</label><input type="number" step="any" value="${r.cantidad}" onchange="updateIngresoRow(${i},'cantidad',this.value)"></div>
       <div style="flex:0 0 auto;"><button class="del" onclick="removeIngresoRow(${i})">✕</button></div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   return `<div class="card">
     <h2>Ingresos de mercadería</h2>
@@ -410,7 +424,7 @@ function viewIngresos(){
 window.toggleNuevoIngreso = function(){ ingresoNuevoAbierto = !ingresoNuevoAbierto; render(); }
 window.addIngresoRow = function(){ ingresoRows.push({variante:'',cantidad:''}); render(); }
 window.removeIngresoRow = function(i){ ingresoRows.splice(i,1); if(!ingresoRows.length) ingresoRows=[{variante:'',cantidad:''}]; render(); }
-window.updateIngresoRow = function(i,field,val){ ingresoRows[i][field] = val; }
+window.updateIngresoRow = function(i,field,val){ ingresoRows[i][field] = val; if(field==='variante') render(); }
 window.abrirIngreso = function(id){ ingresoDetalleId = id; render(); }
 window.cerrarDetalleIngreso = function(){ ingresoDetalleId = null; render(); }
 
@@ -464,7 +478,7 @@ function viewIngresoDetalle(){
         <option value="corregida">Era error de conteo (corrige stock)</option>
       </select>`;
     return `<tr>
-      <td data-label="Variante">${v ? v.nombre : '(?)'}</td>
+      <td data-label="Variante">${v ? v.nombre : '(?)'}<div class="muted" style="font-size:0.72rem;">${unidadDeVariante(v)}</div></td>
       <td data-label="Recibido" class="right"><b>${l.cantidad_recibida}</b></td>
       <td data-label="Facturado" class="right"><input type="number" step="any" style="margin:0;" value="${tieneFact?fact:''}" onchange="setFacturado(${l.id}, this.value)"></td>
       <td data-label="Estado">${estadoCell}</td>
@@ -597,8 +611,9 @@ function viewSolicitudes(){
         checklist += vs.map(v => {
           const val = Number(solicitudCantidades[v.id]) || 0;
           const activo = val > 0;
+          const unidad = unidadDeVariante(v);
           return `<div class="qty-row ${activo?'qty-row-activa':''}">
-            <div class="qty-row-nombre">${v.nombre}${v.marca?` <span class="badge">${v.marca}</span>`:''}</div>
+            <div class="qty-row-nombre">${v.nombre}${v.marca?` <span class="badge">${v.marca}</span>`:''}<div class="muted" style="font-size:0.72rem;">unidad: ${unidad}</div></div>
             <div class="qty-stepper">
               <button type="button" onclick="ajustarCantidad(${v.id}, -1)">−</button>
               <span class="qty-val">${val || 0}</span>
@@ -690,12 +705,13 @@ function viewSolicitudDetalle(){
   const rows = lineas.map(l => {
     const v = varianteById(l.variante_id);
     const dep = state.depositos.find(d=>d.id===l.deposito_id);
+    const unidad = unidadDeVariante(v);
     return `<tr>
-      <td data-label="Variante">${v?v.nombre:'(?)'}<div class="muted">${dep?dep.nombre:''}</div></td>
-      <td data-label="Pedido" class="right">${l.cantidad_solicitada}</td>
+      <td data-label="Variante">${v?v.nombre:'(?)'}<div class="muted">${dep?dep.nombre:''} · ${unidad}</div></td>
+      <td data-label="Pedido" class="right">${l.cantidad_solicitada} <span class="muted">${unidad}</span></td>
       <td data-label="Entregado" class="right">${puedeEntregar
         ? `<input type="number" step="any" style="margin:0;" value="${l.cantidad_entregada ?? l.cantidad_solicitada}" onchange="setEntregado(${l.id}, this.value)">`
-        : (l.cantidad_entregada ?? '<span class="muted">-</span>')}</td>
+        : (l.cantidad_entregada != null ? `${l.cantidad_entregada} <span class="muted">${unidad}</span>` : '<span class="muted">-</span>')}</td>
     </tr>`;
   }).join('');
   const solicitante = state.usuarios.find(u=>u.id===sol.usuario_solicitante_id);
@@ -746,16 +762,21 @@ function viewTransferencia(){
     <h2>Transferencia entre depósitos</h2>
     <div id="tr-msg"></div>
     <label>Variante</label>
-    <input list="var-list2" type="text" id="tr-variante">
+    <input list="var-list2" type="text" id="tr-variante" oninput="actualizarUnidadTransferencia(this.value)">
     <datalist id="var-list2">${nombresVariantes.map(n=>`<option value="${n}">`).join('')}</datalist>
     <div class="row">
       <div><label>Desde</label><select id="tr-origen">${depOptions}</select></div>
       <div><label>Hacia</label><select id="tr-destino">${depOptions}</select></div>
     </div>
-    <label>Cantidad</label>
+    <label>Cantidad <span id="tr-unidad-hint" class="muted"></span></label>
     <input type="number" step="any" id="tr-cantidad">
     <div class="bottom-bar"><button class="primary" onclick="guardarTransferencia()">Transferir</button></div>
   </div>`;
+}
+window.actualizarUnidadTransferencia = function(nombre){
+  const v = state.variantes.find(x => x.nombre === nombre);
+  const hint = document.getElementById('tr-unidad-hint');
+  if(hint) hint.textContent = v ? `(${unidadDeVariante(v)})` : '';
 }
 window.guardarTransferencia = async function(){
   const nombreVar = document.getElementById('tr-variante').value;
@@ -786,7 +807,8 @@ function viewConteo(){
   const rows = vs.map(v => {
     const teorico = stockDe(v.id, conteoDepositoId);
     const val = conteoValores[v.id] ?? '';
-    return `<tr><td data-label="Variante">${v.nombre}${v.marca?` <span class="badge">${v.marca}</span>`:''}</td><td data-label="Teórico" class="right muted">${teorico}</td><td data-label="Contado" class="right"><input type="number" step="any" style="margin:0;" value="${val}" onchange="setConteoValor(${v.id},this.value)"></td></tr>`;
+    const unidad = unidadDeVariante(v);
+    return `<tr><td data-label="Variante">${v.nombre}${v.marca?` <span class="badge">${v.marca}</span>`:''}<div class="muted" style="font-size:0.72rem;">${unidad}</div></td><td data-label="Teórico" class="right muted">${teorico}</td><td data-label="Contado" class="right"><input type="number" step="any" style="margin:0;" value="${val}" onchange="setConteoValor(${v.id},this.value)"></td></tr>`;
   }).join('') || `<tr><td colspan="3" class="muted">Sin variantes asignadas a este depósito</td></tr>`;
   return `<div class="card">
     <h2>Conteo físico mensual</h2>
