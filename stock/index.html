@@ -254,7 +254,8 @@ function viewStock(){
       const valor = cant * costoUnit;
       totalValor += valor;
       const marcaTxt = v.marca ? ` <span class="badge">${v.marca}</span>` : '';
-      return `<tr><td data-label="Variante">${v.nombre}${marcaTxt}<div class="muted">${v.presentacion||''}</div></td><td data-label="Stock" class="right">${cant}</td><td data-label="Costo unit." class="right">${fmtMoney(costoUnit)}</td><td data-label="Valor" class="right">${fmtMoney(valor)}</td></tr>`;
+      const formatoTxt = v.formato_compra ? ` · entra en ${v.formato_compra}` : '';
+      return `<tr><td data-label="Variante">${v.nombre}${marcaTxt}<div class="muted">${unidadDeVariante(v)}${formatoTxt}</div></td><td data-label="Stock" class="right">${cant}</td><td data-label="Costo unit." class="right">${fmtMoney(costoUnit)}</td><td data-label="Valor" class="right">${fmtMoney(valor)}</td></tr>`;
     }).join('');
     if(!rows) rows = `<tr><td colspan="4" class="muted">Sin variantes asignadas a este depósito todavía</td></tr>`;
     html += `<div class="card"><h2>${dep.nombre}</h2>
@@ -322,6 +323,8 @@ function formNuevaVariante(){
       <div><label>Cantidad por presentación <span id="nv-unidad-base" class="muted"></span></label><input type="number" step="any" id="nv-conversion" value="1" oninput="actualizarPreviewVariante()"></div>
       <div><label>Depósito</label><select id="nv-deposito">${depOptions}</select></div>
     </div>
+    <label>¿Cómo entra del proveedor? (opcional, ej: "Caja x 6")</label>
+    <input type="text" id="nv-formato-compra" placeholder="Caja x 6, Bidón x 1, Paquete x 12...">
     <p class="muted">Se va a mostrar como: <b id="nv-preview">-</b></p>
     <div id="nv-msg"></div>
     <button class="secondary" onclick="crearVarianteInline()">Crear variante</button>
@@ -345,12 +348,13 @@ window.crearVarianteInline = async function(){
   const presentacion = document.getElementById('nv-presentacion').value.trim() || null;
   const unidad_conversion = parseFloat(document.getElementById('nv-conversion').value) || 1;
   const deposito_id = parseInt(document.getElementById('nv-deposito').value);
+  const formato_compra = document.getElementById('nv-formato-compra').value.trim() || null;
   const msg = document.getElementById('nv-msg');
   if(!nombre || !insumo_nombre || !state.insumos[insumo_nombre]){
     msg.innerHTML = `<div class="msg err">Completá el nombre y elegí un insumo base válido (de la lista)</div>`;
     return;
   }
-  const { data, error } = await supabase.from('stock_variantes').insert({nombre, insumo_nombre, marca, presentacion, unidad_conversion, deposito_id}).select().maybeSingle();
+  const { data, error } = await supabase.from('stock_variantes').insert({nombre, insumo_nombre, marca, presentacion, unidad_conversion, deposito_id, formato_compra}).select().maybeSingle();
   if(error){ msg.innerHTML = `<div class="msg err">Error: ${error.message}</div>`; return; }
   await loadAll();
   nuevaVarianteAbierta = false;
@@ -634,8 +638,9 @@ function viewSolicitudes(){
           const val = Number(solicitudCantidades[v.id]) || 0;
           const activo = val > 0;
           const unidad = unidadDeVariante(v);
+          const formatoTxt = v.formato_compra ? ` · entra en ${v.formato_compra}` : '';
           return `<div class="qty-row ${activo?'qty-row-activa':''}">
-            <div class="qty-row-nombre">${v.nombre}${v.marca?` <span class="badge">${v.marca}</span>`:''}<div class="muted" style="font-size:0.72rem;">unidad: ${unidad}</div></div>
+            <div class="qty-row-nombre">${v.nombre}${v.marca?` <span class="badge">${v.marca}</span>`:''}<div class="muted" style="font-size:0.72rem;">unidad: ${unidad}${formatoTxt}</div></div>
             <div class="qty-stepper">
               <button type="button" onclick="ajustarCantidad(${v.id}, -1)">−</button>
               <span class="qty-val">${val || 0}</span>
@@ -894,14 +899,15 @@ function viewVariantes(){
       <td data-label="Marca"><input type="text" value="${v.marca||''}" onchange="editarVariante(${v.id},'marca',this.value)"></td>
       <td data-label="Presentación"><input type="text" value="${v.presentacion||''}" onchange="editarVariante(${v.id},'presentacion',this.value)"></td>
       <td data-label="Cant. por presentación"><input type="number" step="any" value="${v.unidad_conversion}" onchange="editarVariante(${v.id},'unidad_conversion',this.value)"></td>
+      <td data-label="Entra del proveedor"><input type="text" placeholder="ej: Caja x 6" value="${v.formato_compra||''}" onchange="editarVariante(${v.id},'formato_compra',this.value)"></td>
       <td data-label="Depósito"><select onchange="editarVariante(${v.id},'deposito_id',this.value)">${opts}</select></td>
       <td data-label=""><button class="del" onclick="borrarVariante(${v.id})">✕</button></td>
     </tr>`;
-  }).join('') || `<tr><td colspan="6" class="muted">Todavía no hay variantes creadas</td></tr>`;
+  }).join('') || `<tr><td colspan="7" class="muted">Todavía no hay variantes creadas</td></tr>`;
   return `<div class="card"><h2>Variantes (marca/presentación)</h2>
     <div id="var-msg"></div>
-    <p class="muted">Cada variante hereda el costo del insumo de pricing indicado, multiplicado por su equivalencia. La columna "unidad" (ej: bidón x 5 litros) se calcula sola a partir de la presentación y la cantidad.</p>
-    <table class="responsive"><thead><tr><th>Variante</th><th>Marca</th><th>Presentación</th><th>Cant. por presentación</th><th>Depósito</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="muted">Cada variante hereda el costo del insumo de pricing indicado, multiplicado por su equivalencia. "Entra del proveedor" es solo informativo (ej: Caja x 6) — el stock se sigue contando por unidad individual.</p>
+    <table class="responsive"><thead><tr><th>Variante</th><th>Marca</th><th>Presentación</th><th>Cant. por presentación</th><th>Entra del proveedor</th><th>Depósito</th><th></th></tr></thead><tbody>${rows}</tbody></table>
     <h3>Nueva variante</h3>
     ${formNuevaVariante()}
   </div>`;
