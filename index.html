@@ -537,8 +537,21 @@ function getInsumoDatalistHTML() {
   if (insumoDatalistHTML != null) return insumoDatalistHTML;
   const insumoOpts = getAllInsumos().map(i => `<option value="${i.nombre}" label="Insumo">`);
   const prodOpts = getAllProdNames().map(n => `<option value="${n}" label="Producción">`);
-  insumoDatalistHTML = insumoOpts.concat(prodOpts).join('');
+  const platoOpts = getAllCategoriasFlat().map(n => `<option value="${n}" label="Plato">`);
+  insumoDatalistHTML = insumoOpts.concat(prodOpts).concat(platoOpts).join('');
   return insumoDatalistHTML;
+}
+
+function getAllCategoriasFlat() {
+  const nombres = [];
+  Object.values(getAllCategorias()).forEach(arr => nombres.push(...arr));
+  return nombres;
+}
+
+function getPlatoKey(nombre) {
+  const n = normName(nombre);
+  const match = getAllCategoriasFlat().find(p => normName(p) === n);
+  return match || null;
 }
 
 const fmt = n => n == null ? '—' : '$' + Math.round(n).toLocaleString('es-AR');
@@ -605,6 +618,10 @@ function precioUnitarioIng(ing, recetaNombre) {
     if (frac != null && ing.cantidad) return (frac * costoProduccion(prodKey)) / ing.cantidad;
     return (ing.cantidad && ing.costo) ? (ing.costo / ing.cantidad) : 0;
   }
+  const platoKey = getPlatoKey(ing.insumo);
+  if (platoKey && normName(platoKey) !== normName(recetaNombre)) {
+    return costoActualPlato(platoKey, getPlatoMeta(platoKey)) || 0;
+  }
   const liveKey = insumosPricesCI[normName(ing.insumo)];
   const liveCosto = liveKey ? insumosPrices[liveKey].costo : null;
   return liveCosto != null ? liveCosto : ((ing.cantidad && ing.costo) ? (ing.costo / ing.cantidad) : 0);
@@ -624,6 +641,11 @@ function costoLineaIng(ing, recetaNombre) {
     const cantB = cantidadBruta(recetaNombre, ing.insumo, ing.cantidad || 0);
     const unit = (ing.cantidad && ing.costo) ? (ing.costo / ing.cantidad) : 0;
     return cantB * unit;
+  }
+  const platoKey = getPlatoKey(ing.insumo);
+  if (platoKey && normName(platoKey) !== normName(recetaNombre)) {
+    const unitCost = costoActualPlato(platoKey, getPlatoMeta(platoKey)) || 0;
+    return (ing.cantidad || 0) * unitCost * rendRatio(recetaNombre, ing.insumo);
   }
   const liveKey = insumosPricesCI[normName(ing.insumo)];
   const liveCosto = liveKey ? insumosPrices[liveKey].costo : null;
@@ -654,6 +676,10 @@ function ivaLineaIng(ing, recetaNombre) {
     const frac = getProdFraction(ing, prodKey);
     if (frac != null) return frac * ivaProduccion(prodKey) * rendRatio(recetaNombre, ing.insumo);
     return 0;
+  }
+  const platoKey = getPlatoKey(ing.insumo);
+  if (platoKey && normName(platoKey) !== normName(recetaNombre)) {
+    return (ing.cantidad || 0) * (ivaActualPlato(platoKey) || 0) * rendRatio(recetaNombre, ing.insumo);
   }
   const liveKey = insumosPricesCI[normName(ing.insumo)];
   const ivaRate = liveKey ? (insumosPrices[liveKey].iva || 0) : 0;
@@ -907,6 +933,8 @@ function renderDetail(nm, type) {
     ivaTotal += ivaLineaIng(ing, nm);
     const prodKey = getProdKey(ing.insumo);
     const isProd = prodKey != null;
+    const platoKey = !isProd ? getPlatoKey(ing.insumo) : null;
+    const isPlatoIng = !!platoKey && normName(platoKey) !== normName(nm);
     const liveKey = insumosPricesCI[normName(ing.insumo)];
     const unit = precioUnitarioIng(ing, nm);
     const cantB = cantidadBruta(nm, ing.insumo, ing.cantidad || 0);
@@ -919,6 +947,8 @@ function renderDetail(nm, type) {
 
     const nameCell = isProd
       ? `<span class="ing-name clickable" onclick="pushRecipe('prod','${prodKey}')">${ing.insumo}</span><span class="ing-prod-tag">PRODUCCIÓN</span>`
+      : isPlatoIng
+      ? `<span class="ing-name clickable" onclick="pushRecipe('plato','${platoKey}')">${ing.insumo}</span><span class="ing-prod-tag" style="background:var(--teal);color:var(--bg);">PLATO</span>`
       : `<span class="ing-name">${ing.insumo}</span>`;
 
     let cantCell;
@@ -1236,6 +1266,8 @@ function renderProdDetailTab(nm) {
     ivaTotal += ivaLineaIng(ing, nm);
     const prodKey = getProdKey(ing.insumo);
     const isSubProd = prodKey != null;
+    const platoKey = !isSubProd ? getPlatoKey(ing.insumo) : null;
+    const isPlatoIng = !!platoKey;
     const liveKey = insumosPricesCI[normName(ing.insumo)];
     const unit = precioUnitarioIng(ing, nm);
     const cantB = cantidadBruta(nm, ing.insumo, ing.cantidad || 0);
@@ -1246,6 +1278,8 @@ function renderProdDetailTab(nm) {
     const isOverride = !!(recetaRendimientos[nm] && recetaRendimientos[nm][ing.insumo]);
     const nameCell = isSubProd
       ? `<span class="ing-name clickable" onclick="pushProd('${prodKey}')">${ing.insumo}</span><span class="ing-prod-tag">PRODUCCIÓN</span>`
+      : isPlatoIng
+      ? `<span class="ing-name clickable" onclick="openRecipe('plato','${platoKey}')">${ing.insumo}</span><span class="ing-prod-tag" style="background:var(--teal);color:var(--bg);">PLATO</span>`
       : `<span class="ing-name">${ing.insumo}</span>`;
     let cantCell;
     if (recipeEditMode) {
@@ -1572,7 +1606,7 @@ function buildExportData() {
       recetasRows.push({
         plato: p.nombre,
         insumo: ing.insumo,
-        tipo: isProd ? 'Producción' : 'Insumo',
+        tipo: isProd ? 'Producción' : (getPlatoKey(ing.insumo) ? 'Plato' : 'Insumo'),
         unidad: ing.unidad || '',
         cantidad: ing.cantidad != null ? ing.cantidad : '',
         costo_linea: Math.round(cl * 100) / 100,
@@ -1592,7 +1626,7 @@ function buildExportData() {
       produccionesRows.push({
         produccion: pn,
         insumo: ing.insumo,
-        tipo: isProd ? 'Producción' : 'Insumo',
+        tipo: isProd ? 'Producción' : (getPlatoKey(ing.insumo) ? 'Plato' : 'Insumo'),
         unidad: ing.unidad || '',
         cantidad: ing.cantidad != null ? ing.cantidad : '',
         costo_linea: Math.round(cl * 100) / 100,
