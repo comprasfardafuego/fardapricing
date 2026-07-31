@@ -66,6 +66,9 @@
   .qty-stepper button{width:38px;height:38px;border:none;background:#fff;color:var(--navy);font-size:1.2rem;font-weight:700;line-height:1;}
   .qty-stepper button:active{background:var(--cream-dark);}
   .qty-val{min-width:28px;text-align:center;font-weight:700;font-size:0.95rem;color:var(--ink);}
+  .chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;-webkit-overflow-scrolling:touch;}
+  .chip{background:#fff;border:1px solid #d8cdb0;color:var(--navy);padding:7px 14px;border-radius:16px;font-size:0.8rem;font-weight:600;white-space:nowrap;flex-shrink:0;min-height:36px;}
+  .chip-activo{background:var(--navy);color:#fff;border-color:var(--navy);}
   @media (max-width: 640px){
     table.responsive thead{display:none;}
     table.responsive, table.responsive tbody, table.responsive tr, table.responsive td{display:block;width:100%;}
@@ -182,6 +185,16 @@ function unidadBaseTexto(codigo){
   const map = {KG:'kilos', LT:'litros', UNIDAD:'unidades', BOTELLA:'botellas'};
   return map[codigo] || (codigo||'unidad').toLowerCase();
 }
+// Actualiza estado + redibuja sin perder el foco/cursor del input de búsqueda
+function inputConFoco(id, setter){
+  render();
+  const inp = document.getElementById(id);
+  if(inp){
+    inp.focus();
+    const pos = inp.value.length;
+    inp.setSelectionRange(pos, pos);
+  }
+}
 function unidadDeVariante(v){
   if(!v) return '';
   const ins = state.insumos[v.insumo_nombre];
@@ -243,10 +256,18 @@ function render(){
 }
 
 // ---------- VISTA: STOCK ACTUAL ----------
+let stockFiltro = '';
 function viewStock(){
-  let html = '';
+  const filtro = stockFiltro.trim().toLowerCase();
+  let html = `<div class="card" style="margin-bottom:10px;">
+    <label>Buscar producto en todos los depósitos</label>
+    <input type="text" id="stock-buscador" placeholder="Escribí un nombre o marca..." value="${stockFiltro}" oninput="filtrarStock(this.value)">
+  </div>`;
+  let huboResultados = false;
   state.depositos.forEach(dep => {
-    const vs = variantesDeDeposito(dep.id);
+    const vs = variantesDeDeposito(dep.id).filter(v => !filtro || v.nombre.toLowerCase().includes(filtro) || (v.marca||'').toLowerCase().includes(filtro));
+    if(filtro && !vs.length) return; // ocultar depósitos sin coincidencias cuando se busca
+    huboResultados = true;
     let totalValor = 0;
     let rows = vs.map(v => {
       const cant = stockDe(v.id, dep.id);
@@ -264,8 +285,10 @@ function viewStock(){
       <div class="right" style="margin-top:8px;font-weight:700;color:var(--navy)">Total: ${fmtMoney(totalValor)}</div>
       </div>`;
   });
+  if(filtro && !huboResultados) html += `<p class="muted">Sin resultados para "${stockFiltro}"</p>`;
   return html;
 }
+window.filtrarStock = function(val){ stockFiltro = val; inputConFoco('stock-buscador'); }
 
 // ---------- VISTA: CARGAR MOVIMIENTO (por lotes) ----------
 let batchRows = [{variante:'', cantidad:''}];
@@ -392,6 +415,7 @@ window.guardarMovimiento = async function(tipoFijo){
 let ingresoDetalleId = null;
 let ingresoNuevoAbierto = false;
 let ingresoRows = [{variante:'', cantidad:''}];
+let ingresoFiltroEstado = '';
 
 function estadoIngresoPill(estado){
   const map = {abierto:['#fdf3d8','#8a6d1a','Abierto'], con_diferencias:['#fbe6df','#8f3d21','Con diferencias'], cerrado:['#e3f1e8','#2f7a4f','Cerrado']};
@@ -402,7 +426,12 @@ function estadoIngresoPill(estado){
 function viewIngresos(){
   const depOptions = state.depositos.map(d => `<option value="${d.id}">${d.nombre}</option>`).join('');
   const nombresVariantes = state.variantes.filter(v=>v.activo!==false).map(v=>v.nombre).sort();
-  const lista = (state.ingresos||[]).map(ing => {
+  const estadosDisponibles = [['','Todos'],['abierto','Abierto'],['con_diferencias','Con diferencias'],['cerrado','Cerrado']];
+  const chips = estadosDisponibles.map(([val,label]) =>
+    `<button class="chip ${ingresoFiltroEstado===val?'chip-activo':''}" onclick="filtrarIngresosEstado('${val}')">${label}</button>`
+  ).join('');
+  const ingresosFiltrados = (state.ingresos||[]).filter(ing => !ingresoFiltroEstado || ing.estado === ingresoFiltroEstado);
+  const lista = ingresosFiltrados.map(ing => {
     const lineas = (state.ingresoLineas||[]).filter(l => l.ingreso_id === ing.id);
     const totRecibido = lineas.reduce((s,l)=>s+Number(l.cantidad_recibida),0);
     return `<tr>
@@ -413,7 +442,7 @@ function viewIngresos(){
       <td data-label="Estado">${estadoIngresoPill(ing.estado)}</td>
       <td data-label=""><button class="secondary" onclick="abrirIngreso(${ing.id})">Ver</button></td>
     </tr>`;
-  }).join('') || `<tr><td colspan="6" class="muted">Sin ingresos registrados todavía</td></tr>`;
+  }).join('') || `<tr><td colspan="6" class="muted">Sin ingresos que coincidan</td></tr>`;
 
   const rowsHtml = ingresoRows.map((r,i) => {
     const vMatch = state.variantes.find(x => x.nombre === r.variante);
@@ -444,9 +473,11 @@ function viewIngresos(){
       <button class="primary" onclick="guardarIngreso()">Guardar ingreso (mueve stock)</button>
     </div>` : ''}
     <h3>Historial de ingresos</h3>
+    <div class="chips">${chips}</div>
     <table class="responsive"><thead><tr><th>Fecha</th><th>Proveedor</th><th>Comprobante</th><th class="right">Unid.</th><th>Estado</th><th></th></tr></thead><tbody>${lista}</tbody></table>
   </div>`;
 }
+window.filtrarIngresosEstado = function(val){ ingresoFiltroEstado = val; render(); }
 window.toggleNuevoIngreso = function(){ ingresoNuevoAbierto = !ingresoNuevoAbierto; render(); }
 window.addIngresoRow = function(){ ingresoRows.push({variante:'',cantidad:''}); render(); }
 window.removeIngresoRow = function(i){ ingresoRows.splice(i,1); if(!ingresoRows.length) ingresoRows=[{variante:'',cantidad:''}]; render(); }
@@ -585,6 +616,7 @@ let solicitudDetalleId = null;
 let solicitudNuevaAbierta = false;
 let solicitudCantidades = {}; // varianteId -> cantidad (number)
 let solicitudFiltro = '';
+let solicitudFiltroEstado = '';
 let solicitudSeccionAbierta = {}; // depositoId -> bool
 
 function turnoSugerido(){
@@ -599,8 +631,12 @@ function estadoSolicitudPill(estado){
 function viewSolicitudes(){
   const rol = state.user.rol;
   const propias = rol === 'cocina';
+  const chipsEstado = [['','Todos'],['pendiente','Pendientes'],['entregada','Entregadas']].map(([val,label]) =>
+    `<button class="chip ${solicitudFiltroEstado===val?'chip-activo':''}" onclick="filtrarSolicitudesEstado('${val}')">${label}</button>`
+  ).join('');
   const lista = (state.solicitudes||[])
     .filter(s => propias ? s.usuario_solicitante_id === state.user.id : true)
+    .filter(s => !solicitudFiltroEstado || s.estado === solicitudFiltroEstado)
     .map(s => {
       const lineas = (state.solicitudLineas||[]).filter(l => l.solicitud_id === s.id);
       const solicitante = state.usuarios.find(u=>u.id===s.usuario_solicitante_id);
@@ -612,7 +648,7 @@ function viewSolicitudes(){
         <td data-label="Estado">${estadoSolicitudPill(s.estado)}</td>
         <td data-label=""><button class="secondary" onclick="abrirSolicitud(${s.id})">Ver</button></td>
       </tr>`;
-    }).join('') || `<tr><td colspan="6" class="muted">Sin solicitudes todavía</td></tr>`;
+    }).join('') || `<tr><td colspan="6" class="muted">Sin solicitudes que coincidan</td></tr>`;
 
   const puedeCrear = rol === 'cocina' || rol === 'admin';
   const filtro = solicitudFiltro.trim().toLowerCase();
@@ -670,9 +706,11 @@ function viewSolicitudes(){
       <div class="bottom-bar"><button class="primary" onclick="guardarSolicitud()">Enviar pedido</button></div>
     </div>` : ''}
     <h3>${propias ? 'Tus pedidos' : 'Historial de pedidos'}</h3>
+    <div class="chips">${chipsEstado}</div>
     <table class="responsive"><thead><tr><th>Fecha</th><th>Turno</th><th>Pedido por</th><th class="right">Líneas</th><th>Estado</th><th></th></tr></thead><tbody>${lista}</tbody></table>
   </div>`;
 }
+window.filtrarSolicitudesEstado = function(val){ solicitudFiltroEstado = val; render(); }
 window.toggleNuevaSolicitud = function(){ solicitudNuevaAbierta = !solicitudNuevaAbierta; render(); }
 window.toggleSeccionSolicitud = function(depId){ solicitudSeccionAbierta[depId] = !solicitudSeccionAbierta[depId]; render(); }
 window.ajustarCantidad = function(varianteId, delta){
@@ -890,9 +928,20 @@ window.guardarConteo = async function(){
 }
 
 // ---------- VISTA: VARIANTES (admin) ----------
+let variantesFiltro = '';
+let variantesFiltroDeposito = '';
 function viewVariantes(){
   const depOptions = ['<option value="">Sin asignar</option>'].concat(state.depositos.map(d => `<option value="${d.id}">${d.nombre}</option>`)).join('');
-  const rows = state.variantes.map(v => {
+  const filtro = variantesFiltro.trim().toLowerCase();
+  const chips = ['<button class="chip ' + (variantesFiltroDeposito===''?'chip-activo':'') + '" onclick="filtrarVariantesDeposito(\'\')">Todos</button>']
+    .concat(state.depositos.map(d => `<button class="chip ${variantesFiltroDeposito==String(d.id)?'chip-activo':''}" onclick="filtrarVariantesDeposito('${d.id}')">${d.nombre}</button>`))
+    .join('');
+  const listaFiltrada = state.variantes.filter(v => {
+    if(filtro && !(v.nombre.toLowerCase().includes(filtro) || (v.marca||'').toLowerCase().includes(filtro))) return false;
+    if(variantesFiltroDeposito && String(v.deposito_id) !== variantesFiltroDeposito) return false;
+    return true;
+  });
+  const rows = listaFiltrada.map(v => {
     const opts = depOptions.replace(`value="${v.deposito_id}"`, `value="${v.deposito_id}" selected`);
     return `<tr>
       <td data-label="Variante">${v.nombre}<div class="muted">insumo: ${v.insumo_nombre} · <b>${unidadDeVariante(v)}</b></div></td>
@@ -903,15 +952,21 @@ function viewVariantes(){
       <td data-label="Depósito"><select onchange="editarVariante(${v.id},'deposito_id',this.value)">${opts}</select></td>
       <td data-label=""><button class="del" onclick="borrarVariante(${v.id})">✕</button></td>
     </tr>`;
-  }).join('') || `<tr><td colspan="7" class="muted">Todavía no hay variantes creadas</td></tr>`;
+  }).join('') || `<tr><td colspan="7" class="muted">Sin variantes que coincidan</td></tr>`;
   return `<div class="card"><h2>Variantes (marca/presentación)</h2>
     <div id="var-msg"></div>
     <p class="muted">Cada variante hereda el costo del insumo de pricing indicado, multiplicado por su equivalencia. "Entra del proveedor" es solo informativo (ej: Caja x 6) — el stock se sigue contando por unidad individual.</p>
+    <label>Buscar</label>
+    <input type="text" id="var-buscador" placeholder="Nombre o marca..." value="${variantesFiltro}" oninput="filtrarVariantes(this.value)">
+    <div class="chips">${chips}</div>
+    <p class="muted">${listaFiltrada.length} de ${state.variantes.length} variantes</p>
     <table class="responsive"><thead><tr><th>Variante</th><th>Marca</th><th>Presentación</th><th>Cant. por presentación</th><th>Entra del proveedor</th><th>Depósito</th><th></th></tr></thead><tbody>${rows}</tbody></table>
     <h3>Nueva variante</h3>
     ${formNuevaVariante()}
   </div>`;
 }
+window.filtrarVariantes = function(val){ variantesFiltro = val; inputConFoco('var-buscador'); }
+window.filtrarVariantesDeposito = function(depId){ variantesFiltroDeposito = depId; render(); }
 window.editarVariante = async function(id, campo, valor){
   const patch = {};
   patch[campo] = campo === 'deposito_id' ? (valor?parseInt(valor):null) : (campo === 'unidad_conversion' ? parseFloat(valor) : valor);
