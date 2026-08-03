@@ -228,7 +228,7 @@ function fmtMoney(n){
 function renderNav(){
   const rol = state.user.rol;
   const tabs = [];
-  if(rol === 'admin') tabs.push(['stock','Stock'],['ingresos','Ingresos'],['solicitudes','Solicitudes'],['movimiento','Cargar'],['transferencia','Transferencia'],['conteo','Conteo mensual'],['variantes','Variantes'],['usuarios','Usuarios']);
+  if(rol === 'admin') tabs.push(['stock','Stock'],['ingresos','Ingresos'],['solicitudes','Solicitudes'],['movimiento','Cargar'],['transferencia','Transferencia'],['conteo','Conteo mensual'],['historial','Historial'],['variantes','Variantes'],['usuarios','Usuarios']);
   else if(rol === 'recepcion') tabs.push(['ingresos','Ingresos'],['solicitudes','Solicitudes'],['movimiento','Cargar entrada'],['historial','Historial']);
   else tabs.push(['solicitudes','Solicitudes'],['movimiento','Cargar salida'],['historial','Historial']);
   const nav = document.getElementById('nav');
@@ -276,7 +276,7 @@ function viewStock(){
       totalValor += valor;
       const marcaTxt = v.marca ? ` <span class="badge">${v.marca}</span>` : '';
       const formatoTxt = v.formato_compra ? ` · entra en ${v.formato_compra}` : '';
-      return `<tr><td data-label="Variante">${v.nombre}${marcaTxt}<div class="muted">${unidadDeVariante(v)}${formatoTxt}</div></td><td data-label="Stock" class="right">${cant}</td><td data-label="Costo unit." class="right">${fmtMoney(costoUnit)}</td><td data-label="Valor" class="right">${fmtMoney(valor)}</td></tr>`;
+      return `<tr><td data-label="Variante">${v.nombre}${marcaTxt}<div class="muted">${unidadDeVariante(v)}${formatoTxt} · <a href="#" onclick="verHistorialDeProducto('${v.nombre.replace(/'/g,"\\'")}');return false;" style="color:var(--rust);">ver historial</a></div></td><td data-label="Stock" class="right">${cant}</td><td data-label="Costo unit." class="right">${fmtMoney(costoUnit)}</td><td data-label="Valor" class="right">${fmtMoney(valor)}</td></tr>`;
     }).join('');
     if(!rows) rows = `<tr><td colspan="4" class="muted">Sin variantes asignadas a este depósito todavía</td></tr>`;
     html += `<div class="card"><h2>${dep.nombre}</h2>
@@ -1017,16 +1017,56 @@ window.borrarUsuario = async function(id){
 }
 
 // ---------- VISTA: HISTORIAL (recepción/cocina) ----------
+let historialFiltro = '';
 function viewHistorial(){
-  const mios = state.movimientos.filter(m => m.usuario_id === state.user.id).slice(0,50);
-  const rows = mios.map(m => {
+  const rol = state.user.rol;
+  if(rol !== 'admin'){
+    const mios = state.movimientos.filter(m => m.usuario_id === state.user.id).slice(0,50);
+    const rows = mios.map(m => {
+      const dep = state.depositos.find(d=>d.id===m.deposito_id)?.nombre || '-';
+      const v = varianteById(m.variante_id);
+      return `<tr><td data-label="Fecha">${new Date(m.fecha).toLocaleString('es-AR')}</td><td data-label="Variante">${v?v.nombre:'(eliminada)'}</td><td data-label="Depósito">${dep}</td><td data-label="Tipo"><span class="pill ${m.tipo}">${m.tipo}</span></td><td data-label="Cant." class="right">${m.cantidad}</td></tr>`;
+    }).join('') || `<tr><td colspan="5" class="muted">Todavía no cargaste movimientos</td></tr>`;
+    return `<div class="card"><h2>Tu historial reciente</h2>
+      <table class="responsive"><thead><tr><th>Fecha</th><th>Variante</th><th>Depósito</th><th>Tipo</th><th class="right">Cant.</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>`;
+  }
+  // ---- Vista admin: trazabilidad completa por insumo ----
+  const filtro = historialFiltro.trim().toLowerCase();
+  const movsFiltrados = state.movimientos
+    .filter(m => {
+      if(!filtro) return true;
+      const v = varianteById(m.variante_id);
+      return v && (v.nombre.toLowerCase().includes(filtro) || (v.marca||'').toLowerCase().includes(filtro));
+    })
+    .slice(0, 150);
+  const rows = movsFiltrados.map(m => {
     const dep = state.depositos.find(d=>d.id===m.deposito_id)?.nombre || '-';
     const v = varianteById(m.variante_id);
-    return `<tr><td data-label="Fecha">${new Date(m.fecha).toLocaleString('es-AR')}</td><td data-label="Variante">${v?v.nombre:'(eliminada)'}</td><td data-label="Depósito">${dep}</td><td data-label="Tipo"><span class="pill ${m.tipo}">${m.tipo}</span></td><td data-label="Cant." class="right">${m.cantidad}</td></tr>`;
-  }).join('') || `<tr><td colspan="5" class="muted">Todavía no cargaste movimientos</td></tr>`;
-  return `<div class="card"><h2>Tu historial reciente</h2>
-    <table class="responsive"><thead><tr><th>Fecha</th><th>Variante</th><th>Depósito</th><th>Tipo</th><th class="right">Cant.</th></tr></thead><tbody>${rows}</tbody></table>
+    const usr = state.usuarios.find(u=>u.id===m.usuario_id);
+    return `<tr>
+      <td data-label="Fecha">${new Date(m.fecha).toLocaleString('es-AR')}</td>
+      <td data-label="Variante">${v?v.nombre:'(eliminada)'}${v&&v.marca?` <span class="badge">${v.marca}</span>`:''}</td>
+      <td data-label="Depósito">${dep}</td>
+      <td data-label="Tipo"><span class="pill ${m.tipo}">${m.tipo}</span></td>
+      <td data-label="Cant." class="right">${m.cantidad}</td>
+      <td data-label="Usuario">${usr?usr.nombre:'-'}</td>
+      <td data-label="Comprobante">${m.comprobante || '<span class="muted">-</span>'}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="7" class="muted">Sin movimientos que coincidan</td></tr>`;
+  return `<div class="card">
+    <h2>Historial de movimientos</h2>
+    <p class="muted">Trazabilidad completa: todas las entradas, salidas, transferencias y ajustes, por insumo.</p>
+    <label>Buscar por producto o marca</label>
+    <input type="text" id="hist-buscador" placeholder="Ej: Malbec, Catena Zapata..." value="${historialFiltro}" oninput="filtrarHistorial(this.value)">
+    <p class="muted">Mostrando ${movsFiltrados.length}${movsFiltrados.length===150?' (últimos 150, refiná la búsqueda para ver más específico)':''}</p>
+    <table class="responsive"><thead><tr><th>Fecha</th><th>Variante</th><th>Depósito</th><th>Tipo</th><th class="right">Cant.</th><th>Usuario</th><th>Comprobante</th></tr></thead><tbody>${rows}</tbody></table>
   </div>`;
+}
+window.filtrarHistorial = function(val){ historialFiltro = val; inputConFoco('hist-buscador'); }
+window.verHistorialDeProducto = function(nombre){
+  historialFiltro = nombre;
+  setTab('historial');
 }
 
 document.getElementById('pin-input').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
