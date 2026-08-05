@@ -824,6 +824,19 @@ function renombrarPlato(original, inputId) {
   if (recipeStack.length) renderRecetas();
 }
 
+function renombrarProduccion(original, inputId) {
+  if (blockIfViewer()) return;
+  const el = document.getElementById(inputId);
+  const nuevo = el.value.trim();
+  if (!nuevo) { alert('El nombre no puede quedar vacío.'); return; }
+  if (nuevo === original) delete nombreOverrides[original];
+  else nombreOverrides[original] = nuevo;
+  saveStateDebounced();
+  if (document.getElementById('producciones-list')) renderProduccionesList();
+  if (prodStack.length) renderProducciones();
+  if (recipeStack.length) renderRecetas();
+}
+
 function guardarPrecioPlato(inputId) {
   if (blockIfViewer()) return;
   const el = document.getElementById(inputId);
@@ -963,7 +976,7 @@ function renderDetail(nm, type) {
     const isOverride = !!(recetaRendimientos[nm] && recetaRendimientos[nm][ing.insumo]);
 
     const nameCell = isProd
-      ? `<span class="ing-name clickable" onclick="pushRecipe('prod','${prodKey}')">${ing.insumo}</span><span class="ing-prod-tag">PRODUCCIÓN</span>`
+      ? `<span class="ing-name clickable" onclick="pushRecipe('prod','${prodKey}')">${displayName(ing.insumo)}</span><span class="ing-prod-tag">PRODUCCIÓN</span>`
       : isPlatoIng
       ? `<span class="ing-name clickable" onclick="pushRecipe('plato','${platoKey}')">${displayName(ing.insumo)}</span><span class="ing-prod-tag" style="background:var(--teal);color:var(--bg);">PLATO</span>`
       : `<span class="ing-name">${ing.insumo}</span>`;
@@ -1082,11 +1095,18 @@ function renderDetail(nm, type) {
       <input class="ins-input" style="width:280px;" id="nombre-plato-input" value="${nombreActualEsc}" placeholder="Nombre del plato">
       <button class="btn" style="padding:6px 12px;font-size:12px;" onclick="renombrarPlato('${nmEsc}','nombre-plato-input')">Renombrar</button>
     </div>`;
+  } else {
+    const nmEscP = nm.replace(/"/g,'&quot;');
+    const nombreActualEscP = displayName(nm).replace(/"/g,'&quot;');
+    nombreBlock = `<div class="sim-cell" style="margin:10px 0;">
+      <input class="ins-input" style="width:280px;" id="nombre-prod-input-r" value="${nombreActualEscP}" placeholder="Nombre de la producción">
+      <button class="btn" style="padding:6px 12px;font-size:12px;" onclick="renombrarProduccion('${nmEscP}','nombre-prod-input-r')">Renombrar</button>
+    </div>`;
   }
 
   return `<div class="detail-panel">
-    <div class="detail-title">${type === 'plato' ? displayName(nm) : nm}</div>
-    ${type === 'plato' ? categoriaBlock + nombreBlock : `<div class="detail-meta">${metaText}</div>`}
+    <div class="detail-title">${displayName(nm)}</div>
+    ${type === 'plato' ? categoriaBlock + nombreBlock : `<div class="detail-meta">${metaText}</div>${nombreBlock}`}
     ${rindeBlock}
     ${editBtn}${deleteBtn}
     <datalist id="insumo-datalist">${getInsumoDatalistHTML()}</datalist>
@@ -1244,7 +1264,7 @@ function renderProduccionesList() {
       const tc = costoProduccion(nm);
       const usaSubProd = ings.some(ing => getProdKey(ing.insumo) != null);
       const tag = usaSubProd ? `<span class="ing-prod-tag">usa producciones</span>` : '';
-      h += `<tr><td class="td-name" onclick="openProd('${nm}')">${nm}${tag}</td><td class="td-num">${fmt(tc)}</td><td class="td-num">${ings.length}</td></tr>`;
+      h += `<tr><td class="td-name" onclick="openProd('${nm}')">${displayName(nm)}${tag}</td><td class="td-num">${fmt(tc)}</td><td class="td-num">${ings.length}</td></tr>`;
     });
     h += '</tbody></table></div>';
   }
@@ -1300,7 +1320,7 @@ function renderProdDetailTab(nm) {
     const hasMerma = r.enabled && r.factor > 0 && r.factor < 1;
     const isOverride = !!(recetaRendimientos[nm] && recetaRendimientos[nm][ing.insumo]);
     const nameCell = isSubProd
-      ? `<span class="ing-name clickable" onclick="pushProd('${prodKey}')">${ing.insumo}</span><span class="ing-prod-tag">PRODUCCIÓN</span>`
+      ? `<span class="ing-name clickable" onclick="pushProd('${prodKey}')">${displayName(ing.insumo)}</span><span class="ing-prod-tag">PRODUCCIÓN</span>`
       : isPlatoIng
       ? `<span class="ing-name clickable" onclick="openRecipe('plato','${platoKey}')">${displayName(ing.insumo)}</span><span class="ing-prod-tag" style="background:var(--teal);color:var(--bg);">PLATO</span>`
       : `<span class="ing-name">${ing.insumo}</span>`;
@@ -1388,7 +1408,13 @@ function renderProdDetailTab(nm) {
     summary += `<div><div class="cost-item-label">Costo por 1 ${rinde.unidad}</div><div class="cost-item-value teal">${fmt(tc / rinde.cantidad)}</div></div>`;
   }
   summary += `</div>`;
-  return `<div class="detail-panel"><div class="detail-title">${nm}</div><div class="detail-meta">Producción</div>${rindeBlock}${editBtn}${deleteBtn}<datalist id="insumo-datalist">${getInsumoDatalistHTML()}</datalist><table class="ing-table"><thead><tr><th>Insumo</th><th class="right">Cant. receta</th><th class="right">Unidad</th><th class="right">Precio unit.</th><th class="center">Rendimiento</th><th class="right">IVA línea</th><th class="right">Costo línea</th>${recipeEditMode?'<th></th>':''}</tr></thead><tbody>${ir}${addRow}</tbody></table>${summary}</div>`;
+  const nmEscProd = nm.replace(/"/g,'&quot;');
+  const nombreActualProdEsc = displayName(nm).replace(/"/g,'&quot;');
+  const nombreBlockProd = `<div class="sim-cell" style="margin:10px 0;">
+      <input class="ins-input" style="width:280px;" id="nombre-prod-input" value="${nombreActualProdEsc}" placeholder="Nombre de la producción">
+      <button class="btn" style="padding:6px 12px;font-size:12px;" onclick="renombrarProduccion('${nmEscProd}','nombre-prod-input')">Renombrar</button>
+    </div>`;
+  return `<div class="detail-panel"><div class="detail-title">${displayName(nm)}</div><div class="detail-meta">Producción</div>${nombreBlockProd}${rindeBlock}${editBtn}${deleteBtn}<datalist id="insumo-datalist">${getInsumoDatalistHTML()}</datalist><table class="ing-table"><thead><tr><th>Insumo</th><th class="right">Cant. receta</th><th class="right">Unidad</th><th class="right">Precio unit.</th><th class="center">Rendimiento</th><th class="right">IVA línea</th><th class="right">Costo línea</th>${recipeEditMode?'<th></th>':''}</tr></thead><tbody>${ir}${addRow}</tbody></table>${summary}</div>`;
 }
 
 // ──── RENDIMIENTOS ───────────────────────────────────────────────────────────
