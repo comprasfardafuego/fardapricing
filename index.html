@@ -216,6 +216,7 @@
       insumos_deleted: state.insumosDeleted,
       venta_overrides: state.ventaOverrides,
       categoria_overrides: state.categoriaOverrides,
+      nombre_overrides: state.nombreOverrides,
       competencia: state.competencia,
       updated_at: new Date().toISOString()
     };
@@ -282,7 +283,7 @@
   }
 
   async function loadAndStart() {
-    const res = await supabase.from('pricing_state').select('insumos, rendimientos, recetas, prod_rinde, platos_extra, producciones_extra, receta_rendimientos, platos_deleted, producciones_deleted, insumos_extra, insumos_deleted, venta_overrides, categoria_overrides, competencia, updated_at').eq('id', 1).maybeSingle();
+    const res = await supabase.from('pricing_state').select('insumos, rendimientos, recetas, prod_rinde, platos_extra, producciones_extra, receta_rendimientos, platos_deleted, producciones_deleted, insumos_extra, insumos_deleted, venta_overrides, categoria_overrides, nombre_overrides, competencia, updated_at').eq('id', 1).maybeSingle();
     if (res.error) {
       console.error('No se pudo leer de la nube', res.error);
       loadedOk = false;
@@ -306,6 +307,7 @@
       insumosDeleted: data.insumos_deleted || [],
       ventaOverrides: data.venta_overrides || {},
       categoriaOverrides: data.categoria_overrides || {},
+      nombreOverrides: data.nombre_overrides || {},
       competencia: data.competencia || {}
     });
   }
@@ -364,9 +366,11 @@ let insumosExtra = [];
 let insumosDeleted = [];
 let ventaOverrides = {};
 let categoriaOverrides = {};
+let nombreOverrides = {};
 let competencia = { locations: ['Local A', 'Local B', 'Local C', 'Local D'], urls: ['', '', '', ''], prices: {} };
 
 function normName(s) { return (s || '').trim().toUpperCase(); }
+function displayName(nombre) { return nombreOverrides[nombre] || nombre; }
 
 function saveStateDebounced() {
   window.__saveDirty = true;
@@ -386,6 +390,7 @@ function saveStateDebounced() {
       insumosDeleted,
       ventaOverrides,
       categoriaOverrides,
+      nombreOverrides,
       competencia
     });
   }, 600);
@@ -789,7 +794,7 @@ function renderPlatosList() {
       const fcCalc = p.venta ? costoCalc / p.venta : null;
       const nmEsc = nm.replace(/"/g,'&quot;');
       const catSelect = `<select class="ins-input" style="width:150px;" data-nombre="${nmEsc}" onchange="cambiarCategoriaPlato(this)">${catOptions.map(opt=>`<option value="${opt}" ${opt===c?'selected':''}>${cap(opt)}</option>`).join('')}</select>`;
-      h+=`<tr><td class="td-num" style="color:var(--text-ter);">${contador}</td><td class="td-name" onclick="openRecipe('plato','${nm}')">${nm}</td><td>${catSelect}</td><td class="td-num">${fmt(costoCalc)}</td><td class="td-num">${fmt(p.venta)}</td><td class="td-num">${fcBadge(fcCalc)}</td><td class="td-num"><div class="sim-cell"><input class="sim-input" type="number" id="${sId}" placeholder="nuevo $" data-costo="${costoCalc}" data-nombre="${nmEsc}" oninput="updateSimFC(this)" onkeydown="if(event.key==='Enter')guardarPrecioPlato('${sId}')"><span class="sim-fc fc-none" id="${sfId}">—</span><button class="btn" style="padding:6px 10px;font-size:12px;" onclick="guardarPrecioPlato('${sId}')">Guardar</button></div></td></tr>`;
+      h+=`<tr><td class="td-num" style="color:var(--text-ter);">${contador}</td><td class="td-name" onclick="openRecipe('plato','${nm}')">${displayName(nm)}</td><td>${catSelect}</td><td class="td-num">${fmt(costoCalc)}</td><td class="td-num">${fmt(p.venta)}</td><td class="td-num">${fcBadge(fcCalc)}</td><td class="td-num"><div class="sim-cell"><input class="sim-input" type="number" id="${sId}" placeholder="nuevo $" data-costo="${costoCalc}" data-nombre="${nmEsc}" oninput="updateSimFC(this)" onkeydown="if(event.key==='Enter')guardarPrecioPlato('${sId}')"><span class="sim-fc fc-none" id="${sfId}">—</span><button class="btn" style="padding:6px 10px;font-size:12px;" onclick="guardarPrecioPlato('${sId}')">Guardar</button></div></td></tr>`;
     });
     h+=`</tbody></table></div>`;
   }
@@ -802,6 +807,18 @@ function cambiarCategoriaPlato(sel) {
   const nombre = sel.dataset.nombre;
   const nuevaCat = sel.value;
   categoriaOverrides[nombre] = nuevaCat;
+  saveStateDebounced();
+  if (document.getElementById('platos-list')) renderPlatosList();
+  if (recipeStack.length) renderRecetas();
+}
+
+function renombrarPlato(original, inputId) {
+  if (blockIfViewer()) return;
+  const el = document.getElementById(inputId);
+  const nuevo = el.value.trim();
+  if (!nuevo) { alert('El nombre no puede quedar vacío.'); return; }
+  if (nuevo === original) delete nombreOverrides[original];
+  else nombreOverrides[original] = nuevo;
   saveStateDebounced();
   if (document.getElementById('platos-list')) renderPlatosList();
   if (recipeStack.length) renderRecetas();
@@ -872,7 +889,7 @@ function renderRecetasList() {
       const hasR=getPlatoIngredients(nm)!=null;
       const costoCalc = costoActualPlato(nm, p);
       const fcCalc = p.venta ? costoCalc / p.venta : null;
-      h+=`<tr><td class="td-name" onclick="openRecipe('plato','${nm}')">${nm}</td><td class="td-num">${fmt(costoCalc)}</td><td class="td-num">${fmt(p.venta)}</td><td class="td-num">${fcBadge(fcCalc)}</td></tr>`;
+      h+=`<tr><td class="td-name" onclick="openRecipe('plato','${nm}')">${displayName(nm)}</td><td class="td-num">${fmt(costoCalc)}</td><td class="td-num">${fmt(p.venta)}</td><td class="td-num">${fcBadge(fcCalc)}</td></tr>`;
     });
     h+=`</tbody></table></div>`;
   }
@@ -893,7 +910,7 @@ function renderRecetas() {
     recipeStack.forEach((item, idx) => {
       h += '<span class="crumb-sep">/</span>';
       const isLast = idx === recipeStack.length - 1;
-      h += `<span class="crumb ${isLast?'active':''}" ${!isLast?`onclick="popToIndex(${idx})"`:''}>${item.name}</span>`;
+      h += `<span class="crumb ${isLast?'active':''}" ${!isLast?`onclick="popToIndex(${idx})"`:''}>${item.type==='plato'?displayName(item.name):item.name}</span>`;
     });
     h += '</div>';
     if (recipeStack.length > 1) {
@@ -948,7 +965,7 @@ function renderDetail(nm, type) {
     const nameCell = isProd
       ? `<span class="ing-name clickable" onclick="pushRecipe('prod','${prodKey}')">${ing.insumo}</span><span class="ing-prod-tag">PRODUCCIÓN</span>`
       : isPlatoIng
-      ? `<span class="ing-name clickable" onclick="pushRecipe('plato','${platoKey}')">${ing.insumo}</span><span class="ing-prod-tag" style="background:var(--teal);color:var(--bg);">PLATO</span>`
+      ? `<span class="ing-name clickable" onclick="pushRecipe('plato','${platoKey}')">${displayName(ing.insumo)}</span><span class="ing-prod-tag" style="background:var(--teal);color:var(--bg);">PLATO</span>`
       : `<span class="ing-name">${ing.insumo}</span>`;
 
     let cantCell;
@@ -1050,20 +1067,26 @@ function renderDetail(nm, type) {
   }
 
   let categoriaBlock = '';
+  let nombreBlock = '';
   if (type === 'plato') {
     const catActual = currentCategoriaDePlato(nm);
     const catOptions = Object.keys(DATA.categorias);
     const nmEsc = nm.replace(/"/g,'&quot;');
+    const nombreActualEsc = displayName(nm).replace(/"/g,'&quot;');
     categoriaBlock = `<div class="detail-meta">Plato · Categoría:
       <select class="ins-input" style="width:170px;display:inline-block;margin-left:6px;" data-nombre="${nmEsc}" onchange="cambiarCategoriaPlato(this)">
         ${catOptions.map(opt=>`<option value="${opt}" ${opt===catActual?'selected':''}>${cap(opt)}</option>`).join('')}
       </select>
     </div>`;
+    nombreBlock = `<div class="sim-cell" style="margin:10px 0;">
+      <input class="ins-input" style="width:280px;" id="nombre-plato-input" value="${nombreActualEsc}" placeholder="Nombre del plato">
+      <button class="btn" style="padding:6px 12px;font-size:12px;" onclick="renombrarPlato('${nmEsc}','nombre-plato-input')">Renombrar</button>
+    </div>`;
   }
 
   return `<div class="detail-panel">
-    <div class="detail-title">${nm}</div>
-    ${type === 'plato' ? categoriaBlock : `<div class="detail-meta">${metaText}</div>`}
+    <div class="detail-title">${type === 'plato' ? displayName(nm) : nm}</div>
+    ${type === 'plato' ? categoriaBlock + nombreBlock : `<div class="detail-meta">${metaText}</div>`}
     ${rindeBlock}
     ${editBtn}${deleteBtn}
     <datalist id="insumo-datalist">${getInsumoDatalistHTML()}</datalist>
@@ -1279,7 +1302,7 @@ function renderProdDetailTab(nm) {
     const nameCell = isSubProd
       ? `<span class="ing-name clickable" onclick="pushProd('${prodKey}')">${ing.insumo}</span><span class="ing-prod-tag">PRODUCCIÓN</span>`
       : isPlatoIng
-      ? `<span class="ing-name clickable" onclick="openRecipe('plato','${platoKey}')">${ing.insumo}</span><span class="ing-prod-tag" style="background:var(--teal);color:var(--bg);">PLATO</span>`
+      ? `<span class="ing-name clickable" onclick="openRecipe('plato','${platoKey}')">${displayName(ing.insumo)}</span><span class="ing-prod-tag" style="background:var(--teal);color:var(--bg);">PLATO</span>`
       : `<span class="ing-name">${ing.insumo}</span>`;
     let cantCell;
     if (recipeEditMode) {
@@ -1541,6 +1564,7 @@ function applyState(state) {
   produccionesDeleted = state.produccionesDeleted || [];
   ventaOverrides = state.ventaOverrides || {};
   categoriaOverrides = state.categoriaOverrides || {};
+  nombreOverrides = state.nombreOverrides || {};
   competencia = state.competencia && state.competencia.locations ? state.competencia : { locations: ['Local A', 'Local B', 'Local C', 'Local D'], urls: ['', '', '', ''], prices: {} };
   if (!competencia.urls) competencia.urls = ['', '', '', ''];
   produccionesExtra.forEach(nm => { if (!prodMapCI[normName(nm)]) prodMapCI[normName(nm)] = nm; });
