@@ -257,14 +257,22 @@ function render(){
 
 // ---------- VISTA: STOCK ACTUAL ----------
 let stockFiltro = '';
+let stockFiltroDeposito = '';
+window.filtrarStockDeposito = function(val){ stockFiltroDeposito = val; render(); }
 function viewStock(){
   const filtro = stockFiltro.trim().toLowerCase();
+  const chipsDepositoStock = [{id:"", nombre:"Todos"}].concat(state.depositos).map(function(d){
+    var activo = String(stockFiltroDeposito) === String(d.id) ? "chip-activo" : "";
+    return "<button class=\"chip " + activo + "\" onclick=\"filtrarStockDeposito('" + d.id + "')\">" + d.nombre + "</button>";
+  }).join("");
   let html = `<div class="card" style="margin-bottom:10px;">
     <label>Buscar producto en todos los depósitos</label>
     <input type="text" id="stock-buscador" placeholder="Escribí un nombre o marca..." value="${stockFiltro}" oninput="filtrarStock(this.value)">
+    <div class="chips">${chipsDepositoStock}</div>
   </div>`;
   let huboResultados = false;
   state.depositos.forEach(dep => {
+    if(stockFiltroDeposito && String(dep.id) !== stockFiltroDeposito) return;
     const vs = variantesDeDeposito(dep.id).filter(v => !filtro || v.nombre.toLowerCase().includes(filtro) || (v.marca||'').toLowerCase().includes(filtro));
     if(filtro && !vs.length) return; // ocultar depósitos sin coincidencias cuando se busca
     huboResultados = true;
@@ -1018,6 +1026,23 @@ window.borrarUsuario = async function(id){
 
 // ---------- VISTA: HISTORIAL (recepción/cocina) ----------
 let historialFiltro = '';
+let historialFiltroTipo = '';
+let historialFiltroDeposito = '';
+window.filtrarHistorialTipo = function(val){ historialFiltroTipo = val; render(); }
+window.filtrarHistorialDeposito = function(val){ historialFiltroDeposito = val; render(); }
+window.anularMovimiento = async function(id){
+  if(!confirm('¿Anular este movimiento? Se va a crear un movimiento contrario para revertirlo, sin borrar el original.')) return;
+  const m = state.movimientos.find(x => x.id === id);
+  if(!m) return;
+  const tipoContrario = m.tipo === 'entrada' ? 'salida' : 'entrada';
+  const { error: e1 } = await supabase.from('stock_movimientos').insert({
+    variante_id: m.variante_id, deposito_id: m.deposito_id, tipo: tipoContrario, cantidad: m.cantidad,
+    usuario_id: state.user.id, comprobante: 'Anulación de mov. #' + id
+  });
+  const { error: e2 } = await supabase.from('stock_movimientos').update({anulado:true}).eq('id', id);
+  await loadAll();
+  render();
+}
 function viewHistorial(){
   const rol = state.user.rol;
   if(rol !== 'admin'){
@@ -1033,7 +1058,15 @@ function viewHistorial(){
   }
   // ---- Vista admin: trazabilidad completa por insumo ----
   const filtro = historialFiltro.trim().toLowerCase();
+  const chipsTipo = [['','Todos'],['entrada','Entradas'],['salida','Salidas']].map(([val,label]) =>
+    `<button class="chip ${historialFiltroTipo===val?'chip-activo':''}" onclick="filtrarHistorialTipo('${val}')">${label}</button>`
+  ).join('');
+  const chipsDeposito = ['<button class="chip '+(historialFiltroDeposito===''?'chip-activo':'')+'" onclick="filtrarHistorialDeposito(\'\')">Todos los depósitos</button>']
+    .concat(state.depositos.map(d => `<button class="chip ${historialFiltroDeposito===String(d.id)?'chip-activo':''}" onclick="filtrarHistorialDeposito('${d.id}')">${d.nombre}</button>`))
+    .join('');
   const movsFiltrados = state.movimientos
+    .filter(m => !historialFiltroTipo || m.tipo === historialFiltroTipo)
+    .filter(m => !historialFiltroDeposito || String(m.deposito_id) === historialFiltroDeposito)
     .filter(m => {
       if(!filtro) return true;
       const v = varianteById(m.variante_id);
@@ -1044,23 +1077,29 @@ function viewHistorial(){
     const dep = state.depositos.find(d=>d.id===m.deposito_id)?.nombre || '-';
     const v = varianteById(m.variante_id);
     const usr = state.usuarios.find(u=>u.id===m.usuario_id);
-    return `<tr>
+    const esAnulacion = (m.comprobante||'').startsWith('Anulación de mov.');
+    const estiloFila = m.anulado ? 'opacity:0.55;text-decoration:line-through;' : '';
+    const puedeAnular = !m.anulado && !esAnulacion;
+    return `<tr style="${estiloFila}">
       <td data-label="Fecha">${new Date(m.fecha).toLocaleString('es-AR')}</td>
       <td data-label="Variante">${v?v.nombre:'(eliminada)'}${v&&v.marca?` <span class="badge">${v.marca}</span>`:''}</td>
       <td data-label="Depósito">${dep}</td>
-      <td data-label="Tipo"><span class="pill ${m.tipo}">${m.tipo}</span></td>
+      <td data-label="Tipo"><span class="pill ${m.tipo}">${m.tipo}</span>${m.anulado?' <span class="badge">anulado</span>':''}</td>
       <td data-label="Cant." class="right">${m.cantidad}</td>
       <td data-label="Usuario">${usr?usr.nombre:'-'}</td>
       <td data-label="Comprobante">${m.comprobante || '<span class="muted">-</span>'}</td>
+      <td data-label="">${puedeAnular ? `<button class="del" onclick="anularMovimiento(${m.id})">Anular</button>` : ''}</td>
     </tr>`;
-  }).join('') || `<tr><td colspan="7" class="muted">Sin movimientos que coincidan</td></tr>`;
+  }).join('') || `<tr><td colspan="8" class="muted">Sin movimientos que coincidan</td></tr>`;
   return `<div class="card">
     <h2>Historial de movimientos</h2>
     <p class="muted">Trazabilidad completa: todas las entradas, salidas, transferencias y ajustes, por insumo.</p>
     <label>Buscar por producto o marca</label>
     <input type="text" id="hist-buscador" placeholder="Ej: Malbec, Catena Zapata..." value="${historialFiltro}" oninput="filtrarHistorial(this.value)">
+    <div class="chips">${chipsTipo}</div>
+    <div class="chips">${chipsDeposito}</div>
     <p class="muted">Mostrando ${movsFiltrados.length}${movsFiltrados.length===150?' (últimos 150, refiná la búsqueda para ver más específico)':''}</p>
-    <table class="responsive"><thead><tr><th>Fecha</th><th>Variante</th><th>Depósito</th><th>Tipo</th><th class="right">Cant.</th><th>Usuario</th><th>Comprobante</th></tr></thead><tbody>${rows}</tbody></table>
+    <table class="responsive"><thead><tr><th>Fecha</th><th>Variante</th><th>Depósito</th><th>Tipo</th><th class="right">Cant.</th><th>Usuario</th><th>Comprobante</th><th></th></tr></thead><tbody>${rows}</tbody></table>
   </div>`;
 }
 window.filtrarHistorial = function(val){ historialFiltro = val; inputConFoco('hist-buscador'); }
