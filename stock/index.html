@@ -63,12 +63,13 @@
   .qty-row-activa{background:#faf6ec;}
   .qty-row-nombre{flex:1;font-size:0.9rem;line-height:1.3;}
   .qty-stepper{display:flex;align-items:center;gap:0;flex-shrink:0;border:1px solid #d8cdb0;border-radius:10px;overflow:hidden;background:#fff;}
-  .qty-stepper button{width:38px;height:38px;border:none;background:#fff;color:var(--navy);font-size:1.2rem;font-weight:700;line-height:1;}
+  .qty-stepper button{width:44px;height:44px;border:none;background:#fff;color:var(--navy);font-size:1.35rem;font-weight:700;line-height:1;}
   .qty-stepper button:active{background:var(--cream-dark);}
   .qty-val{min-width:28px;text-align:center;font-weight:700;font-size:0.95rem;color:var(--ink);}
   .chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;-webkit-overflow-scrolling:touch;}
-  .chip{background:#fff;border:1px solid #d8cdb0;color:var(--navy);padding:7px 14px;border-radius:16px;font-size:0.8rem;font-weight:600;white-space:nowrap;flex-shrink:0;min-height:36px;}
+  .chip{background:#fff;border:1px solid #d8cdb0;color:var(--navy);padding:9px 16px;border-radius:18px;font-size:0.82rem;font-weight:600;white-space:nowrap;flex-shrink:0;min-height:42px;}
   .chip-activo{background:var(--navy);color:#fff;border-color:var(--navy);}
+  .link-btn{background:transparent;border:none;color:var(--rust);font-weight:700;font-size:0.8rem;padding:6px 0;min-height:32px;text-align:left;}
   @media (max-width: 640px){
     table.responsive thead{display:none;}
     table.responsive, table.responsive tbody, table.responsive tr, table.responsive td{display:block;width:100%;}
@@ -228,9 +229,9 @@ function fmtMoney(n){
 function renderNav(){
   const rol = state.user.rol;
   const tabs = [];
-  if(rol === 'admin') tabs.push(['stock','Stock'],['ingresos','Ingresos'],['solicitudes','Solicitudes'],['movimiento','Cargar'],['transferencia','Transferencia'],['conteo','Conteo mensual'],['historial','Historial'],['variantes','Variantes'],['usuarios','Usuarios']);
-  else if(rol === 'recepcion') tabs.push(['ingresos','Ingresos'],['solicitudes','Solicitudes'],['movimiento','Cargar entrada'],['historial','Historial']);
-  else tabs.push(['solicitudes','Solicitudes'],['movimiento','Cargar salida'],['historial','Historial']);
+  if(rol === 'admin') tabs.push(['stock','Stock'],['ingresos','Ingresos'],['solicitudes','Pedidos'],['movimiento','Cargar'],['transferencia','Traspaso'],['conteo','Conteo'],['historial','Historial'],['variantes','Variantes'],['usuarios','Usuarios']);
+  else if(rol === 'recepcion') tabs.push(['ingresos','Ingresos'],['solicitudes','Pedidos'],['movimiento','Cargar entrada'],['historial','Historial']);
+  else tabs.push(['solicitudes','Pedidos'],['movimiento','Cargar salida'],['historial','Historial']);
   const nav = document.getElementById('nav');
   nav.innerHTML = tabs.map(([id,label]) => `<button data-tab="${id}" onclick="setTab('${id}')">${label}</button>`).join('');
 }
@@ -284,7 +285,7 @@ function viewStock(){
       totalValor += valor;
       const marcaTxt = v.marca ? ` <span class="badge">${v.marca}</span>` : '';
       const formatoTxt = v.formato_compra ? ` · entra en ${v.formato_compra}` : '';
-      return `<tr><td data-label="Variante">${v.nombre}${marcaTxt}<div class="muted">${unidadDeVariante(v)}${formatoTxt} · <a href="#" onclick="verHistorialDeProducto('${v.nombre.replace(/'/g,"\\'")}');return false;" style="color:var(--rust);">ver historial</a></div></td><td data-label="Stock" class="right">${cant}</td><td data-label="Costo unit." class="right">${fmtMoney(costoUnit)}</td><td data-label="Valor" class="right">${fmtMoney(valor)}</td></tr>`;
+      return `<tr><td data-label="Variante">${v.nombre}${marcaTxt}<div class="muted" style="margin-bottom:4px;">${unidadDeVariante(v)}${formatoTxt}</div><button class="link-btn" onclick="verHistorialDeProducto('${v.nombre.replace(/'/g,"\\'")}')">Ver historial</button></td><td data-label="Stock" class="right">${cant}</td><td data-label="Costo unit." class="right">${fmtMoney(costoUnit)}</td><td data-label="Valor" class="right">${fmtMoney(valor)}</td></tr>`;
     }).join('');
     if(!rows) rows = `<tr><td colspan="4" class="muted">Sin variantes asignadas a este depósito todavía</td></tr>`;
     html += `<div class="card"><h2>${dep.nombre}</h2>
