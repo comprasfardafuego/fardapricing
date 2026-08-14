@@ -301,9 +301,14 @@ window.filtrarStock = function(val){ stockFiltro = val; inputConFoco('stock-busc
 // ---------- VISTA: CARGAR MOVIMIENTO (por lotes) ----------
 let batchRows = [{variante:'', cantidad:''}];
 let nuevaVarianteAbierta = false;
+let movDepositoSel = null;
+let movTipoSel = 'entrada';
+let movProveedorSel = '';
+let movComprobanteSel = '';
 function viewMovimiento(rol){
   const tipoFijo = rol === 'recepcion' ? 'entrada' : (rol === 'cocina' ? 'salida' : null);
-  const depOptions = state.depositos.map(d => `<option value="${d.id}">${d.nombre}</option>`).join('');
+  if(movDepositoSel === null && state.depositos.length) movDepositoSel = state.depositos[0].id;
+  const depOptions = state.depositos.map(d => `<option value="${d.id}" ${String(d.id)===String(movDepositoSel)?'selected':''}>${d.nombre}</option>`).join('');
   const nombresVariantes = state.variantes.filter(v=>v.activo!==false).map(v=>v.nombre).sort();
   const rowsHtml = batchRows.map((r,i) => {
     const vMatch = state.variantes.find(x => x.nombre === r.variante);
@@ -319,10 +324,10 @@ function viewMovimiento(rol){
     <h2>${tipoFijo === 'entrada' ? 'Cargar entrada' : tipoFijo === 'salida' ? 'Cargar salida' : 'Cargar movimiento'}</h2>
     <div id="mov-msg"></div>
     <div class="row">
-      <div><label>Depósito</label><select id="mov-deposito">${depOptions}</select></div>
-      ${tipoFijo ? '' : `<div><label>Tipo</label><select id="mov-tipo"><option value="entrada">Entrada</option><option value="salida">Salida</option></select></div>`}
+      <div><label>Depósito</label><select id="mov-deposito" onchange="movDepositoSel=this.value">${depOptions}</select></div>
+      ${tipoFijo ? '' : `<div><label>Tipo</label><select id="mov-tipo" onchange="movTipoSel=this.value"><option value="entrada" ${movTipoSel==='entrada'?'selected':''}>Entrada</option><option value="salida" ${movTipoSel==='salida'?'selected':''}>Salida</option></select></div>`}
     </div>
-    ${tipoFijo === 'entrada' ? `<div class="row"><div><label>Proveedor (opcional)</label><input type="text" id="mov-proveedor"></div><div><label>Comprobante (opcional)</label><input type="text" id="mov-comprobante"></div></div>` : ''}
+    ${tipoFijo === 'entrada' ? `<div class="row"><div><label>Proveedor (opcional)</label><input type="text" id="mov-proveedor" value="${movProveedorSel}" onchange="movProveedorSel=this.value"></div><div><label>Comprobante (opcional)</label><input type="text" id="mov-comprobante" value="${movComprobanteSel}" onchange="movComprobanteSel=this.value"></div></div>` : ''}
     <h3>Líneas</h3>
     <datalist id="var-list">${nombresVariantes.map(n=>`<option value="${n}">`).join('')}</datalist>
     ${rowsHtml}
@@ -420,6 +425,8 @@ window.guardarMovimiento = async function(tipoFijo){
   const { error } = await supabase.from('stock_movimientos').insert(inserts);
   if(error){ msg.innerHTML = `<div class="msg err">Error: ${error.message}</div>`; return; }
   batchRows = [{variante:'',cantidad:''}];
+  movProveedorSel = '';
+  movComprobanteSel = '';
   await loadAll();
   msg.innerHTML = `<div class="msg ok">${inserts.length} línea(s) guardadas ✓</div>`;
   render();
@@ -430,6 +437,8 @@ let ingresoDetalleId = null;
 let ingresoNuevoAbierto = false;
 let ingresoRows = [{variante:'', cantidad:''}];
 let ingresoFiltroEstado = '';
+let ingDepositoSel = null;
+let ingProveedorSel = '';
 
 function estadoIngresoPill(estado){
   const map = {abierto:['#fdf3d8','#8a6d1a','Abierto'], con_diferencias:['#fbe6df','#8f3d21','Con diferencias'], cerrado:['#e3f1e8','#2f7a4f','Cerrado']};
@@ -438,7 +447,8 @@ function estadoIngresoPill(estado){
 }
 
 function viewIngresos(){
-  const depOptions = state.depositos.map(d => `<option value="${d.id}">${d.nombre}</option>`).join('');
+  if(ingDepositoSel === null && state.depositos.length) ingDepositoSel = state.depositos[0].id;
+  const depOptions = state.depositos.map(d => `<option value="${d.id}" ${String(d.id)===String(ingDepositoSel)?'selected':''}>${d.nombre}</option>`).join('');
   const nombresVariantes = state.variantes.filter(v=>v.activo!==false).map(v=>v.nombre).sort();
   const estadosDisponibles = [['','Todos'],['abierto','Abierto'],['con_diferencias','Con diferencias'],['cerrado','Cerrado']];
   const chips = estadosDisponibles.map(([val,label]) =>
@@ -476,8 +486,8 @@ function viewIngresos(){
     <button class="ghost" onclick="toggleNuevoIngreso()">${ingresoNuevoAbierto ? '– Cancelar nuevo ingreso' : '+ Nuevo ingreso'}</button>
     ${ingresoNuevoAbierto ? `<div class="subcard">
       <div class="row">
-        <div><label>Proveedor</label><input type="text" id="ing-proveedor"></div>
-        <div><label>Depósito destino</label><select id="ing-deposito">${depOptions}</select></div>
+        <div><label>Proveedor</label><input type="text" id="ing-proveedor" value="${ingProveedorSel}" onchange="ingProveedorSel=this.value"></div>
+        <div><label>Depósito destino</label><select id="ing-deposito" onchange="ingDepositoSel=this.value">${depOptions}</select></div>
       </div>
       <h3>Lo que se contó al recibir (sin mirar el remito)</h3>
       <datalist id="ing-var-list">${nombresVariantes.map(n=>`<option value="${n}">`).join('')}</datalist>
@@ -527,6 +537,7 @@ window.guardarIngreso = async function(){
   })));
   if(e3){ msg.innerHTML = `<div class="msg err">Ingreso guardado pero error al mover stock: ${e3.message}</div>`; return; }
   ingresoRows = [{variante:'',cantidad:''}];
+  ingProveedorSel = '';
   ingresoNuevoAbierto = false;
   await loadAll();
   msg.innerHTML = `<div class="msg ok">Ingreso #${ing.id} guardado: ${lineas.length} línea(s), stock actualizado ✓</div>`;
