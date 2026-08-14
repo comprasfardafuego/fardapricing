@@ -310,8 +310,8 @@ function viewMovimiento(rol){
     const unidadLabel = vMatch ? ` (${unidadDeVariante(vMatch)})` : '';
     return `
     <div class="row">
-      <div><label>Variante (marca/presentación)</label><input list="var-list" type="text" value="${r.variante}" onchange="updateRow(${i},'variante',this.value)"></div>
-      <div><label>Cantidad${unidadLabel}</label><input type="number" step="any" value="${r.cantidad}" onchange="updateRow(${i},'cantidad',this.value)"></div>
+      <div><label>Variante (marca/presentación)</label><input list="var-list" type="text" value="${r.variante}" oninput="actualizarUnidadFila(${i}, this.value)" onchange="updateRow(${i},'variante',this.value)"></div>
+      <div><label>Cantidad <span id="mov-unidad-hint-${i}" class="muted">${unidadLabel}</span></label><input type="number" step="any" value="${r.cantidad}" onchange="updateRow(${i},'cantidad',this.value)"></div>
       <div style="flex:0 0 auto;"><button class="del" onclick="removeRow(${i})">✕</button></div>
     </div>`;
   }).join('');
@@ -335,7 +335,13 @@ function viewMovimiento(rol){
 }
 window.addRow = function(){ batchRows.push({variante:'',cantidad:''}); render(); }
 window.removeRow = function(i){ batchRows.splice(i,1); if(!batchRows.length) batchRows=[{variante:'',cantidad:''}]; render(); }
-window.updateRow = function(i,field,val){ batchRows[i][field] = val; if(field==='variante') render(); }
+window.updateRow = function(i,field,val){ batchRows[i][field] = val; }
+window.actualizarUnidadFila = function(i, nombre){
+  batchRows[i].variante = nombre;
+  const v = state.variantes.find(x => x.nombre === nombre);
+  const hint = document.getElementById('mov-unidad-hint-' + i);
+  if(hint) hint.textContent = v ? `(${unidadDeVariante(v)})` : '';
+}
 window.toggleNuevaVariante = function(){ nuevaVarianteAbierta = !nuevaVarianteAbierta; render(); }
 
 function formNuevaVariante(){
@@ -457,8 +463,8 @@ function viewIngresos(){
     const unidadLabel = vMatch ? ` (${unidadDeVariante(vMatch)})` : '';
     return `
     <div class="row">
-      <div><label>Variante</label><input list="ing-var-list" type="text" value="${r.variante}" onchange="updateIngresoRow(${i},'variante',this.value)"></div>
-      <div><label>Cant. recibida${unidadLabel}</label><input type="number" step="any" value="${r.cantidad}" onchange="updateIngresoRow(${i},'cantidad',this.value)"></div>
+      <div><label>Variante</label><input list="ing-var-list" type="text" value="${r.variante}" oninput="actualizarUnidadFilaIngreso(${i}, this.value)" onchange="updateIngresoRow(${i},'variante',this.value)"></div>
+      <div><label>Cant. recibida <span id="ing-unidad-hint-${i}" class="muted">${unidadLabel}</span></label><input type="number" step="any" value="${r.cantidad}" onchange="updateIngresoRow(${i},'cantidad',this.value)"></div>
       <div style="flex:0 0 auto;"><button class="del" onclick="removeIngresoRow(${i})">✕</button></div>
     </div>`;
   }).join('');
@@ -489,7 +495,13 @@ window.filtrarIngresosEstado = function(val){ ingresoFiltroEstado = val; render(
 window.toggleNuevoIngreso = function(){ ingresoNuevoAbierto = !ingresoNuevoAbierto; render(); }
 window.addIngresoRow = function(){ ingresoRows.push({variante:'',cantidad:''}); render(); }
 window.removeIngresoRow = function(i){ ingresoRows.splice(i,1); if(!ingresoRows.length) ingresoRows=[{variante:'',cantidad:''}]; render(); }
-window.updateIngresoRow = function(i,field,val){ ingresoRows[i][field] = val; if(field==='variante') render(); }
+window.updateIngresoRow = function(i,field,val){ ingresoRows[i][field] = val; }
+window.actualizarUnidadFilaIngreso = function(i, nombre){
+  ingresoRows[i].variante = nombre;
+  const v = state.variantes.find(x => x.nombre === nombre);
+  const hint = document.getElementById('ing-unidad-hint-' + i);
+  if(hint) hint.textContent = v ? `(${unidadDeVariante(v)})` : '';
+}
 window.abrirIngreso = function(id){ ingresoDetalleId = id; render(); }
 window.cerrarDetalleIngreso = function(){ ingresoDetalleId = null; render(); }
 
