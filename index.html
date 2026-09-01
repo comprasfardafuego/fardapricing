@@ -845,7 +845,8 @@ function guardarPrecioPlato(inputId) {
   if (!v || v <= 0) { alert('Ingresá un precio de venta válido.'); return; }
   ventaOverrides[nombre] = v;
   saveStateDebounced();
-  renderPlatosList();
+  if (document.getElementById('platos-list')) renderPlatosList();
+  if (document.getElementById('comparativa-section')) renderComparativa();
 }
 
 function crearPlato() {
@@ -1980,11 +1981,11 @@ function renderComparativa() {
     const url = competencia.urls[idx];
     h += `<th class="right">${url ? `<a href="${url}" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:underline;">${nombreLocal} ↗</a>` : nombreLocal}</th>`;
   });
-  h += `<th class="right">Diferencia prom.</th></tr></thead><tbody>`;
+  h += `<th class="right">Diferencia prom.</th><th class="right">Simular / Actualizar precio</th></tr></thead><tbody>`;
 
   Object.entries(getAllCategorias()).forEach(([cat, nombres]) => {
     if (!nombres.length) return;
-    h += `<tr><td colspan="${3 + competencia.locations.length}" style="background:var(--bg-alt);font-weight:700;font-size:11px;letter-spacing:1px;color:var(--text-sec);padding:8px 12px;">${cap(cat)}</td></tr>`;
+    h += `<tr><td colspan="${4 + competencia.locations.length}" style="background:var(--bg-alt);font-weight:700;font-size:11px;letter-spacing:1px;color:var(--text-sec);padding:8px 12px;">${cap(cat)}</td></tr>`;
     nombres.forEach(nm => {
       const p = getPlatoMeta(nm);
       if (!p) return;
@@ -1998,11 +1999,30 @@ function renderComparativa() {
       });
       const diffPct = countDiff ? Math.round((sumDiff / countDiff) * 1000) / 10 : null;
       const diffColor = diffPct == null ? 'var(--text-ter)' : (diffPct > 0 ? 'var(--red)' : 'var(--green)');
-      h += `<td class="td-num" style="color:${diffColor};font-weight:600;">${diffPct != null ? (diffPct > 0 ? '+' : '') + diffPct + '%' : '—'}</td></tr>`;
+      h += `<td class="td-num" style="color:${diffColor};font-weight:600;">${diffPct != null ? (diffPct > 0 ? '+' : '') + diffPct + '%' : '—'}</td>`;
+
+      const simId = 'comp_sim_' + safeid(nm);
+      const promComp = countDiff ? (preciosComp.filter(v=>v!=null).reduce((a,b)=>a+b,0) / preciosComp.filter(v=>v!=null).length) : null;
+      h += `<td class="td-num"><div class="sim-cell">
+        <input class="sim-input" type="number" id="${simId}" placeholder="nuevo $" data-nombre="${nm.replace(/"/g,'&quot;')}" data-prom="${promComp || ''}" oninput="updateSimCompDiff(this)" onkeydown="if(event.key==='Enter')guardarPrecioPlato('${simId}')">
+        <span class="sim-fc fc-none" id="${simId}_diff">—</span>
+        ${isViewer ? '' : `<button class="btn" style="padding:6px 10px;font-size:12px;" onclick="guardarPrecioPlato('${simId}')">Guardar</button>`}
+      </div></td></tr>`;
     });
   });
   h += `</tbody></table></div>`;
   el.innerHTML = h;
+}
+
+function updateSimCompDiff(inp) {
+  const span = document.getElementById(inp.id + '_diff');
+  const prom = parseFloat(inp.dataset.prom);
+  const nuevo = parseFloat(inp.value);
+  if (!span) return;
+  if (!nuevo || !prom) { span.textContent = '—'; span.className = 'sim-fc fc-none'; return; }
+  const diff = ((nuevo - prom) / prom) * 100;
+  span.textContent = (diff > 0 ? '+' : '') + Math.round(diff * 10) / 10 + '%';
+  span.className = 'sim-fc ' + (diff > 0 ? 'fc-bad' : 'fc-ok');
 }
 
 function renombrarLocalComparativa(idx, valor) {
