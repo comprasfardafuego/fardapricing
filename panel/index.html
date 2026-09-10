@@ -1,0 +1,785 @@
+<style>
+  :root{
+    --bg:#F7F3EA; --panel:#FFFFFF; --ink:#1B1A17; --muted:#726B5C;
+    --line:#E6DFD0; --navy:#1B2A4A; --navy-soft:#E7EAF1;
+    --rust:#B33A1D; --rust-soft:#F4E2D9;
+    --ok:#2F7A4F; --ok-soft:#E3F1E8; --warn:#C98A1E; --warn-soft:#FBEFD8;
+    --bad:#B3261E; --bad-soft:#F7E2E0;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+  .mono{font-variant-numeric:tabular-nums;}
+  #app{max-width:480px;margin:0 auto;padding:16px 16px 40px;}
+  header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
+  header h1{font-size:17px;font-weight:700;margin:0 0 2px;letter-spacing:-0.01em;}
+  header p{font-size:12px;color:var(--muted);margin:0;}
+  .back-link{display:inline-block;font-size:11px;font-weight:700;color:var(--rust);
+    text-decoration:none;margin-bottom:4px;}
+  .role-btn{font-size:11px;font-weight:700;color:var(--navy);background:var(--navy-soft);
+    border:none;border-radius:14px;padding:6px 11px;white-space:nowrap;cursor:pointer;}
+
+  .tabs{display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;}
+  .tab{flex:1;text-align:center;padding:9px 6px;border-radius:20px;font-size:12px;
+    font-weight:700;background:var(--panel);border:1px solid var(--line);color:var(--muted);
+    white-space:nowrap;cursor:pointer;}
+  .tab.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px;margin-bottom:12px;}
+  .card .label{font-size:11.5px;color:var(--muted);font-weight:600;margin-bottom:5px;}
+  .card .big{font-size:26px;font-weight:800;line-height:1.1;}
+  .card .sub{font-size:11.5px;color:var(--muted);margin-top:4px;}
+
+  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;}
+  .pill.ok{background:var(--ok-soft);color:var(--ok);}
+  .pill.warn{background:var(--warn-soft);color:var(--warn);}
+  .pill.bad{background:var(--bad-soft);color:var(--bad);}
+  .pill.food{background:var(--ok-soft);color:var(--ok);}
+  .pill.nofood{background:var(--line);color:var(--muted);}
+
+  .seg{display:flex;gap:6px;margin-bottom:12px;}
+  .seg button{flex:1;padding:8px;border-radius:8px;border:1px solid var(--line);
+    background:var(--panel);font-size:12.5px;font-weight:700;color:var(--muted);cursor:pointer;}
+  .seg button.active{background:var(--rust);color:#fff;border-color:var(--rust);}
+
+  .actions2{display:flex;gap:8px;margin-bottom:14px;}
+  .btn-primary{flex:1;background:var(--rust);color:#fff;padding:13px 14px;
+    border:none;border-radius:var(--radius);font-size:14px;font-weight:700;cursor:pointer;}
+  .btn-secondary{flex:1;background:var(--panel);color:var(--ink);border:1px solid var(--line);
+    padding:13px 14px;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer;}
+  .btn-ghost{background:transparent;border:none;color:var(--navy);font-weight:700;
+    font-size:13px;padding:6px 0;cursor:pointer;}
+
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:600;}
+  .field input, .field select{width:100%;padding:11px 12px;border:1.5px solid var(--line);
+    border-radius:8px;font-size:15px;font-family:inherit;background:#fff;color:var(--ink);}
+  .field.dubious input, .field.dubious select{border-color:var(--warn);background:var(--warn-soft);}
+  .field .hint{font-size:11px;color:var(--warn);margin-top:3px;font-weight:600;}
+  .checkline{display:flex;align-items:center;gap:8px;margin-bottom:14px;}
+  .checkline input{width:18px;height:18px;}
+  .checkline label{font-size:13px;font-weight:600;}
+
+  .entry{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:11px 13px;margin-bottom:8px;display:flex;gap:10px;align-items:center;}
+  .entry .thumb{width:36px;height:36px;border-radius:7px;object-fit:cover;
+    background:var(--rust-soft);flex-shrink:0;}
+  .entry .thumb.ph{display:flex;align-items:center;justify-content:center;font-size:14px;}
+  .entry .info{flex:1;min-width:0;}
+  .entry .top{display:flex;justify-content:space-between;gap:8px;}
+  .entry .name{font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .entry .val{font-size:13.5px;font-weight:700;white-space:nowrap;}
+  .entry .meta{font-size:11.5px;color:var(--muted);margin-top:3px;}
+
+  .empty{text-align:center;padding:30px 10px;color:var(--muted);font-size:13px;
+    border:1px dashed var(--line);border-radius:var(--radius);}
+
+  .overlay{position:fixed;inset:0;background:var(--bg);z-index:20;overflow-y:auto;display:none;}
+  .overlay.show{display:block;}
+  .sheet{max-width:480px;margin:0 auto;padding:16px;}
+  .sheet-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+  .sheet-header h2{font-size:16px;margin:0;}
+  .close-btn{font-size:20px;color:var(--muted);background:none;border:none;padding:4px 8px;cursor:pointer;}
+
+  .loading{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:70px 20px;text-align:center;}
+  .spinner{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--rust);
+    border-radius:50%;animation:spin .8s linear infinite;margin-bottom:16px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .loading p{color:var(--muted);font-size:13.5px;margin:0;}
+  .preview-img{width:100%;max-height:200px;object-fit:contain;background:#111;
+    border-radius:8px;margin-bottom:14px;}
+
+  .result-box{background:var(--navy-soft);border-radius:var(--radius);padding:16px;margin-top:6px;}
+  .result-box .row{display:flex;justify-content:space-between;padding:6px 0;font-size:14px;}
+  .result-box .row.total{border-top:1px solid #cdd4e2;margin-top:4px;padding-top:10px;
+    font-weight:800;font-size:16px;}
+
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);
+    color:#fff;padding:10px 18px;border-radius:24px;font-size:13px;font-weight:600;z-index:30;
+    opacity:0;transition:opacity .25s;pointer-events:none;}
+  .toast.show{opacity:1;}
+  .note{font-size:11px;color:var(--muted);margin-top:10px;line-height:1.5;}
+  .setup{padding:30px 16px;max-width:480px;margin:0 auto;}
+  .setup h2{font-size:16px;}
+  .setup code{background:#eee;padding:2px 5px;border-radius:4px;font-size:12px;}
+  .del{font-size:11px;color:var(--bad);font-weight:700;background:none;border:none;cursor:pointer;}
+</style>
+
+<div id="root"></div>
+
+<script>
+(function(){
+  // ====== CONFIGURAR ANTES DE SUBIR ======
+  const SUPABASE_URL = "https://snwuddryxaehunxbyflp.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNud3VkZHJ5eGFlaHVueGJ5ZmxwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5MDU0ODMsImV4cCI6MjA5ODQ4MTQ4M30.8OO53huAHhFBcLe07aMiA7RWTZ2igQ8r2NfTTH7yFcM";
+  const EDITOR_EMAIL = "comprasfardafuego@gmail.com";
+  // =========================================
+
+  if(SUPABASE_URL.includes("TU_SUPABASE") || SUPABASE_ANON_KEY.includes("TU_ANON")){
+    document.getElementById("root").innerHTML = `
+      <div class="setup">
+        <h2>Falta configurar</h2>
+        <p>Antes de usar este panel, completá en el código:</p>
+        <ul>
+          <li><code>SUPABASE_URL</code> — la URL del proyecto</li>
+          <li><code>SUPABASE_ANON_KEY</code> — la anon key (Settings → API en Supabase)</li>
+        </ul>
+        <p>Corré primero el SQL de las tablas nuevas en el SQL Editor de Supabase, y después completá estos dos valores arriba del todo del archivo.</p>
+      </div>`;
+    return;
+  }
+
+  const RUBROS = [
+    {n:"Carnes vacunas y achuras", food:true},
+    {n:"Cerdo, chacinados y fiambres", food:true},
+    {n:"Aves y huevos", food:true},
+    {n:"Pescados y mariscos", food:true},
+    {n:"Frutas, verduras y hierbas", food:true},
+    {n:"Lácteos y quesos", food:true},
+    {n:"Almacén, secos y conservas", food:true},
+    {n:"Panadería y pastelería", food:true},
+    {n:"Bodega, bebidas y hielo", food:false},
+    {n:"Descartables y packaging", food:false},
+    {n:"Químicos y limpieza", food:false},
+    {n:"Otro", food:false},
+  ];
+  const OBJ_MIN=30, OBJ_MAX=32, OBJ_ALERTA=35;
+  const SESSION_KEY = "session";
+
+  let session = null;   // {access_token, email}
+  let isEditor = false;
+  let activeTab = "resumen";
+  let periodoTipoActivo = "mes";
+  let facturas = [], periodos = [], ahorros = [];
+  let pendingThumb = null;
+  let pendingLineas = [];      // líneas extraídas de la última foto, a la espera de revisión
+  let insumosCache = null;     // {"AJO":{costo,iva,unidad}, ...} de pricing_state
+
+  document.getElementById("root").innerHTML = `
+    <div id="app">
+      <header>
+        <div>
+          <a href="/" class="back-link">← Pricing</a>
+          <h1>Panel de Compras — FARDA</h1>
+          <p>CMV, simulador y ahorro logrado.</p>
+        </div>
+        <button class="role-btn" id="roleBtn">Ingresar</button>
+      </header>
+      <div class="tabs">
+        <div class="tab active" data-tab="resumen">Resumen</div>
+        <div class="tab" data-tab="facturas">Facturas</div>
+        <div class="tab" data-tab="cmv">CMV</div>
+        <div class="tab" data-tab="simulador">Simulador</div>
+        <div class="tab" data-tab="ahorros">Ahorros</div>
+      </div>
+      <div id="view"></div>
+    </div>
+    <div class="overlay" id="overlay">
+      <div class="sheet">
+        <div class="sheet-header"><h2 id="sheetTitle">—</h2><button class="close-btn" id="btnClose">✕</button></div>
+        <div id="sheetBody"></div>
+      </div>
+    </div>
+    <div class="toast" id="toast"></div>
+    <input type="file" accept="image/*" capture="environment" id="cameraInput" style="display:none">
+  `;
+
+  const $ = s => document.querySelector(s);
+  const overlay = $("#overlay"), sheetBody = $("#sheetBody"), sheetTitle = $("#sheetTitle"), toastEl = $("#toast");
+
+  function toast(m){ toastEl.textContent=m; toastEl.classList.add("show"); setTimeout(()=>toastEl.classList.remove("show"),1800); }
+  function fmtMoney(n){ if(n===null||n===undefined||isNaN(n)) return "—"; return "$"+Math.round(n).toLocaleString("es-AR"); }
+  function fmtPct(n){ if(n===null||n===undefined||isNaN(n)) return "—"; return n.toFixed(1)+"%"; }
+  function fmtDateShort(iso){ if(!iso) return "—"; const p=iso.split("-"); return p[2]+"/"+p[1]; }
+  function escapeHtml(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+  function cmvBand(pct){
+    if(pct===null||isNaN(pct)) return {cls:"",label:""};
+    if(pct<=OBJ_MAX) return {cls:"ok",label:"en objetivo"};
+    if(pct<=OBJ_ALERTA) return {cls:"warn",label:"atención"};
+    return {cls:"bad",label:"fuera de objetivo"};
+  }
+  function todayISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+
+  // ---------- Supabase REST helpers ----------
+  function authHeaders(extra){
+    return Object.assign({
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: "Bearer " + (session ? session.access_token : SUPABASE_ANON_KEY)
+    }, extra||{});
+  }
+  async function supaSelect(table, query){
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query||"select=*"}`, {headers: authHeaders()});
+    if(!res.ok) return [];
+    return res.json();
+  }
+  async function supaInsert(table, body){
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method:"POST",
+      headers: authHeaders({"Content-Type":"application/json","Prefer":"return=representation"}),
+      body: JSON.stringify(body)
+    });
+    if(!res.ok){ throw new Error(await res.text()); }
+    return res.json();
+  }
+  async function supaUpdate(table, id, body){
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+      method:"PATCH",
+      headers: authHeaders({"Content-Type":"application/json","Prefer":"return=representation"}),
+      body: JSON.stringify(body)
+    });
+    if(!res.ok){ throw new Error(await res.text()); }
+    return res.json();
+  }
+  async function supaDelete(table, id){
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {method:"DELETE", headers: authHeaders()});
+    return res.ok;
+  }
+
+  // ---------- Auth ----------
+  async function tryRestoreSession(){
+    try{
+      const r = await window.storage.get(SESSION_KEY, false);
+      if(r && r.value){
+        session = JSON.parse(r.value);
+        isEditor = session.email === EDITOR_EMAIL;
+      }
+    }catch(e){}
+  }
+  async function login(email, password){
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method:"POST",
+      headers:{"Content-Type":"application/json","apikey":SUPABASE_ANON_KEY},
+      body: JSON.stringify({email, password})
+    });
+    const data = await res.json();
+    if(!res.ok || !data.access_token) throw new Error(data.error_description || "Login inválido");
+    session = {access_token: data.access_token, email: data.user ? data.user.email : email};
+    isEditor = session.email === EDITOR_EMAIL;
+    await window.storage.set(SESSION_KEY, JSON.stringify(session), false);
+  }
+  async function logout(){
+    session = null; isEditor = false;
+    try{ await window.storage.delete(SESSION_KEY, false); }catch(e){}
+    updateRoleBtn(); render();
+  }
+  function updateRoleBtn(){
+    $("#roleBtn").textContent = isEditor ? "Salir (editor)" : "Ingresar";
+  }
+
+  $("#roleBtn").addEventListener("click", ()=>{
+    if(isEditor){ logout(); return; }
+    sheetTitle.textContent = "Ingresar como editor";
+    sheetBody.innerHTML = `
+      <div class="field"><label>Email</label><input type="email" id="l_email" value="${EDITOR_EMAIL}"></div>
+      <div class="field"><label>Contraseña</label><input type="password" id="l_pass"></div>
+      <button class="btn-primary" id="btnLogin">Ingresar</button>
+      <button class="btn-ghost" id="btnCancelLogin">Cancelar</button>
+      <div class="note">Los dueños pueden ver todo sin iniciar sesión. Esto es solo para poder cargar y editar.</div>
+    `;
+    $("#btnCancelLogin").onclick = closeSheet;
+    $("#btnLogin").onclick = async ()=>{
+      try{
+        await login($("#l_email").value.trim(), $("#l_pass").value);
+        updateRoleBtn(); closeSheet(); render();
+        toast("Sesión iniciada");
+      }catch(e){ toast("No se pudo ingresar — revisá los datos"); }
+    };
+    openSheet();
+  });
+
+  function openSheet(){ overlay.classList.add("show"); window.scrollTo(0,0); }
+  function closeSheet(){ overlay.classList.remove("show"); pendingThumb=null; }
+  $("#btnClose").addEventListener("click", closeSheet);
+
+  document.querySelectorAll(".tab").forEach(t=>{
+    t.addEventListener("click", ()=>{
+      document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+      t.classList.add("active");
+      activeTab = t.dataset.tab;
+      render();
+    });
+  });
+
+  // ---------- Data load ----------
+  async function loadAll(){
+    [facturas, periodos, ahorros] = await Promise.all([
+      supaSelect("compras_facturas", "select=*&order=fecha.desc"),
+      supaSelect("panel_periodos", "select=*&order=fecha_fin.desc"),
+      supaSelect("panel_ahorros", "select=*&order=fecha.desc")
+    ]);
+    render();
+  }
+
+  // ---------- Matching de líneas contra pricing_state ----------
+  function normalizeStr(s){
+    return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+      .toUpperCase().replace(/[^A-Z0-9 ]/g," ").replace(/\s+/g," ").trim();
+  }
+  async function loadInsumos(force){
+    if(insumosCache && !force) return insumosCache;
+    const rows = await supaSelect("pricing_state", "select=insumos&id=eq.1");
+    insumosCache = (rows[0] && rows[0].insumos) ? rows[0].insumos : {};
+    return insumosCache;
+  }
+  function matchInsumo(nombreFactura, insumos){
+    const target = normalizeStr(nombreFactura);
+    if(!target) return null;
+    const keys = Object.keys(insumos);
+    // 1. match exacto
+    let best = keys.find(k=> normalizeStr(k)===target);
+    if(best) return best;
+    // 2. mejor superposición de palabras
+    const tWords = new Set(target.split(" ").filter(w=>w.length>2));
+    let bestScore = 0;
+    keys.forEach(k=>{
+      const kWords = new Set(normalizeStr(k).split(" ").filter(w=>w.length>2));
+      let common = 0;
+      tWords.forEach(w=>{ if(kWords.has(w)) common++; });
+      const score = common / Math.max(1, Math.max(tWords.size, kWords.size));
+      if(score > bestScore){ bestScore = score; best = k; }
+    });
+    return bestScore >= 0.35 ? best : null;
+  }
+  async function actualizarPreciosPricing(confirmadas){
+    // confirmadas: [{insumo_nombre, precio_unitario}]
+    if(confirmadas.length===0) return;
+    const rows = await supaSelect("pricing_state", "select=id,insumos&id=eq.1");
+    if(!rows[0]) throw new Error("no se encontró pricing_state");
+    const insumos = rows[0].insumos || {};
+    confirmadas.forEach(c=>{
+      if(insumos[c.insumo_nombre]){
+        insumos[c.insumo_nombre] = Object.assign({}, insumos[c.insumo_nombre], {costo: c.precio_unitario});
+      }
+    });
+    await supaUpdate("pricing_state", 1, {insumos});
+    insumosCache = insumos;
+  }
+
+  function ahorroMensualTotal(){
+    return ahorros.filter(a=>a.activo).reduce((s,a)=> s+(Number(a.ahorro_mensual)||0), 0);
+  }
+  function comprasFoodEnRango(desde, hasta){
+    return facturas.filter(f=> f.es_food && f.fecha>=desde && f.fecha<=hasta)
+      .reduce((s,f)=> s+(Number(f.monto_neto)||0), 0);
+  }
+
+  // ---------- RENDER ----------
+  function render(){
+    const view = $("#view");
+    if(activeTab==="resumen") view.innerHTML = viewResumen();
+    else if(activeTab==="facturas") view.innerHTML = viewFacturas();
+    else if(activeTab==="cmv") view.innerHTML = viewCmv();
+    else if(activeTab==="simulador") view.innerHTML = viewSimulador();
+    else if(activeTab==="ahorros") view.innerHTML = viewAhorros();
+    bindView();
+  }
+
+  function viewResumen(){
+    const mes = periodos.filter(p=>p.tipo==="mes").sort((a,b)=>b.fecha_fin.localeCompare(a.fecha_fin))[0];
+    let cmv = null;
+    if(mes){ const compra = comprasFoodEnRango(mes.fecha_inicio, mes.fecha_fin); cmv = compra/mes.ventas*100; }
+    const band = cmvBand(cmv);
+    return `
+      <div class="card">
+        <div class="label">CMV del último mes cargado</div>
+        <div class="big mono">${cmv!==null ? fmtPct(cmv) : "Sin datos"}</div>
+        ${cmv!==null ? `<span class="pill ${band.cls}">${band.label} · objetivo ${OBJ_MIN}–${OBJ_MAX}%</span>` : `<div class="sub">Cargá un período en la pestaña CMV</div>`}
+      </div>
+      <div class="card">
+        <div class="label">Ahorro mensual recurrente logrado</div>
+        <div class="big mono">${fmtMoney(ahorroMensualTotal())}</div>
+        <div class="sub">${ahorros.filter(a=>a.activo).length} negociación(es) activa(s)</div>
+      </div>
+      <div class="note">Control de costo (CMV en objetivo) y plata concreta ahorrada — los dos números para mostrar hacia arriba.</div>
+    `;
+  }
+
+  function viewFacturas(){
+    const addBtns = isEditor ? `
+      <div class="actions2">
+        <button class="btn-primary" id="btnFoto">📷 Nueva factura</button>
+        <button class="btn-secondary" id="btnManual">Cargar a mano</button>
+      </div>` : `<div class="note">Iniciá sesión como editor para cargar facturas.</div>`;
+    const rows = facturas.slice(0,80).map(f=>`
+      <div class="entry" data-id="${f.id}">
+        ${f.foto_thumb ? `<img class="thumb" src="${f.foto_thumb}">` : `<div class="thumb ph">🧾</div>`}
+        <div class="info">
+          <div class="top"><div class="name">${escapeHtml(f.proveedor||"Sin proveedor")}</div><div class="val mono">${fmtMoney(f.monto_neto)}</div></div>
+          <div class="meta">${fmtDateShort(f.fecha)} · ${escapeHtml(f.rubro||"—")}
+            <span class="pill ${f.es_food?'food':'nofood'}" style="margin-left:6px;">${f.es_food?'comida':'no comida'}</span>
+          </div>
+        </div>
+      </div>`).join("");
+    return `${addBtns}<div class="list">${facturas.length===0?'<div class="empty">Sin facturas cargadas.</div>':rows}</div>`;
+  }
+
+  function viewCmv(){
+    const list = periodos.filter(p=>p.tipo===periodoTipoActivo);
+    return `
+      <div class="seg">
+        <button data-tipo="semana" class="${periodoTipoActivo==='semana'?'active':''}">Semanal</button>
+        <button data-tipo="quincena" class="${periodoTipoActivo==='quincena'?'active':''}">Quincenal</button>
+        <button data-tipo="mes" class="${periodoTipoActivo==='mes'?'active':''}">Mensual</button>
+      </div>
+      ${isEditor ? `<button class="btn-primary" id="btnNuevoPeriodo" style="width:100%;margin-bottom:14px;">+ Cargar período</button>` : ""}
+      ${list.length===0 ? `<div class="empty">No hay períodos ${periodoTipoActivo}es cargados.</div>` :
+        list.map(p=>{
+          const compra = comprasFoodEnRango(p.fecha_inicio, p.fecha_fin);
+          const pct = compra/p.ventas*100;
+          const b = cmvBand(pct);
+          return `<div class="entry" data-id="${p.id}" style="flex-direction:column;align-items:stretch;">
+            <div class="top"><div class="name">${fmtDateShort(p.fecha_inicio)} — ${fmtDateShort(p.fecha_fin)}</div><div class="val mono">${fmtPct(pct)}</div></div>
+            <div class="meta">Venta ${fmtMoney(p.ventas)} · Compra food (auto) ${fmtMoney(compra)}
+              <span class="pill ${b.cls}" style="margin-left:6px;">${b.label}</span>
+            </div>
+            ${isEditor ? `<button class="del" data-delperiodo="${p.id}" style="align-self:flex-end;">Eliminar</button>`:""}
+          </div>`;
+        }).join("")}
+      <div class="note">La compra se calcula sola sumando las facturas marcadas "comida" dentro de esas fechas. Objetivo FARDA: ${OBJ_MIN}–${OBJ_MAX}%.</div>
+    `;
+  }
+
+  function viewSimulador(){
+    return `
+      <div class="field"><label>Venta esperada del período ($)</label><input type="number" step="0.01" inputmode="decimal" id="s_venta"></div>
+      <div class="field"><label>Objetivo de CMV (%)</label><input type="number" step="0.1" inputmode="decimal" id="s_obj" value="31"></div>
+      <button class="btn-primary" style="width:100%;" id="btnSimular">Calcular techo de compra</button>
+      <div id="s_resultado"></div>
+      <div class="note">Techo de compra = lo máximo a gastar en insumos de comida sin salirte del objetivo.</div>
+    `;
+  }
+
+  function viewAhorros(){
+    const rows = ahorros.map(a=>`
+      <div class="entry" data-id="${a.id}" style="flex-direction:column;align-items:stretch;">
+        <div class="top"><div class="name">${escapeHtml(a.insumo)}</div><div class="val mono">${fmtMoney(a.ahorro_mensual)}/mes</div></div>
+        <div class="meta">${escapeHtml(a.proveedor||"Sin proveedor")} · ${fmtMoney(a.precio_anterior)} → ${fmtMoney(a.precio_nuevo)} por ${escapeHtml(a.unidad||"")} · ${a.cantidad_mensual} ${escapeHtml(a.unidad||"")}/mes
+          <span class="pill ${a.activo?'ok':'nofood'}" style="margin-left:6px;">${a.activo?'activo':'de baja'}</span>
+        </div>
+        ${isEditor ? `<div style="display:flex;gap:14px;margin-top:6px;">
+          <button class="del" data-toggleahorro="${a.id}" data-activo="${a.activo}" style="color:var(--navy);">${a.activo?'Dar de baja':'Reactivar'}</button>
+          <button class="del" data-delahorro="${a.id}">Eliminar</button>
+        </div>` : ""}
+      </div>`).join("");
+    return `
+      <div class="card">
+        <div class="label">Ahorro mensual recurrente total</div>
+        <div class="big mono">${fmtMoney(ahorroMensualTotal())}</div>
+      </div>
+      ${isEditor ? `<button class="btn-primary" style="width:100%;margin-bottom:14px;" id="btnNuevoAhorro">+ Cargar renegociación</button>` : ""}
+      ${ahorros.length===0 ? '<div class="empty">Sin negociaciones cargadas.</div>' : rows}
+    `;
+  }
+
+  function bindView(){
+    updateRoleBtn();
+    if(activeTab==="facturas" && isEditor){
+      $("#btnFoto").onclick = ()=> $("#cameraInput").click();
+      $("#btnManual").onclick = ()=>{ pendingLineas=[]; openFacturaForm(emptyFactura(), null); };
+      document.querySelectorAll(".entry[data-id]").forEach(el=>{
+        el.onclick = ()=>{
+          const f = facturas.find(x=>x.id===el.dataset.id);
+          if(f){ pendingLineas=[]; openFacturaForm(f, f.foto_thumb, true); }
+        };
+      });
+    }
+    if(activeTab==="cmv"){
+      document.querySelectorAll("[data-tipo]").forEach(b=> b.onclick = ()=>{ periodoTipoActivo=b.dataset.tipo; render(); });
+      if(isEditor){
+        $("#btnNuevoPeriodo").onclick = openPeriodoForm;
+        document.querySelectorAll("[data-delperiodo]").forEach(b=> b.onclick = async (ev)=>{
+          ev.stopPropagation();
+          await supaDelete("panel_periodos", b.dataset.delperiodo);
+          await loadAll(); toast("Período eliminado");
+        });
+      }
+    }
+    if(activeTab==="simulador"){
+      $("#btnSimular").onclick = ()=>{
+        const venta = Number($("#s_venta").value), obj = Number($("#s_obj").value);
+        if(!venta){ toast("Cargá la venta esperada"); return; }
+        const techo = venta*obj/100, tMin = venta*OBJ_MIN/100, tMax = venta*OBJ_MAX/100;
+        $("#s_resultado").innerHTML = `
+          <div class="result-box">
+            <div class="row"><span>Venta esperada</span><span class="mono">${fmtMoney(venta)}</span></div>
+            <div class="row total"><span>Techo de compra (${obj}%)</span><span class="mono">${fmtMoney(techo)}</span></div>
+            <div class="row"><span>Rango objetivo FARDA (${OBJ_MIN}–${OBJ_MAX}%)</span><span class="mono">${fmtMoney(tMin)} – ${fmtMoney(tMax)}</span></div>
+          </div>`;
+      };
+    }
+    if(activeTab==="ahorros" && isEditor){
+      $("#btnNuevoAhorro").onclick = openAhorroForm;
+      document.querySelectorAll("[data-toggleahorro]").forEach(b=> b.onclick = async (ev)=>{
+        ev.stopPropagation();
+        const activo = b.dataset.activo === "true";
+        await supaUpdate("panel_ahorros", b.dataset.toggleahorro, {activo: !activo});
+        await loadAll(); toast(activo?"Ahorro dado de baja":"Ahorro reactivado");
+      });
+      document.querySelectorAll("[data-delahorro]").forEach(b=> b.onclick = async (ev)=>{
+        ev.stopPropagation();
+        await supaDelete("panel_ahorros", b.dataset.delahorro);
+        await loadAll(); toast("Registro eliminado");
+      });
+    }
+  }
+
+  // ---------- Facturas: capture + form ----------
+  function emptyFactura(){
+    return {fecha: todayISO(), proveedor:"", numero_factura:"", rubro:"", es_food:true,
+      monto_neto:"", monto_iva:"", monto_total:"", notas:"", campos_dudosos:[]};
+  }
+  function resizeImage(file, maxDim, quality){
+    return new Promise((resolve,reject)=>{
+      const img=new Image(), reader=new FileReader();
+      reader.onload=e=>{ img.src=e.target.result; };
+      reader.onerror=reject;
+      img.onload=()=>{
+        let w=img.width,h=img.height;
+        if(w>h && w>maxDim){h=h*maxDim/w;w=maxDim;} else if(h>maxDim){w=w*maxDim/h;h=maxDim;}
+        const c=document.createElement("canvas"); c.width=w;c.height=h;
+        c.getContext("2d").drawImage(img,0,0,w,h);
+        resolve(c.toDataURL("image/jpeg",quality));
+      };
+      img.onerror=reject;
+      reader.readAsDataURL(file);
+    });
+  }
+  async function extractFromImage(dataUrl){
+    const base64 = dataUrl.split(",")[1];
+    const rubroNames = RUBROS.map(r=>r.n).join(" | ");
+    const prompt = `Sos un asistente que extrae datos de facturas de proveedores de un restaurante en Argentina. Mirá la imagen y devolvé SOLO un objeto JSON, sin texto adicional, sin markdown:
+{"fecha":"YYYY-MM-DD o null","proveedor":"string o null","numero_factura":"string o null","rubro":"una de: ${rubroNames}","monto_neto":number o null,"monto_iva":number o null,"monto_total":number o null,"campos_dudosos":["campos poco confiables"],"notas":"observación breve o vacío","lineas":[{"nombre":"texto tal cual figura en el renglón","cantidad":number o null,"unidad":"string o null","precio_unitario":number o null}]}
+Criterio de monto_neto: con descuentos e impuestos internos si figuran discriminados, SIN percepciones y SIN IVA. Si es Factura B sin discriminar IVA, calculá monto_neto = monto_total/1.21 y agregalo a campos_dudosos. Si un dato no se lee con confianza, ponelo null y agregalo a campos_dudosos. No inventes datos.
+Para "lineas": listá cada renglón/ítem de la factura con su cantidad, unidad y precio unitario NETO (mismo criterio que monto_neto: con impuestos internos, sin percepciones, sin IVA). Si la factura no discrimina precio unitario por línea, dejá esa línea con precio_unitario null. Si no se puede leer ningún renglón, devolvé "lineas":[].`;
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({model:"claude-sonnet-4-6", max_tokens:1000,
+        messages:[{role:"user", content:[
+          {type:"image", source:{type:"base64", media_type:"image/jpeg", data:base64}},
+          {type:"text", text:prompt}
+        ]}]})
+    });
+    const data = await resp.json();
+    const tb = (data.content||[]).find(c=>c.type==="text");
+    if(!tb) throw new Error("sin respuesta");
+    let clean = tb.text.trim().replace(/^```json/i,"").replace(/^```/,"").replace(/```$/,"").trim();
+    return JSON.parse(clean);
+  }
+
+  $("#cameraInput").addEventListener("change", async (ev)=>{
+    const file = ev.target.files[0]; ev.target.value="";
+    if(!file) return;
+    openSheet();
+    sheetTitle.textContent = "Un momento";
+    sheetBody.innerHTML = `<div class="loading"><div class="spinner"></div><p>Leyendo la factura…</p></div>`;
+    try{
+      const sendImg = await resizeImage(file, 1280, 0.7);
+      pendingThumb = await resizeImage(file, 110, 0.45);
+      const d = await extractFromImage(sendImg);
+      const rubroMatch = RUBROS.find(r=>r.n===d.rubro);
+      d.es_food = rubroMatch ? rubroMatch.food : true;
+      pendingLineas = (d.lineas||[]).filter(l=> l && l.nombre);
+      openFacturaForm(d, sendImg, false, true);
+    }catch(e){
+      toast("No se pudo leer la foto — completá a mano");
+      pendingLineas = [];
+      openFacturaForm(emptyFactura(), pendingThumb, false, true);
+    }
+  });
+
+  function isDub(field, d){ return (d.campos_dudosos||[]).includes(field); }
+
+  function openFacturaForm(d, previewImg, isEdit, keepOpen){
+    sheetTitle.textContent = isEdit ? "Editar factura" : "Revisá y confirmá";
+    const rubroOpts = RUBROS.map(r=>`<option value="${r.n}" ${d.rubro===r.n?'selected':''}>${r.n}</option>`).join("");
+    sheetBody.innerHTML = `
+      ${previewImg ? `<img class="preview-img" src="${previewImg}">` : ""}
+      <div class="field ${isDub('fecha',d)?'dubious':''}"><label>Fecha</label><input type="date" id="f_fecha" value="${d.fecha||''}"></div>
+      <div class="field ${isDub('proveedor',d)?'dubious':''}"><label>Proveedor</label><input type="text" id="f_proveedor" value="${escapeHtml(d.proveedor)}"></div>
+      <div class="field"><label>N° de factura</label><input type="text" id="f_numero" value="${escapeHtml(d.numero_factura)}"></div>
+      <div class="field"><label>Rubro</label><select id="f_rubro"><option value="">Sin especificar</option>${rubroOpts}</select></div>
+      <div class="checkline"><input type="checkbox" id="f_esfood" ${d.es_food?'checked':''}><label>Cuenta como comida (food cost)</label></div>
+      <div class="field ${isDub('monto_neto',d)?'dubious':''}"><label>Monto neto (sin IVA, sin percepciones)</label><input type="number" step="0.01" inputmode="decimal" id="f_neto" value="${d.monto_neto??''}"></div>
+      <div class="field"><label>IVA (referencia)</label><input type="number" step="0.01" inputmode="decimal" id="f_iva" value="${d.monto_iva??''}"></div>
+      <div class="field"><label>Total (referencia)</label><input type="number" step="0.01" inputmode="decimal" id="f_total" value="${d.monto_total??''}"></div>
+      <button class="btn-primary" style="width:100%;margin-bottom:10px;" id="btnGuardarF">Guardar</button>
+      <button class="btn-ghost" id="btnCancelF">Cancelar</button>
+      ${isEdit ? `<div style="text-align:center;margin-top:10px;"><button class="btn-ghost" style="color:var(--bad);" id="btnDelF">Eliminar factura</button></div>`:""}
+    `;
+    $("#f_rubro").addEventListener("change", ()=>{
+      const m = RUBROS.find(r=>r.n===$("#f_rubro").value);
+      if(m) $("#f_esfood").checked = m.food;
+    });
+    $("#btnCancelF").onclick = closeSheet;
+    $("#btnGuardarF").onclick = async ()=>{
+      const body = {
+        fecha: $("#f_fecha").value || null,
+        proveedor: $("#f_proveedor").value.trim(),
+        numero_factura: $("#f_numero").value.trim(),
+        rubro: $("#f_rubro").value,
+        es_food: $("#f_esfood").checked,
+        monto_neto: $("#f_neto").value===""?null:Number($("#f_neto").value),
+        monto_iva: $("#f_iva").value===""?null:Number($("#f_iva").value),
+        monto_total: $("#f_total").value===""?null:Number($("#f_total").value),
+        foto_thumb: isEdit ? d.foto_thumb : pendingThumb
+      };
+      try{
+        let saved;
+        if(isEdit) saved = await supaUpdate("compras_facturas", d.id, body);
+        else saved = await supaInsert("compras_facturas", body);
+        await loadAll();
+        toast("Factura guardada");
+        if(!isEdit && pendingLineas.length>0){
+          const facturaId = saved && saved[0] ? saved[0].id : null;
+          await openLineasForm(facturaId, pendingLineas);
+        } else {
+          closeSheet();
+        }
+      }catch(e){ toast("Error al guardar — revisá la conexión"); }
+    };
+    if(isEdit){
+      $("#btnDelF").onclick = async ()=>{
+        await supaDelete("compras_facturas", d.id);
+        await loadAll(); closeSheet(); toast("Factura eliminada");
+      };
+    }
+    if(!keepOpen) openSheet();
+  }
+
+  async function openLineasForm(facturaId, lineas){
+    sheetTitle.textContent = "Un momento";
+    sheetBody.innerHTML = `<div class="loading"><div class="spinner"></div><p>Comparando contra pricing…</p></div>`;
+    const insumos = await loadInsumos(true).catch(()=>({}));
+    const keys = Object.keys(insumos).sort();
+    const rows = lineas.map((l, i)=>{
+      const suggested = matchInsumo(l.nombre, insumos);
+      return Object.assign({}, l, {insumo_nombre: suggested, pendiente: !suggested});
+    });
+
+    function renderLineasBody(){
+      sheetTitle.textContent = "Líneas de la factura";
+      sheetBody.innerHTML = `
+        <div class="note" style="margin-top:0;">Revisá el insumo de cada línea y el precio antes de actualizar pricing. Lo que no matchea queda pendiente para que lo asignes o crees vos.</div>
+        ${rows.map((r,i)=>{
+          const costoActual = r.insumo_nombre && insumos[r.insumo_nombre] ? insumos[r.insumo_nombre].costo : null;
+          const opts = `<option value="">— Pendiente / sin asignar —</option>` +
+            keys.map(k=>`<option value="${k}" ${r.insumo_nombre===k?'selected':''}>${k}</option>`).join("");
+          return `
+          <div class="card" data-linea="${i}">
+            <div class="label">Factura dice: "${escapeHtml(r.nombre)}"${r.cantidad?` · ${r.cantidad} ${escapeHtml(r.unidad||'')}`:''}</div>
+            <div class="field"><label>Insumo en pricing</label><select class="l_insumo" data-i="${i}">${opts}</select></div>
+            <div class="field"><label>Precio unitario neto ($)</label><input type="number" step="0.01" inputmode="decimal" class="l_precio" data-i="${i}" value="${r.precio_unitario??''}"></div>
+            <div class="sub l_costo_actual" data-i="${i}">${costoActual!==null ? `Costo actual en pricing: ${fmtMoney(costoActual)}` : (r.insumo_nombre?'':'Sin insumo asignado — no se va a actualizar pricing para esta línea')}</div>
+          </div>`;
+        }).join("")}
+        <button class="btn-primary" style="width:100%;margin-bottom:10px;" id="btnGuardarLineas">Guardar líneas y actualizar pricing</button>
+        <button class="btn-ghost" id="btnOmitirLineas">Omitir — no actualizar pricing ahora</button>
+      `;
+      sheetBody.querySelectorAll(".l_insumo").forEach(sel=>{
+        sel.addEventListener("change", ()=>{
+          const i = Number(sel.dataset.i);
+          rows[i].insumo_nombre = sel.value || null;
+          const costoActual = rows[i].insumo_nombre && insumos[rows[i].insumo_nombre] ? insumos[rows[i].insumo_nombre].costo : null;
+          const sub = sheetBody.querySelector(`.l_costo_actual[data-i="${i}"]`);
+          sub.textContent = costoActual!==null ? `Costo actual en pricing: ${fmtMoney(costoActual)}` : (rows[i].insumo_nombre?'':'Sin insumo asignado — no se va a actualizar pricing para esta línea');
+        });
+      });
+      sheetBody.querySelectorAll(".l_precio").forEach(inp=>{
+        inp.addEventListener("input", ()=>{
+          rows[Number(inp.dataset.i)].precio_unitario = inp.value===""?null:Number(inp.value);
+        });
+      });
+      $("#btnOmitirLineas").onclick = closeSheet;
+      $("#btnGuardarLineas").onclick = async ()=>{
+        try{
+          // guardar el detalle de cada línea
+          for(const r of rows){
+            await supaInsert("compras_factura_lineas", {
+              factura_id: facturaId,
+              nombre_factura: r.nombre,
+              insumo_nombre: r.insumo_nombre || null,
+              cantidad: r.cantidad ?? null,
+              unidad: r.unidad || null,
+              precio_unitario: r.precio_unitario ?? null,
+              costo_anterior: r.insumo_nombre && insumos[r.insumo_nombre] ? insumos[r.insumo_nombre].costo : null,
+              pendiente: !r.insumo_nombre,
+              aplicado: !!(r.insumo_nombre && r.precio_unitario)
+            });
+          }
+          // actualizar pricing_state para las confirmadas
+          const confirmadas = rows.filter(r=> r.insumo_nombre && r.precio_unitario!==null && r.precio_unitario!==undefined)
+            .map(r=> ({insumo_nombre:r.insumo_nombre, precio_unitario:r.precio_unitario}));
+          await actualizarPreciosPricing(confirmadas);
+          closeSheet();
+          toast(confirmadas.length>0 ? `${confirmadas.length} precio(s) actualizados en pricing` : "Líneas guardadas");
+        }catch(e){ toast("Error al guardar las líneas"); }
+      };
+    }
+    renderLineasBody();
+    openSheet();
+  }
+
+  function openPeriodoForm(){
+    sheetTitle.textContent = "Cargar período de CMV";
+    sheetBody.innerHTML = `
+      <div class="field"><label>Tipo de período</label>
+        <select id="p_tipo">
+          <option value="semana" ${periodoTipoActivo==='semana'?'selected':''}>Semanal</option>
+          <option value="quincena" ${periodoTipoActivo==='quincena'?'selected':''}>Quincenal</option>
+          <option value="mes" ${periodoTipoActivo==='mes'?'selected':''}>Mensual</option>
+        </select>
+      </div>
+      <div class="field"><label>Desde</label><input type="date" id="p_desde"></div>
+      <div class="field"><label>Hasta</label><input type="date" id="p_hasta"></div>
+      <div class="field"><label>Venta del período ($)</label><input type="number" step="0.01" inputmode="decimal" id="p_venta"></div>
+      <button class="btn-primary" style="width:100%;margin-bottom:10px;" id="btnGuardarP">Guardar</button>
+      <button class="btn-ghost" id="btnCancelP">Cancelar</button>
+      <div class="note">La compra la calcula el sistema solo, sumando las facturas de comida entre esas fechas.</div>
+    `;
+    $("#btnCancelP").onclick = closeSheet;
+    $("#btnGuardarP").onclick = async ()=>{
+      const venta = Number($("#p_venta").value);
+      if(!venta || !$("#p_desde").value || !$("#p_hasta").value){ toast("Completá venta y fechas"); return; }
+      try{
+        await supaInsert("panel_periodos", {tipo:$("#p_tipo").value, fecha_inicio:$("#p_desde").value, fecha_fin:$("#p_hasta").value, ventas:venta});
+        periodoTipoActivo = $("#p_tipo").value;
+        await loadAll(); closeSheet(); toast("Período guardado");
+      }catch(e){ toast("Error al guardar"); }
+    };
+    openSheet();
+  }
+
+  function openAhorroForm(){
+    sheetTitle.textContent = "Cargar renegociación";
+    sheetBody.innerHTML = `
+      <div class="field"><label>Insumo</label><input type="text" id="a_insumo" placeholder="Ej: Bife de chorizo"></div>
+      <div class="field"><label>Proveedor</label><input type="text" id="a_proveedor" placeholder="Opcional"></div>
+      <div class="field"><label>Precio anterior ($/unidad)</label><input type="number" step="0.01" inputmode="decimal" id="a_anterior"></div>
+      <div class="field"><label>Precio nuevo ($/unidad)</label><input type="number" step="0.01" inputmode="decimal" id="a_nuevo"></div>
+      <div class="field"><label>Unidad</label><select id="a_unidad"><option>kg</option><option>L</option><option>unidad</option><option>caja</option></select></div>
+      <div class="field"><label>Cantidad estimada por mes</label><input type="number" step="0.01" inputmode="decimal" id="a_cantidad"></div>
+      <button class="btn-primary" style="width:100%;margin-bottom:10px;" id="btnGuardarA">Guardar</button>
+      <button class="btn-ghost" id="btnCancelA">Cancelar</button>
+    `;
+    $("#btnCancelA").onclick = closeSheet;
+    $("#btnGuardarA").onclick = async ()=>{
+      const insumo=$("#a_insumo").value.trim(), anterior=Number($("#a_anterior").value), nuevo=Number($("#a_nuevo").value), cant=Number($("#a_cantidad").value);
+      if(!insumo||!anterior||!nuevo||!cant){ toast("Completá insumo, precios y cantidad"); return; }
+      try{
+        await supaInsert("panel_ahorros", {insumo, proveedor:$("#a_proveedor").value.trim(), precio_anterior:anterior, precio_nuevo:nuevo, unidad:$("#a_unidad").value, cantidad_mensual:cant, activo:true});
+        await loadAll(); closeSheet(); toast("Ahorro cargado");
+      }catch(e){ toast("Error al guardar"); }
+    };
+    openSheet();
+  }
+
+  (async function init(){
+    await tryRestoreSession();
+    updateRoleBtn();
+    await loadAll();
+  })();
+})();
+</script>
