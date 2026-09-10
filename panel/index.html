@@ -157,6 +157,10 @@
   let pendingThumb = null;
   let pendingLineas = [];      // líneas extraídas de la última foto, a la espera de revisión
   let insumosCache = null;     // {"AJO":{costo,iva,unidad}, ...} de pricing_state
+  let variantesCache = null;   // stock_variantes
+  let depositosCache = null;   // stock_depositos
+  let recepcionUser = null;    // {id, nombre} de stock_usuarios con rol='recepcion'
+  const RECEPCION_KEY = "recepcion_session";
 
   document.getElementById("root").innerHTML = `
     <div id="app">
@@ -168,9 +172,10 @@
         </div>
         <button class="role-btn" id="roleBtn">Ingresar</button>
       </header>
-      <div class="tabs">
+      <div class="tabs" id="tabsBar">
         <div class="tab active" data-tab="resumen">Resumen</div>
         <div class="tab" data-tab="facturas">Facturas</div>
+        <div class="tab" data-tab="pendientes">Pendientes</div>
         <div class="tab" data-tab="cmv">CMV</div>
         <div class="tab" data-tab="simulador">Simulador</div>
         <div class="tab" data-tab="ahorros">Ahorros</div>
@@ -247,6 +252,10 @@
         isEditor = session.email === EDITOR_EMAIL;
       }
     }catch(e){}
+    try{
+      const r2 = await window.storage.get(RECEPCION_KEY, false);
+      if(r2 && r2.value){ recepcionUser = JSON.parse(r2.value); }
+    }catch(e){}
   }
   async function login(email, password){
     const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
@@ -265,27 +274,65 @@
     try{ await window.storage.delete(SESSION_KEY, false); }catch(e){}
     updateRoleBtn(); render();
   }
+  async function loginRecepcion(pin){
+    const rows = await supaSelect("stock_usuarios", `select=id,nombre,rol&pin=eq.${encodeURIComponent(pin)}&rol=eq.recepcion`);
+    if(!rows.length) throw new Error("PIN inválido");
+    recepcionUser = {id: rows[0].id, nombre: rows[0].nombre};
+    await window.storage.set(RECEPCION_KEY, JSON.stringify(recepcionUser), false);
+  }
+  async function logoutRecepcion(){
+    recepcionUser = null;
+    try{ await window.storage.delete(RECEPCION_KEY, false); }catch(e){}
+    updateRoleBtn(); render();
+  }
   function updateRoleBtn(){
-    $("#roleBtn").textContent = isEditor ? "Salir (editor)" : "Ingresar";
+    if(recepcionUser){ $("#roleBtn").textContent = `Salir (${recepcionUser.nombre})`; }
+    else if(isEditor){ $("#roleBtn").textContent = "Salir (editor)"; }
+    else { $("#roleBtn").textContent = "Ingresar"; }
   }
 
   $("#roleBtn").addEventListener("click", ()=>{
+    if(recepcionUser){ logoutRecepcion(); return; }
     if(isEditor){ logout(); return; }
-    sheetTitle.textContent = "Ingresar como editor";
+    sheetTitle.textContent = "¿Cómo ingresás?";
     sheetBody.innerHTML = `
-      <div class="field"><label>Email</label><input type="email" id="l_email" value="${EDITOR_EMAIL}"></div>
-      <div class="field"><label>Contraseña</label><input type="password" id="l_pass"></div>
-      <button class="btn-primary" id="btnLogin">Ingresar</button>
-      <button class="btn-ghost" id="btnCancelLogin">Cancelar</button>
-      <div class="note">Los dueños pueden ver todo sin iniciar sesión. Esto es solo para poder cargar y editar.</div>
+      <button class="btn-primary" style="width:100%;margin-bottom:10px;" id="btnSoyEditor">Soy el editor (email y contraseña)</button>
+      <button class="btn-secondary" style="width:100%;margin-bottom:10px;" id="btnSoyRecepcion">Soy de recepción (PIN)</button>
+      <button class="btn-ghost" id="btnCancelChoose">Cancelar</button>
     `;
-    $("#btnCancelLogin").onclick = closeSheet;
-    $("#btnLogin").onclick = async ()=>{
-      try{
-        await login($("#l_email").value.trim(), $("#l_pass").value);
-        updateRoleBtn(); closeSheet(); render();
-        toast("Sesión iniciada");
-      }catch(e){ toast("No se pudo ingresar — revisá los datos"); }
+    $("#btnCancelChoose").onclick = closeSheet;
+    $("#btnSoyEditor").onclick = ()=>{
+      sheetTitle.textContent = "Ingresar como editor";
+      sheetBody.innerHTML = `
+        <div class="field"><label>Email</label><input type="email" id="l_email" value="${EDITOR_EMAIL}"></div>
+        <div class="field"><label>Contraseña</label><input type="password" id="l_pass"></div>
+        <button class="btn-primary" id="btnLogin">Ingresar</button>
+        <button class="btn-ghost" id="btnCancelLogin">Cancelar</button>
+      `;
+      $("#btnCancelLogin").onclick = closeSheet;
+      $("#btnLogin").onclick = async ()=>{
+        try{
+          await login($("#l_email").value.trim(), $("#l_pass").value);
+          updateRoleBtn(); closeSheet(); render();
+          toast("Sesión iniciada");
+        }catch(e){ toast("No se pudo ingresar — revisá los datos"); }
+      };
+    };
+    $("#btnSoyRecepcion").onclick = ()=>{
+      sheetTitle.textContent = "Ingresar con PIN";
+      sheetBody.innerHTML = `
+        <div class="field"><label>PIN</label><input type="password" inputmode="numeric" id="r_pin" placeholder="••••"></div>
+        <button class="btn-primary" id="btnLoginPin">Ingresar</button>
+        <button class="btn-ghost" id="btnCancelPin">Cancelar</button>
+      `;
+      $("#btnCancelPin").onclick = closeSheet;
+      $("#btnLoginPin").onclick = async ()=>{
+        try{
+          await loginRecepcion($("#r_pin").value.trim());
+          updateRoleBtn(); closeSheet(); render();
+          toast(`Hola, ${recepcionUser.nombre}`);
+        }catch(e){ toast("PIN inválido"); }
+      };
     };
     openSheet();
   });
@@ -323,6 +370,16 @@
     const rows = await supaSelect("pricing_state", "select=insumos&id=eq.1");
     insumosCache = (rows[0] && rows[0].insumos) ? rows[0].insumos : {};
     return insumosCache;
+  }
+  async function loadVariantes(force){
+    if(variantesCache && !force) return variantesCache;
+    variantesCache = await supaSelect("stock_variantes", "select=*&activo=eq.true");
+    return variantesCache;
+  }
+  async function loadDepositos(force){
+    if(depositosCache && !force) return depositosCache;
+    depositosCache = await supaSelect("stock_depositos", "select=*");
+    return depositosCache;
   }
   function matchInsumo(nombreFactura, insumos){
     const target = normalizeStr(nombreFactura);
@@ -368,9 +425,22 @@
 
   // ---------- RENDER ----------
   function render(){
+    updateRoleBtn();
+    const tabsBar = $("#tabsBar");
+    if(recepcionUser){
+      tabsBar.style.display = "none";
+      $("#view").innerHTML = viewRecepcionHome();
+      bindRecepcionHome();
+      return;
+    }
+    tabsBar.style.display = "flex";
+    const pendCount = facturas.filter(f=>f.estado==="pendiente").length;
+    const pendTab = tabsBar.querySelector('[data-tab="pendientes"]');
+    if(pendTab) pendTab.textContent = pendCount>0 ? `Pendientes (${pendCount})` : "Pendientes";
     const view = $("#view");
     if(activeTab==="resumen") view.innerHTML = viewResumen();
     else if(activeTab==="facturas") view.innerHTML = viewFacturas();
+    else if(activeTab==="pendientes") view.innerHTML = viewPendientes();
     else if(activeTab==="cmv") view.innerHTML = viewCmv();
     else if(activeTab==="simulador") view.innerHTML = viewSimulador();
     else if(activeTab==="ahorros") view.innerHTML = viewAhorros();
@@ -403,17 +473,36 @@
         <button class="btn-primary" id="btnFoto">📷 Nueva factura</button>
         <button class="btn-secondary" id="btnManual">Cargar a mano</button>
       </div>` : `<div class="note">Iniciá sesión como editor para cargar facturas.</div>`;
-    const rows = facturas.slice(0,80).map(f=>`
+    const listadas = facturas.filter(f=> f.estado!=="pendiente").slice(0,80);
+    const rows = listadas.map(f=>`
       <div class="entry" data-id="${f.id}">
         ${f.foto_thumb ? `<img class="thumb" src="${f.foto_thumb}">` : `<div class="thumb ph">🧾</div>`}
         <div class="info">
           <div class="top"><div class="name">${escapeHtml(f.proveedor||"Sin proveedor")}</div><div class="val mono">${fmtMoney(f.monto_neto)}</div></div>
           <div class="meta">${fmtDateShort(f.fecha)} · ${escapeHtml(f.rubro||"—")}
             <span class="pill ${f.es_food?'food':'nofood'}" style="margin-left:6px;">${f.es_food?'comida':'no comida'}</span>
+            ${f.estado==="rechazada" ? `<span class="pill bad" style="margin-left:6px;">rechazada</span>` : ""}
           </div>
         </div>
       </div>`).join("");
-    return `${addBtns}<div class="list">${facturas.length===0?'<div class="empty">Sin facturas cargadas.</div>':rows}</div>`;
+    return `${addBtns}<div class="list">${listadas.length===0?'<div class="empty">Sin facturas aprobadas todavía.</div>':rows}</div>`;
+  }
+
+  function viewPendientes(){
+    if(!isEditor) return `<div class="note">Solo el editor puede revisar pendientes.</div>`;
+    const pend = facturas.filter(f=>f.estado==="pendiente");
+    const rows = pend.map(f=>`
+      <div class="entry" data-id="${f.id}">
+        ${f.foto_thumb ? `<img class="thumb" src="${f.foto_thumb}">` : `<div class="thumb ph">🧾</div>`}
+        <div class="info">
+          <div class="top"><div class="name">${escapeHtml(f.proveedor||"Sin proveedor")}</div><div class="val mono">${fmtMoney(f.monto_neto)}</div></div>
+          <div class="meta">${fmtDateShort(f.fecha)} · cargada por recepción</div>
+        </div>
+      </div>`).join("");
+    return `
+      <div class="note" style="margin-top:0;">Facturas cargadas por recepción, a la espera de tu revisión.</div>
+      <div class="list">${pend.length===0?'<div class="empty">No hay pendientes.</div>':rows}</div>
+    `;
   }
 
   function viewCmv(){
@@ -483,6 +572,14 @@
         el.onclick = ()=>{
           const f = facturas.find(x=>x.id===el.dataset.id);
           if(f){ pendingLineas=[]; openFacturaForm(f, f.foto_thumb, true); }
+        };
+      });
+    }
+    if(activeTab==="pendientes" && isEditor){
+      document.querySelectorAll(".entry[data-id]").forEach(el=>{
+        el.onclick = ()=>{
+          const f = facturas.find(x=>x.id===el.dataset.id);
+          if(f) openAprobarForm(f);
         };
       });
     }
@@ -582,11 +679,13 @@ Para "lineas": listá cada renglón/ítem de la factura con su cantidad, unidad 
       const rubroMatch = RUBROS.find(r=>r.n===d.rubro);
       d.es_food = rubroMatch ? rubroMatch.food : true;
       pendingLineas = (d.lineas||[]).filter(l=> l && l.nombre);
-      openFacturaForm(d, sendImg, false, true);
+      if(recepcionUser) openFacturaFormRecepcion(d, sendImg);
+      else openFacturaForm(d, sendImg, false, true);
     }catch(e){
       toast("No se pudo leer la foto — completá a mano");
       pendingLineas = [];
-      openFacturaForm(emptyFactura(), pendingThumb, false, true);
+      if(recepcionUser) openFacturaFormRecepcion(emptyFactura(), pendingThumb);
+      else openFacturaForm(emptyFactura(), pendingThumb, false, true);
     }
   });
 
@@ -720,6 +819,243 @@ Para "lineas": listá cada renglón/ítem de la factura con su cantidad, unidad 
     }
     renderLineasBody();
     openSheet();
+  }
+
+  // ---------- Modo recepción (usuarios con PIN) ----------
+  function viewRecepcionHome(){
+    const mias = facturas.filter(f=> f.usuario_recepcion_id===recepcionUser.id).slice(0,30);
+    const rows = mias.map(f=>{
+      const pillCls = f.estado==="aprobada" ? "ok" : f.estado==="rechazada" ? "bad" : "warn";
+      return `<div class="entry" style="flex-direction:column;align-items:stretch;">
+        <div class="top"><div class="name">${escapeHtml(f.proveedor||"Sin proveedor")}</div><div class="val mono">${fmtMoney(f.monto_neto)}</div></div>
+        <div class="meta">${fmtDateShort(f.fecha)} <span class="pill ${pillCls}" style="margin-left:6px;">${f.estado}</span>
+          ${f.estado==="rechazada" && f.comentario_admin ? ` · ${escapeHtml(f.comentario_admin)}` : ""}
+        </div>
+      </div>`;
+    }).join("");
+    return `
+      <div class="card"><div class="label">Hola, ${escapeHtml(recepcionUser.nombre)}</div><div class="sub">Sacale foto a la factura al recibir la mercadería.</div></div>
+      <button class="btn-primary" style="width:100%;margin-bottom:8px;" id="btnFotoRecepcion">📷 Cargar factura recibida</button>
+      <button class="btn-secondary" style="width:100%;margin-bottom:14px;" id="btnManualRecepcion">Cargar a mano</button>
+      <div class="note" style="margin-top:0;">Mis cargas</div>
+      <div class="list">${mias.length===0?'<div class="empty">Todavía no cargaste ninguna.</div>':rows}</div>
+    `;
+  }
+  function bindRecepcionHome(){
+    $("#btnFotoRecepcion").onclick = ()=> $("#cameraInput").click();
+    $("#btnManualRecepcion").onclick = ()=>{
+      pendingLineas = []; pendingThumb = null;
+      openFacturaFormRecepcion(emptyFactura(), null);
+      openSheet();
+    };
+  }
+
+  function openFacturaFormRecepcion(d, previewImg){
+    sheetTitle.textContent = "Revisá y confirmá";
+    sheetBody.innerHTML = `
+      ${previewImg ? `<img class="preview-img" src="${previewImg}">` : ""}
+      <div class="field ${isDub('fecha',d)?'dubious':''}"><label>Fecha</label><input type="date" id="rf_fecha" value="${d.fecha||''}"></div>
+      <div class="field ${isDub('proveedor',d)?'dubious':''}"><label>Proveedor</label><input type="text" id="rf_proveedor" value="${escapeHtml(d.proveedor)}"></div>
+      <div class="field"><label>N° de factura</label><input type="text" id="rf_numero" value="${escapeHtml(d.numero_factura)}"></div>
+      <div class="field ${isDub('monto_neto',d)?'dubious':''}"><label>Monto neto (sin IVA, sin percepciones)</label><input type="number" step="0.01" inputmode="decimal" id="rf_neto" value="${d.monto_neto??''}"></div>
+      <div class="field"><label>IVA (referencia)</label><input type="number" step="0.01" inputmode="decimal" id="rf_iva" value="${d.monto_iva??''}"></div>
+      <div class="field"><label>Total (referencia)</label><input type="number" step="0.01" inputmode="decimal" id="rf_total" value="${d.monto_total??''}"></div>
+      <button class="btn-primary" style="width:100%;margin-bottom:10px;" id="btnSiguienteR">${pendingLineas.length>0 ? "Siguiente: revisar cantidades" : "Enviar a revisión"}</button>
+      <button class="btn-ghost" id="btnCancelR">Cancelar</button>
+    `;
+    $("#btnCancelR").onclick = closeSheet;
+    $("#btnSiguienteR").onclick = ()=>{
+      const body = {
+        fecha: $("#rf_fecha").value || null,
+        proveedor: $("#rf_proveedor").value.trim(),
+        numero_factura: $("#rf_numero").value.trim(),
+        rubro: d.rubro || "",
+        es_food: d.es_food!==undefined ? d.es_food : true,
+        monto_neto: $("#rf_neto").value===""?null:Number($("#rf_neto").value),
+        monto_iva: $("#rf_iva").value===""?null:Number($("#rf_iva").value),
+        monto_total: $("#rf_total").value===""?null:Number($("#rf_total").value),
+        foto_thumb: pendingThumb,
+        estado: "pendiente",
+        usuario_recepcion_id: recepcionUser.id
+      };
+      if(pendingLineas.length>0) openLineasFormRecepcion(body, pendingLineas);
+      else guardarFacturaRecepcion(body, []);
+    };
+  }
+
+  function openLineasFormRecepcion(facturaBody, lineas){
+    const rows = lineas.map(l=> Object.assign({}, l, {cantidad_recibida: l.cantidad ?? ""}));
+    sheetTitle.textContent = "Revisá las cantidades recibidas";
+    sheetBody.innerHTML = `
+      <div class="note" style="margin-top:0;">La factura dice esto — corregí la cantidad recibida si al abrir el pedido no coincide.</div>
+      ${rows.map((r,i)=>`
+        <div class="card" data-linea="${i}">
+          <div class="label">${escapeHtml(r.nombre)}</div>
+          <div class="meta" style="margin-bottom:8px;">Factura: ${r.cantidad??'—'} ${escapeHtml(r.unidad||'')} · $${r.precio_unitario??'—'}</div>
+          <div class="field"><label>Cantidad recibida</label><input type="number" step="0.01" inputmode="decimal" class="rl_cant" data-i="${i}" value="${r.cantidad_recibida}"></div>
+        </div>`).join("")}
+      <button class="btn-primary" style="width:100%;margin-bottom:10px;" id="btnEnviarR">Enviar a revisión</button>
+      <button class="btn-ghost" id="btnCancelRL">Cancelar</button>
+    `;
+    sheetBody.querySelectorAll(".rl_cant").forEach(inp=>{
+      inp.addEventListener("input", ()=>{ rows[Number(inp.dataset.i)].cantidad_recibida = inp.value===""?null:Number(inp.value); });
+    });
+    $("#btnCancelRL").onclick = closeSheet;
+    $("#btnEnviarR").onclick = ()=> guardarFacturaRecepcion(facturaBody, rows);
+  }
+
+  async function guardarFacturaRecepcion(facturaBody, lineas){
+    try{
+      const saved = await supaInsert("compras_facturas", facturaBody);
+      const facturaId = saved && saved[0] ? saved[0].id : null;
+      for(const l of lineas){
+        await supaInsert("compras_factura_lineas", {
+          factura_id: facturaId,
+          nombre_factura: l.nombre,
+          cantidad: l.cantidad ?? null,
+          unidad: l.unidad || null,
+          precio_unitario: l.precio_unitario ?? null,
+          cantidad_recibida: l.cantidad_recibida ?? null,
+          pendiente: true,
+          aplicado: false
+        });
+      }
+      await loadAll();
+      closeSheet();
+      toast("Factura enviada — el editor la va a revisar");
+    }catch(e){ toast("Error al enviar — revisá la conexión"); }
+  }
+
+  // ---------- Aprobación (editor): pricing + stock ----------
+  async function openAprobarForm(factura){
+    sheetTitle.textContent = "Un momento";
+    sheetBody.innerHTML = `<div class="loading"><div class="spinner"></div><p>Cargando datos de pricing y stock…</p></div>`;
+    openSheet();
+    const [lineasDb, insumos, variantes, depositos] = await Promise.all([
+      supaSelect("compras_factura_lineas", `select=*&factura_id=eq.${factura.id}`),
+      loadInsumos(true), loadVariantes(true), loadDepositos(true)
+    ]);
+    const insumoKeys = Object.keys(insumos).sort();
+    const rows = lineasDb.map(l=>{
+      const insumo_nombre = l.insumo_nombre || matchInsumo(l.nombre_factura, insumos);
+      const variantesDelInsumo = variantes.filter(v=> v.insumo_nombre===insumo_nombre);
+      return Object.assign({}, l, {
+        insumo_nombre,
+        variante_id: l.variante_id || (variantesDelInsumo[0] ? variantesDelInsumo[0].id : null)
+      });
+    });
+
+    function depositoNombre(id){
+      const d = depositos.find(x=>x.id===id);
+      return d ? d.nombre : "—";
+    }
+    function variantesFor(insumoNombre){
+      return variantes.filter(v=> v.insumo_nombre===insumoNombre);
+    }
+
+    function renderAprobarBody(){
+      sheetTitle.textContent = "Revisar factura pendiente";
+      sheetBody.innerHTML = `
+        ${factura.foto_thumb ? `<img class="preview-img" src="${factura.foto_thumb}">` : ""}
+        <div class="field"><label>Fecha</label><input type="date" id="ap_fecha" value="${factura.fecha||''}"></div>
+        <div class="field"><label>Proveedor</label><input type="text" id="ap_proveedor" value="${escapeHtml(factura.proveedor)}"></div>
+        <div class="field"><label>Rubro</label><select id="ap_rubro">
+          <option value="">Sin especificar</option>
+          ${RUBROS.map(r=>`<option value="${r.n}" ${factura.rubro===r.n?'selected':''}>${r.n}</option>`).join("")}
+        </select></div>
+        <div class="checkline"><input type="checkbox" id="ap_esfood" ${factura.es_food?'checked':''}><label>Cuenta como comida (food cost)</label></div>
+        <div class="field"><label>Monto neto ($)</label><input type="number" step="0.01" id="ap_neto" value="${factura.monto_neto??''}"></div>
+        <div class="note" style="margin:14px 0 6px;">Líneas — insumo, variante de stock y cantidad recibida</div>
+        ${rows.map((r,i)=>{
+          const opts = `<option value="">— Pendiente / sin asignar —</option>` +
+            insumoKeys.map(k=>`<option value="${k}" ${r.insumo_nombre===k?'selected':''}>${k}</option>`).join("");
+          const varOpts = variantesFor(r.insumo_nombre).map(v=>
+            `<option value="${v.id}" ${r.variante_id===v.id?'selected':''}>${v.nombre} — ${v.formato_compra||''} (${depositoNombre(v.deposito_id)})</option>`
+          ).join("");
+          const costoActual = r.insumo_nombre && insumos[r.insumo_nombre] ? insumos[r.insumo_nombre].costo : null;
+          const difCant = (r.cantidad!==null && r.cantidad_recibida!==null && Number(r.cantidad)!==Number(r.cantidad_recibida));
+          return `
+          <div class="card" data-i="${i}">
+            <div class="label">Factura dice: "${escapeHtml(r.nombre_factura)}"</div>
+            <div class="field"><label>Insumo en pricing</label><select class="ap_insumo" data-i="${i}">${opts}</select></div>
+            <div class="sub ap_costo" data-i="${i}">${costoActual!==null?`Costo actual: ${fmtMoney(costoActual)}`:''}</div>
+            <div class="field"><label>Precio unitario neto ($)</label><input type="number" step="0.01" class="ap_precio" data-i="${i}" value="${r.precio_unitario??''}"></div>
+            <div class="field"><label>Variante de stock (depósito)</label><select class="ap_variante" data-i="${i}">
+              <option value="">— Pendiente, crear/asignar en stock —</option>${varOpts}
+            </select></div>
+            <div class="field"><label>Cantidad recibida${difCant?' ⚠️ distinta a la facturada ('+r.cantidad+')':''}</label>
+              <input type="number" step="0.01" class="ap_cantrec" data-i="${i}" value="${r.cantidad_recibida??r.cantidad??''}"></div>
+          </div>`;
+        }).join("")}
+        <button class="btn-primary" style="width:100%;margin-bottom:10px;" id="btnAprobar">✓ Aprobar e ingresar a stock</button>
+        <button class="btn-secondary" style="width:100%;margin-bottom:10px;" id="btnRechazar">Rechazar</button>
+        <button class="btn-ghost" id="btnCancelAp">Cancelar</button>
+      `;
+      sheetBody.querySelectorAll(".ap_insumo").forEach(sel=> sel.addEventListener("change", ()=>{
+        const i = Number(sel.dataset.i);
+        rows[i].insumo_nombre = sel.value || null;
+        rows[i].variante_id = null;
+        renderAprobarBody();
+      }));
+      sheetBody.querySelectorAll(".ap_precio").forEach(inp=> inp.addEventListener("input", ()=>{
+        rows[Number(inp.dataset.i)].precio_unitario = inp.value===""?null:Number(inp.value);
+      }));
+      sheetBody.querySelectorAll(".ap_variante").forEach(sel=> sel.addEventListener("change", ()=>{
+        rows[Number(sel.dataset.i)].variante_id = sel.value ? Number(sel.value) : null;
+      }));
+      sheetBody.querySelectorAll(".ap_cantrec").forEach(inp=> inp.addEventListener("input", ()=>{
+        rows[Number(inp.dataset.i)].cantidad_recibida = inp.value===""?null:Number(inp.value);
+      }));
+      $("#btnCancelAp").onclick = closeSheet;
+      $("#btnRechazar").onclick = async ()=>{
+        try{
+          await supaUpdate("compras_facturas", factura.id, {estado:"rechazada", comentario_admin:"Rechazada por el editor"});
+          await loadAll(); closeSheet(); toast("Factura rechazada");
+        }catch(e){ toast("Error al rechazar"); }
+      };
+      $("#btnAprobar").onclick = async ()=>{
+        try{
+          await supaUpdate("compras_facturas", factura.id, {
+            fecha: $("#ap_fecha").value, proveedor: $("#ap_proveedor").value.trim(),
+            rubro: $("#ap_rubro").value, es_food: $("#ap_esfood").checked,
+            monto_neto: $("#ap_neto").value===""?null:Number($("#ap_neto").value)
+          });
+          for(const r of rows){
+            await supaUpdate("compras_factura_lineas", r.id, {
+              insumo_nombre: r.insumo_nombre, precio_unitario: r.precio_unitario,
+              variante_id: r.variante_id, cantidad_recibida: r.cantidad_recibida,
+              pendiente: !r.insumo_nombre, aplicado: !!(r.insumo_nombre && r.precio_unitario)
+            });
+          }
+          const confirmadas = rows.filter(r=> r.insumo_nombre && r.precio_unitario!=null)
+            .map(r=> ({insumo_nombre:r.insumo_nombre, precio_unitario:r.precio_unitario}));
+          await actualizarPreciosPricing(confirmadas);
+
+          const conVariante = rows.filter(r=> r.variante_id && r.cantidad_recibida!=null);
+          let stockIngresoId = null;
+          if(conVariante.length>0){
+            const ingreso = await supaInsert("stock_ingresos", {
+              proveedor: $("#ap_proveedor").value.trim(),
+              fecha: $("#ap_fecha").value,
+              comprobante: factura.numero_factura || "",
+              estado: "cerrado",
+              usuario_id: factura.usuario_recepcion_id || null
+            });
+            stockIngresoId = ingreso && ingreso[0] ? ingreso[0].id : null;
+            for(const r of conVariante){
+              await supaInsert("stock_ingreso_lineas", {
+                ingreso_id: stockIngresoId, variante_id: r.variante_id,
+                cantidad_recibida: r.cantidad_recibida, cantidad_facturada: r.cantidad
+              });
+            }
+          }
+          await supaUpdate("compras_facturas", factura.id, {estado:"aprobada", stock_ingreso_id: stockIngresoId});
+          await loadAll(); closeSheet();
+          toast(conVariante.length>0 ? "Aprobada — ingreso creado en stock" : "Aprobada");
+        }catch(e){ toast("Error al aprobar — revisá la conexión"); }
+      };
+    }
+    renderAprobarBody();
   }
 
   function openPeriodoForm(){
