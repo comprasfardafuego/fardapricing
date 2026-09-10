@@ -422,6 +422,26 @@
     return facturas.filter(f=> f.es_food && f.fecha>=desde && f.fecha<=hasta)
       .reduce((s,f)=> s+(Number(f.monto_neto)||0), 0);
   }
+  function limpiezaDescEnRango(desde, hasta){
+    return facturas.filter(f=> (f.rubro==="Químicos y limpieza" || f.rubro==="Descartables y packaging") && f.fecha>=desde && f.fecha<=hasta)
+      .reduce((s,f)=> s+(Number(f.monto_neto)||0), 0);
+  }
+  function periodoAnterior(p){
+    return periodos.filter(x=> x.tipo===p.tipo && x.id!==p.id && x.fecha_fin < p.fecha_inicio)
+      .sort((a,b)=> b.fecha_fin.localeCompare(a.fecha_fin))[0];
+  }
+  function calcularCmv(p){
+    const anterior = periodoAnterior(p);
+    const eInicial = anterior ? Number(anterior.e_final)||0 : 0;
+    const compras = comprasFoodEnRango(p.fecha_inicio, p.fecha_fin);
+    const eFinal = Number(p.e_final)||0;
+    const transferencias = Number(p.transferencias)||0;
+    const notasCredito = Number(p.notas_credito)||0;
+    const menuPersonal = Number(p.menu_personal)||0;
+    const cmvMonto = eInicial + compras - transferencias - notasCredito - menuPersonal - eFinal;
+    const cmvPct = p.ventas ? (cmvMonto / p.ventas * 100) : null;
+    return {eInicial, compras, eFinal, transferencias, notasCredito, menuPersonal, cmvMonto, cmvPct, tieneAnterior: !!anterior};
+  }
 
   // ---------- RENDER ----------
   function render(){
@@ -449,21 +469,28 @@
 
   function viewResumen(){
     const mes = periodos.filter(p=>p.tipo==="mes").sort((a,b)=>b.fecha_fin.localeCompare(a.fecha_fin))[0];
-    let cmv = null;
-    if(mes){ const compra = comprasFoodEnRango(mes.fecha_inicio, mes.fecha_fin); cmv = compra/mes.ventas*100; }
-    const band = cmvBand(cmv);
+    let calc = null;
+    if(mes) calc = calcularCmv(mes);
+    const band = calc ? cmvBand(calc.cmvPct) : {cls:"",label:""};
+    const limpieza = mes ? (limpiezaDescEnRango(mes.fecha_inicio, mes.fecha_fin) / (mes.ventas||1) * 100) : null;
     return `
       <div class="card">
         <div class="label">CMV del último mes cargado</div>
-        <div class="big mono">${cmv!==null ? fmtPct(cmv) : "Sin datos"}</div>
-        ${cmv!==null ? `<span class="pill ${band.cls}">${band.label} · objetivo ${OBJ_MIN}–${OBJ_MAX}%</span>` : `<div class="sub">Cargá un período en la pestaña CMV</div>`}
+        <div class="big mono">${calc ? fmtPct(calc.cmvPct) : "Sin datos"}</div>
+        ${calc ? `<span class="pill ${band.cls}">${band.label} · objetivo ${OBJ_MIN}–${OBJ_MAX}%</span>` : `<div class="sub">Cargá un período en la pestaña CMV</div>`}
+        ${calc && !calc.tieneAnterior ? `<div class="sub">Sin período anterior — E.I. tomado como $0</div>` : ""}
       </div>
+      ${mes ? `<div class="card">
+        <div class="label">Limpieza y descartables</div>
+        <div class="big mono">${fmtPct(limpieza)}</div>
+        <div class="sub">sobre la venta del mes</div>
+      </div>` : ""}
       <div class="card">
         <div class="label">Ahorro mensual recurrente logrado</div>
         <div class="big mono">${fmtMoney(ahorroMensualTotal())}</div>
         <div class="sub">${ahorros.filter(a=>a.activo).length} negociación(es) activa(s)</div>
       </div>
-      <div class="note">Control de costo (CMV en objetivo) y plata concreta ahorrada — los dos números para mostrar hacia arriba.</div>
+      <div class="note">Control de costo (CMV en objetivo) y plata concreta ahorrada — los números para mostrar hacia arriba.</div>
     `;
   }
 
@@ -516,18 +543,25 @@
       ${isEditor ? `<button class="btn-primary" id="btnNuevoPeriodo" style="width:100%;margin-bottom:14px;">+ Cargar período</button>` : ""}
       ${list.length===0 ? `<div class="empty">No hay períodos ${periodoTipoActivo}es cargados.</div>` :
         list.map(p=>{
-          const compra = comprasFoodEnRango(p.fecha_inicio, p.fecha_fin);
-          const pct = compra/p.ventas*100;
-          const b = cmvBand(pct);
+          const c = calcularCmv(p);
+          const b = cmvBand(c.cmvPct);
+          const limpiezaPct = limpiezaDescEnRango(p.fecha_inicio, p.fecha_fin) / (p.ventas||1) * 100;
           return `<div class="entry" data-id="${p.id}" style="flex-direction:column;align-items:stretch;">
-            <div class="top"><div class="name">${fmtDateShort(p.fecha_inicio)} — ${fmtDateShort(p.fecha_fin)}</div><div class="val mono">${fmtPct(pct)}</div></div>
-            <div class="meta">Venta ${fmtMoney(p.ventas)} · Compra food (auto) ${fmtMoney(compra)}
-              <span class="pill ${b.cls}" style="margin-left:6px;">${b.label}</span>
+            <div class="top"><div class="name">${fmtDateShort(p.fecha_inicio)} — ${fmtDateShort(p.fecha_fin)}</div><div class="val mono">${fmtPct(c.cmvPct)}</div></div>
+            <div class="meta"><span class="pill ${b.cls}">${b.label}</span> · Limpieza/desc: ${fmtPct(limpiezaPct)}</div>
+            <div class="result-box" style="margin-top:8px;">
+              <div class="row"><span>E.I.${c.tieneAnterior?'':' (sin anterior)'}</span><span class="mono">${fmtMoney(c.eInicial)}</span></div>
+              <div class="row"><span>+ Compras (food)</span><span class="mono">${fmtMoney(c.compras)}</span></div>
+              <div class="row"><span>− Transferencias</span><span class="mono">${fmtMoney(c.transferencias)}</span></div>
+              <div class="row"><span>− Notas de crédito</span><span class="mono">${fmtMoney(c.notasCredito)}</span></div>
+              <div class="row"><span>− Menú de personal</span><span class="mono">${fmtMoney(c.menuPersonal)}</span></div>
+              <div class="row"><span>− E.F.</span><span class="mono">${fmtMoney(c.eFinal)}</span></div>
+              <div class="row total"><span>CMV</span><span class="mono">${fmtMoney(c.cmvMonto)}</span></div>
             </div>
-            ${isEditor ? `<button class="del" data-delperiodo="${p.id}" style="align-self:flex-end;">Eliminar</button>`:""}
+            ${isEditor ? `<button class="del" data-delperiodo="${p.id}" style="align-self:flex-end;margin-top:6px;">Eliminar</button>`:""}
           </div>`;
         }).join("")}
-      <div class="note">La compra se calcula sola sumando las facturas marcadas "comida" dentro de esas fechas. Objetivo FARDA: ${OBJ_MIN}–${OBJ_MAX}%.</div>
+      <div class="note">E.I. = E.F. del período anterior del mismo tipo. Objetivo FARDA: ${OBJ_MIN}–${OBJ_MAX}%.</div>
     `;
   }
 
@@ -1071,16 +1105,26 @@ Para "lineas": listá cada renglón/ítem de la factura con su cantidad, unidad 
       <div class="field"><label>Desde</label><input type="date" id="p_desde"></div>
       <div class="field"><label>Hasta</label><input type="date" id="p_hasta"></div>
       <div class="field"><label>Venta del período ($)</label><input type="number" step="0.01" inputmode="decimal" id="p_venta"></div>
+      <div class="field"><label>Existencia Final valorizada ($)</label><input type="number" step="0.01" inputmode="decimal" id="p_efinal"></div>
+      <div class="field"><label>Transferencias entre locales ($)</label><input type="number" step="0.01" inputmode="decimal" id="p_transf" value="0"></div>
+      <div class="field"><label>Notas de crédito ($)</label><input type="number" step="0.01" inputmode="decimal" id="p_nc" value="0"></div>
+      <div class="field"><label>Menú de personal ($)</label><input type="number" step="0.01" inputmode="decimal" id="p_menu" value="0"></div>
       <button class="btn-primary" style="width:100%;margin-bottom:10px;" id="btnGuardarP">Guardar</button>
       <button class="btn-ghost" id="btnCancelP">Cancelar</button>
-      <div class="note">La compra la calcula el sistema solo, sumando las facturas de comida entre esas fechas.</div>
+      <div class="note">La compra sale sola de las facturas de comida. El E.I. lo toma automático del E.F. del período anterior del mismo tipo.</div>
     `;
     $("#btnCancelP").onclick = closeSheet;
     $("#btnGuardarP").onclick = async ()=>{
       const venta = Number($("#p_venta").value);
       if(!venta || !$("#p_desde").value || !$("#p_hasta").value){ toast("Completá venta y fechas"); return; }
       try{
-        await supaInsert("panel_periodos", {tipo:$("#p_tipo").value, fecha_inicio:$("#p_desde").value, fecha_fin:$("#p_hasta").value, ventas:venta});
+        await supaInsert("panel_periodos", {
+          tipo:$("#p_tipo").value, fecha_inicio:$("#p_desde").value, fecha_fin:$("#p_hasta").value, ventas:venta,
+          e_final: $("#p_efinal").value===""?null:Number($("#p_efinal").value),
+          transferencias: Number($("#p_transf").value)||0,
+          notas_credito: Number($("#p_nc").value)||0,
+          menu_personal: Number($("#p_menu").value)||0
+        });
         periodoTipoActivo = $("#p_tipo").value;
         await loadAll(); closeSheet(); toast("Período guardado");
       }catch(e){ toast("Error al guardar"); }
