@@ -195,7 +195,7 @@
   const $ = s => document.querySelector(s);
   const overlay = $("#overlay"), sheetBody = $("#sheetBody"), sheetTitle = $("#sheetTitle"), toastEl = $("#toast");
 
-  function toast(m){ toastEl.textContent=m; toastEl.classList.add("show"); setTimeout(()=>toastEl.classList.remove("show"),1800); }
+  function toast(m){ toastEl.textContent=m; toastEl.classList.add("show"); setTimeout(()=>toastEl.classList.remove("show"),4000); }
   function fmtMoney(n){ if(n===null||n===undefined||isNaN(n)) return "—"; return "$"+Math.round(n).toLocaleString("es-AR"); }
   function fmtPct(n){ if(n===null||n===undefined||isNaN(n)) return "—"; return n.toFixed(1)+"%"; }
   function fmtDateShort(iso){ if(!iso) return "—"; const p=iso.split("-"); return p[2]+"/"+p[1]; }
@@ -315,7 +315,7 @@
           await login($("#l_email").value.trim(), $("#l_pass").value);
           updateRoleBtn(); closeSheet(); render();
           toast("Sesión iniciada");
-        }catch(e){ toast("No se pudo ingresar — revisá los datos"); }
+        }catch(e){ toast("Error: " + e.message); }
       };
     };
     $("#btnSoyRecepcion").onclick = ()=>{
