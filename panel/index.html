@@ -106,6 +106,37 @@
   .setup h2{font-size:16px;}
   .setup code{background:#eee;padding:2px 5px;border-radius:4px;font-size:12px;}
   .del{font-size:11px;color:var(--bad);font-weight:700;background:none;border:none;cursor:pointer;}
+
+  /* ---------- Desktop / pantallas grandes ---------- */
+  @media (min-width: 860px){
+    body{background:linear-gradient(180deg,var(--bg) 0%,#F1ECE0 100%);}
+    #app{max-width:1080px;padding:28px 32px 60px;}
+    header{align-items:center;}
+    header h1{font-size:21px;}
+    header p{font-size:13px;}
+    .tabs{overflow-x:visible;}
+    .tab{flex:0 0 auto;padding:9px 18px;font-size:13px;}
+
+    .summary-grid, .card-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+    .card{padding:18px 20px;}
+    .card .big{font-size:30px;}
+
+    .list{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;align-content:start;}
+    .entry{padding:13px 15px;}
+
+    .actions2{max-width:640px;}
+    .field, .checkline{max-width:640px;}
+
+    /* el modal/sheet queda como diálogo centrado, no a pantalla completa */
+    .overlay{background:rgba(27,25,23,0.45);display:none;align-items:flex-start;justify-content:center;padding-top:5vh;}
+    .overlay.show{display:flex;}
+    .sheet{max-width:560px;width:100%;background:var(--panel);border-radius:16px;
+      max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.25);padding:24px 28px;margin:0;}
+  }
+  @media (min-width: 1200px){
+    #app{max-width:1240px;}
+    .list{grid-template-columns:repeat(3,1fr);}
+  }
 </style>
 
 <div id="root"></div>
@@ -474,6 +505,7 @@
     const band = calc ? cmvBand(calc.cmvPct) : {cls:"",label:""};
     const limpieza = mes ? (limpiezaDescEnRango(mes.fecha_inicio, mes.fecha_fin) / (mes.ventas||1) * 100) : null;
     return `
+      <div class="card-grid">
       <div class="card">
         <div class="label">CMV del último mes cargado</div>
         <div class="big mono">${calc ? fmtPct(calc.cmvPct) : "Sin datos"}</div>
@@ -489,6 +521,7 @@
         <div class="label">Ahorro mensual recurrente logrado</div>
         <div class="big mono">${fmtMoney(ahorroMensualTotal())}</div>
         <div class="sub">${ahorros.filter(a=>a.activo).length} negociación(es) activa(s)</div>
+      </div>
       </div>
       <div class="note">Control de costo (CMV en objetivo) y plata concreta ahorrada — los números para mostrar hacia arriba.</div>
     `;
@@ -593,7 +626,7 @@
         <div class="big mono">${fmtMoney(ahorroMensualTotal())}</div>
       </div>
       ${isEditor ? `<button class="btn-primary" style="width:100%;margin-bottom:14px;" id="btnNuevoAhorro">+ Cargar renegociación</button>` : ""}
-      ${ahorros.length===0 ? '<div class="empty">Sin negociaciones cargadas.</div>' : rows}
+      <div class="list">${ahorros.length===0 ? '<div class="empty">Sin negociaciones cargadas.</div>' : rows}</div>
     `;
   }
 
