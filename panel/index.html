@@ -246,15 +246,15 @@
   // ---------- Auth ----------
   async function tryRestoreSession(){
     try{
-      const r = await window.storage.get(SESSION_KEY, false);
-      if(r && r.value){
-        session = JSON.parse(r.value);
+      const v = localStorage.getItem(SESSION_KEY);
+      if(v){
+        session = JSON.parse(v);
         isEditor = session.email === EDITOR_EMAIL;
       }
     }catch(e){}
     try{
-      const r2 = await window.storage.get(RECEPCION_KEY, false);
-      if(r2 && r2.value){ recepcionUser = JSON.parse(r2.value); }
+      const v2 = localStorage.getItem(RECEPCION_KEY);
+      if(v2){ recepcionUser = JSON.parse(v2); }
     }catch(e){}
   }
   async function login(email, password){
@@ -267,22 +267,22 @@
     if(!res.ok || !data.access_token) throw new Error(data.error_description || "Login inválido");
     session = {access_token: data.access_token, email: data.user ? data.user.email : email};
     isEditor = session.email === EDITOR_EMAIL;
-    await window.storage.set(SESSION_KEY, JSON.stringify(session), false);
+    try{ localStorage.setItem(SESSION_KEY, JSON.stringify(session)); }catch(e){}
   }
   async function logout(){
     session = null; isEditor = false;
-    try{ await window.storage.delete(SESSION_KEY, false); }catch(e){}
+    try{ localStorage.removeItem(SESSION_KEY); }catch(e){}
     updateRoleBtn(); render();
   }
   async function loginRecepcion(pin){
     const rows = await supaSelect("stock_usuarios", `select=id,nombre,rol&pin=eq.${encodeURIComponent(pin)}&rol=eq.recepcion`);
     if(!rows.length) throw new Error("PIN inválido");
     recepcionUser = {id: rows[0].id, nombre: rows[0].nombre};
-    await window.storage.set(RECEPCION_KEY, JSON.stringify(recepcionUser), false);
+    try{ localStorage.setItem(RECEPCION_KEY, JSON.stringify(recepcionUser)); }catch(e){}
   }
   async function logoutRecepcion(){
     recepcionUser = null;
-    try{ await window.storage.delete(RECEPCION_KEY, false); }catch(e){}
+    try{ localStorage.removeItem(RECEPCION_KEY); }catch(e){}
     updateRoleBtn(); render();
   }
   function updateRoleBtn(){
