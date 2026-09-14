@@ -147,6 +147,8 @@
   const SUPABASE_URL = "https://snwuddryxaehunxbyflp.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_prm4_Iq9xVmX9aPRC5aurA_gWicE2KX";
   const EDITOR_EMAIL = "comprasfardafuego@gmail.com";
+  const CLOUDINARY_CLOUD = "kiqpo56d";
+  const CLOUDINARY_PRESET = "panel_facturas";
   // =========================================
 
   if(SUPABASE_URL.includes("TU_SUPABASE") || SUPABASE_ANON_KEY.includes("TU_ANON")){
@@ -843,14 +845,13 @@ Para "lineas": listá cada renglón/ítem de la factura con su cantidad, unidad 
 
   async function uploadFoto(dataUrl){
     const blob = await (await fetch(dataUrl)).blob();
-    const path = `factura_${Date.now()}_${Math.random().toString(36).slice(2,8)}.jpg`;
-    const res = await fetch(`${SUPABASE_URL}/storage/v1/object/facturas/${path}`, {
-      method: "POST",
-      headers: authHeaders({"Content-Type":"image/jpeg"}),
-      body: blob
-    });
-    if(!res.ok) throw new Error("no se pudo subir la foto");
-    return `${SUPABASE_URL}/storage/v1/object/public/facturas/${path}`;
+    const fd = new FormData();
+    fd.append("file", blob);
+    fd.append("upload_preset", CLOUDINARY_PRESET);
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, {method:"POST", body: fd});
+    const data = await res.json();
+    if(!data.secure_url) throw new Error("no se pudo subir la foto");
+    return data.secure_url;
   }
 
   $("#cameraInput").addEventListener("change", async (ev)=>{
