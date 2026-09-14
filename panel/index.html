@@ -184,6 +184,7 @@
   let isEditor = false;
   let activeTab = "resumen";
   let periodoTipoActivo = "mes";
+  let facturasVista = "lista"; // lista | dia | proveedor
   let facturas = [], periodos = [], ahorros = [];
   let pendingThumb = null;
   let pendingLineas = [];      // líneas extraídas de la última foto, a la espera de revisión
@@ -526,25 +527,81 @@
     `;
   }
 
+  function openFotoViewer(url){
+    sheetTitle.textContent = "Foto de la factura";
+    sheetBody.innerHTML = `
+      <img class="preview-img" style="max-height:75vh;" src="${url}">
+      <button class="btn-ghost" id="btnCerrarFoto">Cerrar</button>
+    `;
+    $("#btnCerrarFoto").onclick = closeSheet;
+    openSheet();
+  }
+
+  function renderPorDia(list){
+    if(list.length===0) return `<div class="empty">Sin facturas aprobadas todavía.</div>`;
+    const byDate = {};
+    list.forEach(f=>{ (byDate[f.fecha]=byDate[f.fecha]||[]).push(f); });
+    const dates = Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
+    return dates.map(d=>{
+      const items = byDate[d];
+      const total = items.reduce((s,f)=> s+(Number(f.monto_neto)||0),0);
+      return `<div class="card">
+        <div class="top"><div class="name">${fmtDateShort(d)}</div><div class="val mono">${fmtMoney(total)}</div></div>
+        ${items.map(f=>`<div class="meta" style="display:flex;justify-content:space-between;padding:4px 0;">
+          <span>${escapeHtml(f.proveedor||'Sin proveedor')} <span class="pill ${f.es_food?'food':'nofood'}" style="margin-left:4px;">${escapeHtml(f.rubro||'—')}</span></span>
+          <span class="mono">${fmtMoney(f.monto_neto)}</span>
+        </div>`).join("")}
+      </div>`;
+    }).join("");
+  }
+
+  function renderPorProveedor(list){
+    if(list.length===0) return `<div class="empty">Sin facturas aprobadas todavía.</div>`;
+    const byProv = {};
+    list.forEach(f=>{
+      const key = f.proveedor || "Sin proveedor";
+      if(!byProv[key]) byProv[key] = {total:0,count:0};
+      byProv[key].total += Number(f.monto_neto)||0;
+      byProv[key].count += 1;
+    });
+    const provs = Object.keys(byProv).sort((a,b)=> byProv[b].total-byProv[a].total);
+    return `<div class="list">${provs.map(p=>`
+      <div class="entry" style="flex-direction:column;align-items:stretch;">
+        <div class="top"><div class="name">${escapeHtml(p)}</div><div class="val mono">${fmtMoney(byProv[p].total)}</div></div>
+        <div class="meta">${byProv[p].count} factura(s)</div>
+      </div>`).join("")}</div>`;
+  }
+
   function viewFacturas(){
     const addBtns = isEditor ? `
       <div class="actions2">
         <button class="btn-primary" id="btnFoto">📷 Nueva factura</button>
         <button class="btn-secondary" id="btnManual">Cargar a mano</button>
       </div>` : `<div class="note">Iniciá sesión como editor para cargar facturas.</div>`;
-    const listadas = facturas.filter(f=> f.estado!=="pendiente").slice(0,80);
-    const rows = listadas.map(f=>`
-      <div class="entry" data-id="${f.id}">
-        ${f.foto_thumb ? `<img class="thumb" src="${f.foto_thumb}">` : `<div class="thumb ph">🧾</div>`}
-        <div class="info">
-          <div class="top"><div class="name">${escapeHtml(f.proveedor||"Sin proveedor")}</div><div class="val mono">${fmtMoney(f.monto_neto)}</div></div>
-          <div class="meta">${fmtDateShort(f.fecha)} · ${escapeHtml(f.rubro||"—")}
-            <span class="pill ${f.es_food?'food':'nofood'}" style="margin-left:6px;">${f.es_food?'comida':'no comida'}</span>
-            ${f.estado==="rechazada" ? `<span class="pill bad" style="margin-left:6px;">rechazada</span>` : ""}
+    const listadas = facturas.filter(f=> f.estado!=="pendiente");
+    const seg = `<div class="seg">
+      <button data-vista="lista" class="${facturasVista==='lista'?'active':''}">Lista</button>
+      <button data-vista="dia" class="${facturasVista==='dia'?'active':''}">Por día</button>
+      <button data-vista="proveedor" class="${facturasVista==='proveedor'?'active':''}">Por proveedor</button>
+    </div>`;
+    let body;
+    if(facturasVista==="dia") body = renderPorDia(listadas);
+    else if(facturasVista==="proveedor") body = renderPorProveedor(listadas);
+    else {
+      const rows = listadas.slice(0,80).map(f=>`
+        <div class="entry" data-id="${f.id}">
+          ${f.foto_thumb ? `<img class="thumb" data-foto="${f.id}" src="${f.foto_thumb}">` : `<div class="thumb ph">🧾</div>`}
+          <div class="info">
+            <div class="top"><div class="name">${escapeHtml(f.proveedor||"Sin proveedor")}</div><div class="val mono">${fmtMoney(f.monto_neto)}</div></div>
+            <div class="meta">${fmtDateShort(f.fecha)} · ${escapeHtml(f.rubro||"—")}
+              <span class="pill ${f.es_food?'food':'nofood'}" style="margin-left:6px;">${f.es_food?'comida':'no comida'}</span>
+              ${f.estado==="rechazada" ? `<span class="pill bad" style="margin-left:6px;">rechazada</span>` : ""}
+            </div>
           </div>
-        </div>
-      </div>`).join("");
-    return `${addBtns}<div class="list">${listadas.length===0?'<div class="empty">Sin facturas aprobadas todavía.</div>':rows}</div>`;
+        </div>`).join("");
+      body = `<div class="list">${listadas.length===0?'<div class="empty">Sin facturas aprobadas todavía.</div>':rows}</div>`;
+    }
+    return `${addBtns}${seg}${body}`;
   }
 
   function viewPendientes(){
@@ -631,15 +688,21 @@
 
   function bindView(){
     updateRoleBtn();
-    if(activeTab==="facturas" && isEditor){
-      $("#btnFoto").onclick = ()=> $("#cameraInput").click();
-      $("#btnManual").onclick = ()=>{ pendingLineas=[]; openFacturaForm(emptyFactura(), null); };
-      document.querySelectorAll(".entry[data-id]").forEach(el=>{
-        el.onclick = ()=>{
-          const f = facturas.find(x=>x.id===el.dataset.id);
-          if(f){ pendingLineas=[]; openFacturaForm(f, f.foto_thumb, true); }
-        };
+    if(activeTab==="facturas"){
+      document.querySelectorAll("[data-vista]").forEach(b=> b.onclick = ()=>{ facturasVista=b.dataset.vista; render(); });
+      document.querySelectorAll(".thumb[data-foto]").forEach(img=>{
+        img.onclick = (ev)=>{ ev.stopPropagation(); openFotoViewer(img.src); };
       });
+      if(isEditor){
+        $("#btnFoto").onclick = ()=> $("#cameraInput").click();
+        $("#btnManual").onclick = ()=>{ pendingLineas=[]; openFacturaForm(emptyFactura(), null); };
+        document.querySelectorAll(".entry[data-id]").forEach(el=>{
+          el.onclick = ()=>{
+            const f = facturas.find(x=>x.id===el.dataset.id);
+            if(f){ pendingLineas=[]; openFacturaForm(f, f.foto_thumb, true); }
+          };
+        });
+      }
     }
     if(activeTab==="pendientes" && isEditor){
       document.querySelectorAll(".entry[data-id]").forEach(el=>{
@@ -732,21 +795,37 @@ Para "lineas": listá cada renglón/ítem de la factura con su cantidad, unidad 
     return JSON.parse(clean);
   }
 
+  async function uploadFoto(dataUrl){
+    const blob = await (await fetch(dataUrl)).blob();
+    const path = `factura_${Date.now()}_${Math.random().toString(36).slice(2,8)}.jpg`;
+    const res = await fetch(`${SUPABASE_URL}/storage/v1/object/facturas/${path}`, {
+      method: "POST",
+      headers: authHeaders({"Content-Type":"image/jpeg"}),
+      body: blob
+    });
+    if(!res.ok) throw new Error("no se pudo subir la foto");
+    return `${SUPABASE_URL}/storage/v1/object/public/facturas/${path}`;
+  }
+
   $("#cameraInput").addEventListener("change", async (ev)=>{
     const file = ev.target.files[0]; ev.target.value="";
     if(!file) return;
     openSheet();
     sheetTitle.textContent = "Un momento";
-    sheetBody.innerHTML = `<div class="loading"><div class="spinner"></div><p>Leyendo la factura…</p></div>`;
+    sheetBody.innerHTML = `<div class="loading"><div class="spinner"></div><p>Subiendo y leyendo la factura…</p></div>`;
+    pendingThumb = null;
+    try{
+      const uploadImg = await resizeImage(file, 1600, 0.8);
+      pendingThumb = await uploadFoto(uploadImg);
+    }catch(e){ pendingThumb = null; }
     try{
       const sendImg = await resizeImage(file, 1280, 0.7);
-      pendingThumb = await resizeImage(file, 110, 0.45);
       const d = await extractFromImage(sendImg);
       const rubroMatch = RUBROS.find(r=>r.n===d.rubro);
       d.es_food = rubroMatch ? rubroMatch.food : true;
       pendingLineas = (d.lineas||[]).filter(l=> l && l.nombre);
-      if(recepcionUser) openFacturaFormRecepcion(d, sendImg);
-      else openFacturaForm(d, sendImg, false, true);
+      if(recepcionUser) openFacturaFormRecepcion(d, pendingThumb || sendImg);
+      else openFacturaForm(d, pendingThumb || sendImg, false, true);
     }catch(e){
       toast("Lectura automática no disponible todavía — completá a mano, la foto queda guardada");
       pendingLineas = [];
