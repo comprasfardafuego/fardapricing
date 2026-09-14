@@ -749,7 +749,7 @@ Para "lineas": listá cada renglón/ítem de la factura con su cantidad, unidad 
       if(recepcionUser) openFacturaFormRecepcion(d, sendImg);
       else openFacturaForm(d, sendImg, false, true);
     }catch(e){
-      toast("No se pudo leer la foto — completá a mano");
+      toast("Lectura automática no disponible todavía — completá a mano, la foto queda guardada");
       pendingLineas = [];
       if(recepcionUser) openFacturaFormRecepcion(emptyFactura(), pendingThumb);
       else openFacturaForm(emptyFactura(), pendingThumb, false, true);
