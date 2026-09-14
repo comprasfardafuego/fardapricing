@@ -241,10 +241,9 @@
 
   // ---------- Supabase REST helpers ----------
   function authHeaders(extra){
-    return Object.assign({
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: "Bearer " + (session ? session.access_token : SUPABASE_ANON_KEY)
-    }, extra||{});
+    const h = { apikey: SUPABASE_ANON_KEY };
+    if(session && session.access_token){ h.Authorization = "Bearer " + session.access_token; }
+    return Object.assign(h, extra||{});
   }
   async function supaSelect(table, query){
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query||"select=*"}`, {headers: authHeaders()});
