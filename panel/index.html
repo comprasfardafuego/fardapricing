@@ -514,15 +514,6 @@
     }
     return {actualizados, sinMatch};
   }
-  async function crearGastoFudo(factura){
-    return fudoAction({
-      action:"create_expense",
-      fecha: factura.fecha,
-      proveedorNombre: factura.proveedor,
-      importe: factura.monto_total ?? factura.monto_neto,
-      rubro: factura.rubro
-    });
-  }
 
   function ahorroMensualTotal(){
     return ahorros.filter(a=>a.activo).reduce((s,a)=> s+(Number(a.ahorro_mensual)||0), 0);
@@ -1292,16 +1283,11 @@ Para "lineas": listá cada renglón/ítem de la factura con su cantidad, unidad 
           }
           await supaUpdate("compras_facturas", factura.id, {estado:"aprobada", stock_ingreso_id: stockIngresoId});
 
-          // Sincronización automática con FUDO (no bloquea la aprobación si falla)
+          // Sincronización automática de costos con FUDO (gratis — solo esto, sin IA de por medio)
           let fudoMsg = "";
           try{
             const { actualizados, sinMatch } = await sincronizarCostosFudo(confirmadas);
-            const gasto = await crearGastoFudo(Object.assign({}, factura, {
-              fecha: $("#ap_fecha").value, proveedor: $("#ap_proveedor").value.trim(),
-              rubro: $("#ap_rubro").value,
-              monto_neto: $("#ap_neto").value===""?null:Number($("#ap_neto").value)
-            }));
-            fudoMsg = ` · FUDO: ${actualizados} costo(s) y gasto cargado`;
+            fudoMsg = ` · FUDO: ${actualizados} costo(s) actualizados`;
             if(sinMatch.length>0) fudoMsg += ` (sin match: ${sinMatch.join(", ")})`;
           }catch(e){
             fudoMsg = " · FUDO: no se pudo sincronizar (revisar /api/fudo)";
