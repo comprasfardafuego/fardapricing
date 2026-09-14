@@ -187,6 +187,7 @@
   let activeTab = "resumen";
   let periodoTipoActivo = "mes";
   let facturasVista = "lista"; // lista | dia | proveedor
+  let proveedores = [];
   let filtro = { tipo: "mes", mes: todayISO_module(), desde: null, hasta: null };
   function todayISO_module(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
   let facturas = [], periodos = [], ahorros = [];
@@ -215,6 +216,7 @@
         <div class="tab" data-tab="cmv">CMV</div>
         <div class="tab" data-tab="simulador">Simulador</div>
         <div class="tab" data-tab="ahorros">Ahorros</div>
+        <div class="tab" data-tab="proveedores">Proveedores</div>
       </div>
       <div id="view"></div>
     </div>
@@ -423,10 +425,11 @@
 
   // ---------- Data load ----------
   async function loadAll(){
-    [facturas, periodos, ahorros] = await Promise.all([
+    [facturas, periodos, ahorros, proveedores] = await Promise.all([
       supaSelect("compras_facturas", "select=*&order=fecha.desc"),
       supaSelect("panel_periodos", "select=*&order=fecha_fin.desc"),
-      supaSelect("panel_ahorros", "select=*&order=fecha.desc")
+      supaSelect("panel_ahorros", "select=*&order=fecha.desc"),
+      supaSelect("panel_proveedores", "select=*&order=nombre.asc")
     ]);
     render();
   }
@@ -564,6 +567,7 @@
     else if(activeTab==="cmv") view.innerHTML = viewCmv();
     else if(activeTab==="simulador") view.innerHTML = viewSimulador();
     else if(activeTab==="ahorros") view.innerHTML = viewAhorros();
+    else if(activeTab==="proveedores") view.innerHTML = viewProveedores();
     bindView();
   }
 
@@ -762,9 +766,85 @@
     `;
   }
 
+  function viewProveedores(){
+    const rows = proveedores.map(p=>`
+      <div class="entry" data-provid="${p.id}" style="flex-direction:column;align-items:stretch;">
+        <div class="top"><div class="name">${escapeHtml(p.nombre)}</div>${p.activo===false?'<span class="pill nofood">inactivo</span>':''}</div>
+        <div class="meta">${escapeHtml(p.rubro||"Sin rubro")} ${p.cuit?(' · CUIT '+escapeHtml(p.cuit)):''}</div>
+        <div class="meta">${p.condicion_pago?('Pago: '+escapeHtml(p.condicion_pago)):''}${p.dia_vencimiento?(' · Vence: '+escapeHtml(p.dia_vencimiento)):''}</div>
+        ${p.contacto_nombre||p.telefono||p.email ? `<div class="meta">${escapeHtml(p.contacto_nombre||'')} ${p.telefono?('· '+escapeHtml(p.telefono)):''} ${p.email?('· '+escapeHtml(p.email)):''}</div>` : ''}
+        ${p.numero_cliente ? `<div class="meta">N° de cliente: ${escapeHtml(p.numero_cliente)}</div>` : ''}
+        ${p.acuerdos ? `<div class="meta" style="white-space:pre-wrap;">Acuerdos: ${escapeHtml(p.acuerdos)}</div>` : ''}
+      </div>`).join("");
+    return `
+      ${isEditor ? `<button class="btn-primary" style="width:100%;margin-bottom:14px;" id="btnNuevoProveedor">+ Nuevo proveedor</button>` : ""}
+      <div class="list">${proveedores.length===0 ? '<div class="empty">Sin proveedores cargados.</div>' : rows}</div>
+    `;
+  }
+
+  function openProveedorForm(p){
+    const d = p || {nombre:"",cuit:"",rubro:"",contacto_nombre:"",telefono:"",email:"",condicion_pago:"",dia_vencimiento:"",numero_cliente:"",acuerdos:"",activo:true};
+    sheetTitle.textContent = p ? "Editar proveedor" : "Nuevo proveedor";
+    const rubroOpts = RUBROS.map(r=>`<option value="${r.n}" ${d.rubro===r.n?'selected':''}>${r.n}</option>`).join("");
+    sheetBody.innerHTML = `
+      <div class="field"><label>Nombre</label><input type="text" id="pv_nombre" value="${escapeHtml(d.nombre)}"></div>
+      <div class="field"><label>CUIT</label><input type="text" id="pv_cuit" value="${escapeHtml(d.cuit)}"></div>
+      <div class="field"><label>Rubro</label><select id="pv_rubro"><option value="">Sin especificar</option>${rubroOpts}</select></div>
+      <div class="field"><label>Contacto (nombre)</label><input type="text" id="pv_contacto" value="${escapeHtml(d.contacto_nombre)}"></div>
+      <div class="field"><label>Teléfono</label><input type="text" id="pv_telefono" value="${escapeHtml(d.telefono)}"></div>
+      <div class="field"><label>Email</label><input type="email" id="pv_email" value="${escapeHtml(d.email)}"></div>
+      <div class="field"><label>Condición de pago</label><input type="text" id="pv_condicion" placeholder="Ej: Cuenta corriente 15 días" value="${escapeHtml(d.condicion_pago)}"></div>
+      <div class="field"><label>Día de vencimiento / pago</label><input type="text" id="pv_venc" placeholder="Ej: Viernes, o día 10 de cada mes" value="${escapeHtml(d.dia_vencimiento)}"></div>
+      <div class="field"><label>N° de cliente en el proveedor</label><input type="text" id="pv_numcli" value="${escapeHtml(d.numero_cliente)}"></div>
+      <div class="field"><label>Acuerdos / notas</label><textarea id="pv_acuerdos" style="min-height:70px;">${escapeHtml(d.acuerdos)}</textarea></div>
+      <div class="checkline"><input type="checkbox" id="pv_activo" ${d.activo!==false?'checked':''}><label>Proveedor activo</label></div>
+      <button class="btn-primary" style="width:100%;margin-bottom:10px;" id="btnGuardarPv">Guardar</button>
+      <button class="btn-ghost" id="btnCancelPv">Cancelar</button>
+      ${p ? `<div style="text-align:center;margin-top:10px;"><button class="btn-ghost" style="color:var(--bad);" id="btnDelPv">Eliminar proveedor</button></div>` : ""}
+    `;
+    $("#btnCancelPv").onclick = closeSheet;
+    $("#btnGuardarPv").onclick = async ()=>{
+      const body = {
+        nombre: $("#pv_nombre").value.trim(),
+        cuit: $("#pv_cuit").value.trim(),
+        rubro: $("#pv_rubro").value,
+        contacto_nombre: $("#pv_contacto").value.trim(),
+        telefono: $("#pv_telefono").value.trim(),
+        email: $("#pv_email").value.trim(),
+        condicion_pago: $("#pv_condicion").value.trim(),
+        dia_vencimiento: $("#pv_venc").value.trim(),
+        numero_cliente: $("#pv_numcli").value.trim(),
+        acuerdos: $("#pv_acuerdos").value.trim(),
+        activo: $("#pv_activo").checked
+      };
+      if(!body.nombre){ toast("Ponele un nombre al proveedor"); return; }
+      try{
+        if(p) await supaUpdate("panel_proveedores", p.id, body);
+        else await supaInsert("panel_proveedores", body);
+        await loadAll(); closeSheet(); toast("Proveedor guardado");
+      }catch(e){ toast("Error al guardar"); }
+    };
+    if(p){
+      $("#btnDelPv").onclick = async ()=>{
+        await supaDelete("panel_proveedores", p.id);
+        await loadAll(); closeSheet(); toast("Proveedor eliminado");
+      };
+    }
+    openSheet();
+  }
+
   function bindView(){
     updateRoleBtn();
     bindFiltroBar();
+    if(activeTab==="proveedores" && isEditor){
+      $("#btnNuevoProveedor").onclick = ()=> openProveedorForm(null);
+      document.querySelectorAll(".entry[data-provid]").forEach(el=>{
+        el.onclick = ()=>{
+          const p = proveedores.find(x=>x.id===el.dataset.provid);
+          if(p) openProveedorForm(p);
+        };
+      });
+    }
     if(activeTab==="facturas"){
       document.querySelectorAll("[data-vista]").forEach(b=> b.onclick = ()=>{ facturasVista=b.dataset.vista; render(); });
       document.querySelectorAll(".thumb[data-foto]").forEach(img=>{
