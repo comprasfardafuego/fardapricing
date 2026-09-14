@@ -806,6 +806,21 @@
       monto_neto:"", monto_iva:"", monto_total:"", notas:"", campos_dudosos:[]};
   }
   function resizeImage(file, maxDim, quality){
+    // createImageBitmap es mucho más liviano en memoria que Image+FileReader,
+    // clave en celulares con fotos de cámara de alta resolución.
+    if(window.createImageBitmap){
+      return createImageBitmap(file).then(bitmap=>{
+        let w=bitmap.width, h=bitmap.height;
+        if(w>h && w>maxDim){h=h*maxDim/w;w=maxDim;} else if(h>maxDim){w=w*maxDim/h;h=maxDim;}
+        const c=document.createElement("canvas"); c.width=w; c.height=h;
+        c.getContext("2d").drawImage(bitmap,0,0,w,h);
+        bitmap.close();
+        return c.toDataURL("image/jpeg",quality);
+      }).catch(()=> resizeImageLegacy(file, maxDim, quality));
+    }
+    return resizeImageLegacy(file, maxDim, quality);
+  }
+  function resizeImageLegacy(file, maxDim, quality){
     return new Promise((resolve,reject)=>{
       const img=new Image(), reader=new FileReader();
       reader.onload=e=>{ img.src=e.target.result; };
@@ -862,7 +877,7 @@ Para "lineas": listá cada renglón/ítem de la factura con su cantidad, unidad 
     sheetBody.innerHTML = `<div class="loading"><div class="spinner"></div><p>Subiendo y leyendo la factura…</p></div>`;
     pendingThumb = null;
     try{
-      const uploadImg = await resizeImage(file, 1600, 0.8);
+      const uploadImg = await resizeImage(file, 1400, 0.75);
       pendingThumb = await uploadFoto(uploadImg);
     }catch(e){ pendingThumb = null; }
     try{
