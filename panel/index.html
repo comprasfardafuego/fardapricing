@@ -486,6 +486,44 @@
     insumosCache = insumos;
   }
 
+  // ---------- Sincronización automática con FUDO ----------
+  async function fudoAction(payload){
+    const res = await fetch("/api/fudo", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if(!res.ok || data.error) throw new Error(typeof data.error==="string" ? data.error : JSON.stringify(data.error||data));
+    return data;
+  }
+  async function sincronizarCostosFudo(confirmadas){
+    // confirmadas: [{insumo_nombre, precio_unitario}] — mismo match que pricing, por nombre
+    if(confirmadas.length===0) return {actualizados:0, sinMatch:[]};
+    const { ingredients } = await fudoAction({action:"list_ingredients"});
+    let actualizados = 0; const sinMatch = [];
+    for(const c of confirmadas){
+      const match = matchInsumo(c.insumo_nombre, Object.fromEntries(ingredients.map(i=>[i.name,i])));
+      if(match){
+        const ing = ingredients.find(i=>i.name===match);
+        const final = Math.round(c.precio_unitario*1.21*100)/100;
+        await fudoAction({action:"update_ingredient", id: ing.id, cost: final});
+        actualizados++;
+      } else {
+        sinMatch.push(c.insumo_nombre);
+      }
+    }
+    return {actualizados, sinMatch};
+  }
+  async function crearGastoFudo(factura){
+    return fudoAction({
+      action:"create_expense",
+      fecha: factura.fecha,
+      proveedorNombre: factura.proveedor,
+      importe: factura.monto_total ?? factura.monto_neto,
+      rubro: factura.rubro
+    });
+  }
+
   function ahorroMensualTotal(){
     return ahorros.filter(a=>a.activo).reduce((s,a)=> s+(Number(a.ahorro_mensual)||0), 0);
   }
@@ -843,13 +881,9 @@
 {"fecha":"YYYY-MM-DD o null","proveedor":"string o null","numero_factura":"string o null","rubro":"una de: ${rubroNames}","monto_neto":number o null,"monto_iva":number o null,"monto_total":number o null,"campos_dudosos":["campos poco confiables"],"notas":"observación breve o vacío","lineas":[{"nombre":"texto tal cual figura en el renglón","cantidad":number o null,"unidad":"string o null","precio_unitario":number o null}]}
 Criterio de monto_neto: con descuentos e impuestos internos si figuran discriminados, SIN percepciones y SIN IVA. Si es Factura B sin discriminar IVA, calculá monto_neto = monto_total/1.21 y agregalo a campos_dudosos. Si un dato no se lee con confianza, ponelo null y agregalo a campos_dudosos. No inventes datos.
 Para "lineas": listá cada renglón/ítem de la factura con su cantidad, unidad y precio unitario NETO (mismo criterio que monto_neto: con impuestos internos, sin percepciones, sin IVA). Si la factura no discrimina precio unitario por línea, dejá esa línea con precio_unitario null. Si no se puede leer ningún renglón, devolvé "lineas":[].`;
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    const resp = await fetch("/api/extract", {
       method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({model:"claude-sonnet-4-6", max_tokens:1000,
-        messages:[{role:"user", content:[
-          {type:"image", source:{type:"base64", media_type:"image/jpeg", data:base64}},
-          {type:"text", text:prompt}
-        ]}]})
+      body: JSON.stringify({image_base64: base64, prompt: prompt})
     });
     const data = await resp.json();
     const tb = (data.content||[]).find(c=>c.type==="text");
@@ -1257,8 +1291,24 @@ Para "lineas": listá cada renglón/ítem de la factura con su cantidad, unidad 
             }
           }
           await supaUpdate("compras_facturas", factura.id, {estado:"aprobada", stock_ingreso_id: stockIngresoId});
+
+          // Sincronización automática con FUDO (no bloquea la aprobación si falla)
+          let fudoMsg = "";
+          try{
+            const { actualizados, sinMatch } = await sincronizarCostosFudo(confirmadas);
+            const gasto = await crearGastoFudo(Object.assign({}, factura, {
+              fecha: $("#ap_fecha").value, proveedor: $("#ap_proveedor").value.trim(),
+              rubro: $("#ap_rubro").value,
+              monto_neto: $("#ap_neto").value===""?null:Number($("#ap_neto").value)
+            }));
+            fudoMsg = ` · FUDO: ${actualizados} costo(s) y gasto cargado`;
+            if(sinMatch.length>0) fudoMsg += ` (sin match: ${sinMatch.join(", ")})`;
+          }catch(e){
+            fudoMsg = " · FUDO: no se pudo sincronizar (revisar /api/fudo)";
+          }
+
           await loadAll(); closeSheet();
-          toast(conVariante.length>0 ? "Aprobada — ingreso creado en stock" : "Aprobada");
+          toast((conVariante.length>0 ? "Aprobada — ingreso creado en stock" : "Aprobada") + fudoMsg);
         }catch(e){ toast("Error al aprobar — revisá la conexión"); }
       };
     }
