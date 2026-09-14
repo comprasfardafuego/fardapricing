@@ -185,6 +185,8 @@
   let activeTab = "resumen";
   let periodoTipoActivo = "mes";
   let facturasVista = "lista"; // lista | dia | proveedor
+  let filtro = { tipo: "mes", mes: todayISO_module(), desde: null, hasta: null };
+  function todayISO_module(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
   let facturas = [], periodos = [], ahorros = [];
   let pendingThumb = null;
   let pendingLineas = [];      // líneas extraídas de la última foto, a la espera de revisión
@@ -239,6 +241,42 @@
     return {cls:"bad",label:"fuera de objetivo"};
   }
   function todayISO(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+
+  // ---------- Filtro de fecha compartido (Facturas / Resumen / CMV) ----------
+  function fechaEnFiltro(fechaISO){
+    if(!fechaISO) return false;
+    if(filtro.tipo==="todo") return true;
+    if(filtro.tipo==="mes") return fechaISO.slice(0,7)===filtro.mes;
+    if(filtro.tipo==="rango"){
+      if(filtro.desde && fechaISO < filtro.desde) return false;
+      if(filtro.hasta && fechaISO > filtro.hasta) return false;
+      return true;
+    }
+    return true;
+  }
+  function renderFiltroBar(){
+    return `
+      <div class="seg" style="margin-bottom:8px;">
+        <button data-ftipo="mes" class="${filtro.tipo==='mes'?'active':''}">Mes</button>
+        <button data-ftipo="rango" class="${filtro.tipo==='rango'?'active':''}">Rango</button>
+        <button data-ftipo="todo" class="${filtro.tipo==='todo'?'active':''}">Todo</button>
+      </div>
+      ${filtro.tipo==='mes' ? `<div class="field"><input type="month" id="filtroMesInput" value="${filtro.mes}"></div>` : ""}
+      ${filtro.tipo==='rango' ? `<div style="display:flex;gap:8px;">
+        <div class="field" style="flex:1;"><label>Desde</label><input type="date" id="filtroDesdeInput" value="${filtro.desde||''}"></div>
+        <div class="field" style="flex:1;"><label>Hasta</label><input type="date" id="filtroHastaInput" value="${filtro.hasta||''}"></div>
+      </div>` : ""}
+    `;
+  }
+  function bindFiltroBar(){
+    document.querySelectorAll("[data-ftipo]").forEach(b=> b.onclick = ()=>{ filtro.tipo=b.dataset.ftipo; render(); });
+    const mi = document.getElementById("filtroMesInput");
+    if(mi) mi.onchange = ()=>{ filtro.mes = mi.value; render(); };
+    const di = document.getElementById("filtroDesdeInput");
+    if(di) di.onchange = ()=>{ filtro.desde = di.value; render(); };
+    const hi = document.getElementById("filtroHastaInput");
+    if(hi) hi.onchange = ()=>{ filtro.hasta = hi.value; render(); };
+  }
 
   // ---------- Supabase REST helpers ----------
   function authHeaders(extra){
@@ -499,17 +537,23 @@
   }
 
   function viewResumen(){
-    const mes = periodos.filter(p=>p.tipo==="mes").sort((a,b)=>b.fecha_fin.localeCompare(a.fecha_fin))[0];
+    let mes;
+    if(filtro.tipo==="mes"){
+      mes = periodos.find(p=> p.tipo==="mes" && p.fecha_inicio.slice(0,7)===filtro.mes);
+    } else {
+      mes = periodos.filter(p=>p.tipo==="mes").sort((a,b)=>b.fecha_fin.localeCompare(a.fecha_fin))[0];
+    }
     let calc = null;
     if(mes) calc = calcularCmv(mes);
     const band = calc ? cmvBand(calc.cmvPct) : {cls:"",label:""};
     const limpieza = mes ? (limpiezaDescEnRango(mes.fecha_inicio, mes.fecha_fin) / (mes.ventas||1) * 100) : null;
     return `
+      ${renderFiltroBar()}
       <div class="card-grid">
       <div class="card">
-        <div class="label">CMV del último mes cargado</div>
+        <div class="label">CMV del mes ${filtro.tipo==="mes"?"seleccionado":"más reciente cargado"}</div>
         <div class="big mono">${calc ? fmtPct(calc.cmvPct) : "Sin datos"}</div>
-        ${calc ? `<span class="pill ${band.cls}">${band.label} · objetivo ${OBJ_MIN}–${OBJ_MAX}%</span>` : `<div class="sub">Cargá un período en la pestaña CMV</div>`}
+        ${calc ? `<span class="pill ${band.cls}">${band.label} · objetivo ${OBJ_MIN}–${OBJ_MAX}%</span>` : `<div class="sub">No hay período de tipo "mes" cargado para esta selección</div>`}
         ${calc && !calc.tieneAnterior ? `<div class="sub">Sin período anterior — E.I. tomado como $0</div>` : ""}
       </div>
       ${mes ? `<div class="card">
@@ -578,7 +622,7 @@
         <button class="btn-primary" id="btnFoto">📷 Nueva factura</button>
         <button class="btn-secondary" id="btnManual">Cargar a mano</button>
       </div>` : `<div class="note">Iniciá sesión como editor para cargar facturas.</div>`;
-    const listadas = facturas.filter(f=> f.estado!=="pendiente");
+    const listadas = facturas.filter(f=> f.estado!=="pendiente" && fechaEnFiltro(f.fecha));
     const seg = `<div class="seg">
       <button data-vista="lista" class="${facturasVista==='lista'?'active':''}">Lista</button>
       <button data-vista="dia" class="${facturasVista==='dia'?'active':''}">Por día</button>
@@ -599,9 +643,9 @@
             </div>
           </div>
         </div>`).join("");
-      body = `<div class="list">${listadas.length===0?'<div class="empty">Sin facturas aprobadas todavía.</div>':rows}</div>`;
+      body = `<div class="list">${listadas.length===0?'<div class="empty">Sin facturas en este período.</div>':rows}</div>`;
     }
-    return `${addBtns}${seg}${body}`;
+    return `${addBtns}${renderFiltroBar()}${seg}${body}`;
   }
 
   function viewPendientes(){
@@ -622,15 +666,16 @@
   }
 
   function viewCmv(){
-    const list = periodos.filter(p=>p.tipo===periodoTipoActivo);
+    const list = periodos.filter(p=>p.tipo===periodoTipoActivo && fechaEnFiltro(p.fecha_inicio));
     return `
+      ${renderFiltroBar()}
       <div class="seg">
         <button data-tipo="semana" class="${periodoTipoActivo==='semana'?'active':''}">Semanal</button>
         <button data-tipo="quincena" class="${periodoTipoActivo==='quincena'?'active':''}">Quincenal</button>
         <button data-tipo="mes" class="${periodoTipoActivo==='mes'?'active':''}">Mensual</button>
       </div>
       ${isEditor ? `<button class="btn-primary" id="btnNuevoPeriodo" style="width:100%;margin-bottom:14px;">+ Cargar período</button>` : ""}
-      ${list.length===0 ? `<div class="empty">No hay períodos ${periodoTipoActivo}es cargados.</div>` :
+      ${list.length===0 ? `<div class="empty">No hay períodos ${periodoTipoActivo}es en este filtro.</div>` :
         list.map(p=>{
           const c = calcularCmv(p);
           const b = cmvBand(c.cmvPct);
@@ -688,6 +733,7 @@
 
   function bindView(){
     updateRoleBtn();
+    bindFiltroBar();
     if(activeTab==="facturas"){
       document.querySelectorAll("[data-vista]").forEach(b=> b.onclick = ()=>{ facturasVista=b.dataset.vista; render(); });
       document.querySelectorAll(".thumb[data-foto]").forEach(img=>{
