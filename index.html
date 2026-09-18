@@ -1971,8 +1971,14 @@ function renderComparativa() {
     h += `<div style="display:flex;flex-direction:column;gap:6px;">
       <input class="ins-input" style="width:160px;" value="${(loc||'').replace(/"/g,'&quot;')}" ${isViewer?'disabled':''} placeholder="Nombre del local" onchange="renombrarLocalComparativa(${idx}, this.value)">
       <input class="ins-input" style="width:160px;font-size:11px;" value="${(competencia.urls[idx]||'').replace(/"/g,'&quot;')}" ${isViewer?'disabled':''} placeholder="URL de la carta" onchange="setUrlComparativa(${idx}, this.value)">
+      ${!isViewer && competencia.locations.length > 1 ? `<button class="logout-btn" style="padding:4px 8px;font-size:11px;" onclick="quitarLocalComparativa(${idx})">Quitar local</button>` : ''}
     </div>`;
   });
+  if (!isViewer) {
+    h += `<div style="display:flex;align-items:flex-end;">
+      <button class="btn" style="padding:8px 14px;font-size:12px;" onclick="agregarLocalComparativa()">+ Agregar local</button>
+    </div>`;
+  }
   h += `</div></div>`;
 
   h += `<div class="table-container"><table><thead><tr><th>Plato</th><th class="right">FARDA</th>`;
@@ -2028,6 +2034,27 @@ function updateSimCompDiff(inp) {
 function renombrarLocalComparativa(idx, valor) {
   if (blockIfViewer()) return;
   competencia.locations[idx] = valor;
+  saveStateDebounced();
+  renderComparativa();
+}
+
+function agregarLocalComparativa() {
+  if (blockIfViewer()) return;
+  competencia.locations.push('Nuevo local');
+  competencia.urls.push('');
+  saveStateDebounced();
+  renderComparativa();
+}
+
+function quitarLocalComparativa(idx) {
+  if (blockIfViewer()) return;
+  const nombre = competencia.locations[idx] || ('Local ' + (idx + 1));
+  if (!confirm(`¿Quitar "${nombre}"? Se van a perder los precios cargados para ese local en todos los platos.`)) return;
+  competencia.locations.splice(idx, 1);
+  competencia.urls.splice(idx, 1);
+  Object.keys(competencia.prices).forEach(plato => {
+    if (competencia.prices[plato]) competencia.prices[plato].splice(idx, 1);
+  });
   saveStateDebounced();
   renderComparativa();
 }
