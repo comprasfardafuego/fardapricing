@@ -2,11 +2,13 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
+<meta name="color-scheme" content="light">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>FARDA · Conteo</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
 <style>
 :root{
+  color-scheme: light;
   --navy:#1F2A44; --navy-2:#2B3A5C; --rust:#B5532C; --rust-2:#C9663C;
   --cream:#F5EFE3; --bg:#F7F5F1; --card:#FFFFFF; --line:#E2DDD4;
   --ink:#1A1A1A; --muted:#6B6B6B; --ok:#2E7D52; --warn:#8F3D21;
@@ -76,10 +78,9 @@ td.r,th.r{text-align:right}
 .center{text-align:center} .hide{display:none!important}
 a.link{color:var(--navy);font-size:.85rem}
 select.mini{padding:7px 9px;font-size:.8rem;border-radius:9px;width:auto}
-@media (prefers-color-scheme: dark){
-  :root{--bg:#14161A;--card:#1C1F25;--line:#2E333C;--ink:#ECEAE6;--muted:#9A9A9A;--cream:#242830}
-  .item,.chips button,.pad button,input,select{background:var(--card);color:var(--ink)}
-}
+.nuevo{display:inline-block;background:var(--rust);color:#fff;font-size:.62rem;font-weight:700;
+  padding:2px 6px;border-radius:999px;vertical-align:middle;margin-left:6px;letter-spacing:.03em;text-transform:uppercase}
+
 </style>
 </head>
 <body>
@@ -103,8 +104,10 @@ const MOTIVOS_DIF = [
 const S = {
   user:null, variantes:[], depositos:[], insumos:{}, stock:{},
   sesiones:[], sesion:null, items:{},      // variante_id -> fila de stock_conteo_items
-  vista:'home', modo:'foco', idx:0, buffer:'', busca:'',
-  guardando:false, cerrando:false, motivosDif:{}, msg:''
+  vista:'home', modo:'lista', idx:0, buffer:'', busca:'', filtro:'pend', desdeLista:true,
+  guardando:false, cerrando:false, motivosDif:{}, msg:'',
+  nuevos:{},                                // variante_id de los dados de alta en este conteo
+  alta:{nombre:'',unidad:'kg',cantidad:''}  // formulario de "no está en la lista"
 };
 
 /* ---------------- carga ---------------- */
@@ -133,6 +136,7 @@ async function abrirSesion(s){
   const pend = lista.findIndex(v=>!S.items[v.id]);
   S.idx = pend >= 0 ? pend : 0;
   S.buffer = '';
+  S.modo = 'lista'; S.busca=''; S.filtro='pend';
   S.vista = 'contando';
   render();
 }
@@ -157,7 +161,8 @@ function render(){
   document.getElementById('who').textContent = S.user?S.user.nombre:'';
   document.getElementById('btnOut').classList.toggle('hide', !S.user);
   if(!S.user){ app.innerHTML = viewLogin(); return; }
-  if(S.vista==='contando') app.innerHTML = (S.modo==='foco')?viewFoco():viewLista();
+  if(S.vista==='alta') app.innerHTML = viewAlta();
+  else if(S.vista==='contando') app.innerHTML = (S.modo==='foco')?viewFoco():viewLista();
   else if(S.vista==='cierre') app.innerHTML = viewCierre();
   else app.innerHTML = viewHome();
   const m=document.getElementById('msgSlot');
@@ -214,7 +219,7 @@ function viewFoco(){
   <div class="card">
     <div class="between">
       <span class="small muted">${esc(dep?dep.nombre:'')}</span>
-      <button class="small" style="color:var(--navy);font-weight:600" onclick="S.modo='lista';render()">Ver lista</button>
+      <button class="small" style="color:var(--navy);font-weight:600" onclick="S.modo='lista';S.busca='';render()">‹ Buscador</button>
     </div>
     <div class="prog">
       <div class="bar"><i style="width:${pct}%"></i></div>
@@ -238,7 +243,8 @@ function viewFoco(){
     <button class="btn ghost" style="margin-top:8px" onclick="mover(1)">Saltear por ahora ›</button>
   </div>
 
-  <button class="btn" style="margin-top:12px;background:var(--ok)" onclick="irCierre()">Cerrar el conteo</button>
+  <button class="btn ghost" style="margin-top:12px" onclick="abrirAlta()">Encontré algo que no está en la lista</button>
+  <button class="btn" style="margin-top:8px;background:var(--ok)" onclick="irCierre()">Cerrar el conteo</button>
   <button class="btn ghost" style="margin-top:8px" onclick="S.vista='home';S.sesion=null;render()">Dejarlo para después</button>`;
 }
 
@@ -246,27 +252,107 @@ function viewLista(){
   const lista=listaVariantes();
   const dep=S.depositos.find(d=>d.id===S.sesion.deposito_id);
   const q=norm(S.busca).trim();
-  const vis=q?lista.filter(v=>norm(v.nombre||v.insumo_nombre).includes(q)):lista;
+  const pend=lista.length-contados();
+
+  /* el buscador manda: si escribís, ves todo lo que coincide sin importar el filtro */
+  let vis = lista;
+  if(q) vis = lista.filter(v=>norm((v.nombre||'')+' '+(v.insumo_nombre||'')+' '+(v.marca||'')).includes(q));
+  else if(S.filtro==='pend') vis = lista.filter(v=>!S.items[v.id]);
+  else if(S.filtro==='hechos') vis = lista.filter(v=>S.items[v.id]);
+
   const filas=vis.map(v=>{
     const it=S.items[v.id];
     const i=lista.indexOf(v);
     return `<button class="item ${it?'':'pend'}" onclick="irA(${i})">
-      <span><b>${esc(v.nombre||v.insumo_nombre)}</b>
-      <span class="sub">${esc([v.marca,v.presentacion].filter(Boolean).join(' · '))}</span></span>
-      <span class="val">${it?num(it.cantidad_contada)+' '+esc(unidadVariante(v,S.insumos)):'pendiente'}</span></button>`;
+      <span><b>${esc(v.nombre||v.insumo_nombre)}${S.nuevos[v.id]?' <span class="nuevo">nuevo</span>':''}</b>
+      <span class="sub">${esc([v.marca,v.presentacion].filter(Boolean).join(' · '))||esc(unidadVariante(v,S.insumos))}</span></span>
+      <span class="val">${it?num(it.cantidad_contada)+' '+esc(unidadVariante(v,S.insumos)):'contar'}</span></button>`;
   }).join('');
+
+  const vacio = q
+    ? `<div class="center" style="padding:18px 6px">
+         <p class="muted small">Nada se llama así en ${esc(dep?dep.nombre:'')}.</p>
+         <button class="btn rust" style="margin-top:6px" onclick="abrirAlta('${esc(S.busca).replace(/'/g,"&#39;")}')">Agregar «${esc(S.busca)}»</button>
+       </div>`
+    : `<p class="muted small center" style="padding:18px">${S.filtro==='pend'?'No queda nada pendiente.':'Nada para mostrar.'}</p>`;
+
+  const pct=lista.length?Math.round(contados()/lista.length*100):0;
 
   return `<div id="msgSlot"></div>
   <div class="card">
     <div class="between">
-      <h2 style="margin:0">${esc(dep?dep.nombre:'')} · ${contados()}/${lista.length}</h2>
-      <button class="small" style="color:var(--navy);font-weight:600" onclick="S.modo='foco';render()">Modo foco</button>
+      <h2 style="margin:0">${esc(dep?dep.nombre:'')}</h2>
+      <button class="small" style="color:var(--navy);font-weight:600" onclick="S.desdeLista=false;S.modo='foco';render()">Recorrer uno por uno ›</button>
     </div>
-    <input placeholder="Buscar…" value="${esc(S.busca)}" oninput="S.busca=this.value;render()" style="margin-top:10px" autocomplete="off">
-    <div class="list">${filas||'<p class="muted small center" style="padding:18px">Nada con ese nombre.</p>'}</div>
+    <div class="prog">
+      <div class="bar"><i style="width:${pct}%"></i></div>
+      <span>${contados()}/${lista.length}</span>
+    </div>
+
+    <input id="buscador" placeholder="Buscar lo que tenés en la mano…" value="${esc(S.busca)}"
+      oninput="S.busca=this.value;render();const e=document.getElementById('buscador');if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length);}"
+      autocomplete="off" style="margin-top:12px">
+
+    <div class="chips" style="margin-top:10px">
+      <button class="${!q&&S.filtro==='pend'?'on':''}" onclick="S.busca='';S.filtro='pend';render()">Faltan ${pend}</button>
+      <button class="${!q&&S.filtro==='hechos'?'on':''}" onclick="S.busca='';S.filtro='hechos';render()">Contados ${contados()}</button>
+      <button class="${!q&&S.filtro==='todos'?'on':''}" onclick="S.busca='';S.filtro='todos';render()">Todos ${lista.length}</button>
+    </div>
+
+    <div class="list">${filas||vacio}</div>
   </div>
-  <button class="btn" style="margin-top:12px;background:var(--ok)" onclick="irCierre()">Cerrar el conteo</button>
+
+  <button class="btn ghost" style="margin-top:12px" onclick="abrirAlta()">Agregar un insumo que no está</button>
+  <button class="btn" style="margin-top:8px;background:var(--ok)" onclick="irCierre()">Cerrar el conteo</button>
   <button class="btn ghost" style="margin-top:8px" onclick="S.vista='home';S.sesion=null;render()">Dejarlo para después</button>`;
+}
+
+function viewAlta(){
+  const dep=S.depositos.find(d=>d.id===S.sesion.deposito_id);
+  const unidades=['kg','litro','unidad','caja','bolsa','botella'];
+  const yaExiste=S.alta.nombre.trim()
+    ? S.variantes.find(v=>norm(v.nombre||v.insumo_nombre)===norm(S.alta.nombre.trim()))
+    : null;
+  return `<div class="card">
+    <h2>Algo que no está en la lista</h2>
+    <p class="small muted" style="margin-top:-6px">Se da de alta en ${esc(dep?dep.nombre:'')} y entra al conteo con lo que cuentes ahora.</p>
+
+    <label class="small muted" style="display:block;margin-top:12px">¿Qué es?</label>
+    <input id="altaNombre" placeholder="Nombre del insumo" value="${esc(S.alta.nombre)}"
+      oninput="S.alta.nombre=this.value;chequearAlta()" autocomplete="off">
+    <div id="altaAviso">${yaExiste?avisoExiste(yaExiste):''}</div>
+
+    <label class="small muted" style="display:block;margin-top:12px">¿En qué se cuenta?</label>
+    <div class="chips" style="margin-top:6px">
+      ${unidades.map(u=>`<button class="${S.alta.unidad===u?'on':''}" onclick="S.alta.unidad='${u}';render()">${u}</button>`).join('')}
+    </div>
+
+    <label class="small muted" style="display:block;margin-top:12px">¿Cuánto hay?</label>
+    <input type="number" step="any" inputmode="decimal" placeholder="0" value="${esc(S.alta.cantidad)}"
+      oninput="S.alta.cantidad=this.value" autocomplete="off">
+
+    <div id="altaMsg"></div>
+    <div class="foot">
+      <button class="btn ghost" onclick="S.vista='contando';render()">Cancelar</button>
+      <button class="btn rust" id="btnAlta" onclick="guardarAlta()">Agregar y contar</button>
+    </div>
+  </div>`;
+}
+
+function avisoExiste(v){
+  const dep=S.depositos.find(d=>d.id===v.deposito_id);
+  return `<div class="msg info">Ya existe como <b>${esc(v.nombre||v.insumo_nombre)}</b>`
+    + (v.deposito_id===S.sesion.deposito_id
+        ? `, en este mismo depósito. Buscalo en la lista en vez de darlo de alta.`
+        : `, pero en ${esc(dep?dep.nombre:'otro depósito')}. Si lo guardás, se muda acá.`)
+    + `</div>`;
+}
+
+function chequearAlta(){
+  const el=document.getElementById('altaAviso'); if(!el) return;
+  const n=S.alta.nombre.trim();
+  const v=n?S.variantes.find(x=>norm(x.nombre||x.insumo_nombre)===norm(n)):null;
+  el.innerHTML=v?avisoExiste(v):'';
 }
 
 function viewCierre(){
@@ -341,11 +427,11 @@ function tecla(t){
   else S.buffer+=t;
   render();
 }
-function irA(i){ S.idx=i; S.buffer=''; S.modo='foco'; render(); }
+function irA(i){ S.idx=i; S.buffer=''; S.desdeLista=true; S.modo='foco'; render(); }
 function mover(d){
   const lista=listaVariantes();
   S.idx=Math.max(0,Math.min(lista.length-1,S.idx+d));
-  S.buffer=''; render();
+  S.buffer=''; S.desdeLista=false; render();
 }
 
 /* guarda el ítem al toque: si se corta la luz, no se pierde nada */
@@ -369,12 +455,75 @@ async function guardarItem(){
     });
     S.items[v.id]=(r&&r[0])||fila;
     S.buffer='';
-    const sig=lista.findIndex((x,i)=>i>S.idx && !S.items[x.id]);
-    S.idx = sig>=0 ? sig : Math.min(S.idx+1, lista.length-1);
+    if(S.desdeLista){
+      /* venía del buscador: vuelve ahí con el campo limpio para el próximo */
+      S.modo='lista'; S.busca='';
+      S.msg=`<div class="msg ok">${esc(v.nombre||v.insumo_nombre)}: ${num(val)} ${esc(unidadVariante(v,S.insumos))}</div>`;
+    }else{
+      const sig=lista.findIndex((x,i)=>i>S.idx && !S.items[x.id]);
+      S.idx = sig>=0 ? sig : Math.min(S.idx+1, lista.length-1);
+    }
     render();
+    if(S.modo==='lista'){ const el=document.getElementById('buscador'); if(el) el.focus(); }
   }catch(e){
     S.msg=`<div class="msg err">No se pudo guardar: ${esc(e.message)}</div>`;
     render();
+  }finally{ S.guardando=false; }
+}
+
+function abrirAlta(nombre){
+  S.alta={nombre:nombre||S.busca||'',unidad:'kg',cantidad:''};
+  S.vista='alta'; render();
+  const el=document.getElementById('altaNombre'); if(el) el.focus();
+}
+
+/* da de alta la variante en el depósito de la sesión y la cuenta en el acto */
+async function guardarAlta(){
+  if(S.guardando) return;
+  const nombre=S.alta.nombre.trim();
+  const cant=parseFloat(S.alta.cantidad);
+  const msg=document.getElementById('altaMsg');
+  if(!nombre){ if(msg) msg.innerHTML='<div class="msg err">Ponele un nombre.</div>'; return; }
+  if(isNaN(cant)||cant<0){ if(msg) msg.innerHTML='<div class="msg err">Falta la cantidad.</div>'; return; }
+  S.guardando=true;
+  const btn=document.getElementById('btnAlta');
+  if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
+  try{
+    let v=S.variantes.find(x=>norm(x.nombre||x.insumo_nombre)===norm(nombre));
+    if(v){
+      /* existía en otro depósito: lo mudamos al que se está contando */
+      if(v.deposito_id!==S.sesion.deposito_id){
+        await sb('stock_variantes?id=eq.'+v.id,{method:'PATCH',body:JSON.stringify({deposito_id:S.sesion.deposito_id})});
+        v.deposito_id=S.sesion.deposito_id;
+      }
+    }else{
+      const r=await sb('stock_variantes',{method:'POST',body:JSON.stringify({
+        insumo_nombre:nombre, nombre:nombre, presentacion:S.alta.unidad,
+        unidad_conversion:1, deposito_id:S.sesion.deposito_id, activo:true, confirmada:false
+      })});
+      v=r[0];
+      S.variantes.push(v);
+    }
+    S.nuevos[v.id]=true;
+    const teo=stockDe(S.stock, v.id, S.sesion.deposito_id);
+    const r2=await sb('stock_conteo_items?on_conflict=sesion_id,variante_id',{
+      method:'POST',
+      body:JSON.stringify({
+        sesion_id:S.sesion.id, variante_id:v.id,
+        cantidad_contada:cant, cantidad_teorica:teo,
+        costo_unitario:costoVariante(v,S.insumos),
+        usuario_id:S.user.id, contado_en:new Date().toISOString()
+      }),
+      prefer:'resolution=merge-duplicates,return=representation'
+    });
+    S.items[v.id]=(r2&&r2[0])||{variante_id:v.id,cantidad_contada:cant,cantidad_teorica:teo};
+    S.msg=`<div class="msg ok">Agregado: ${esc(nombre)} · ${num(cant)} ${esc(S.alta.unidad)}</div>`;
+    S.alta={nombre:'',unidad:'kg',cantidad:''};
+    S.vista='contando'; S.modo='lista'; S.busca='';
+    render();
+  }catch(e){
+    if(msg) msg.innerHTML=`<div class="msg err">${esc(e.message)}</div>`;
+    if(btn){ btn.disabled=false; btn.textContent='Agregar y contar'; }
   }finally{ S.guardando=false; }
 }
 
