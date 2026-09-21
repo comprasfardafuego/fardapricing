@@ -2,11 +2,13 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
+<meta name="color-scheme" content="light">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>FARDA · Desperdicios</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗑️</text></svg>">
 <style>
 :root{
+  color-scheme: light;
   --navy:#1F2A44; --navy-2:#2B3A5C; --rust:#B5532C; --rust-2:#C9663C;
   --cream:#F5EFE3; --bg:#F7F5F1; --card:#FFFFFF; --line:#E2DDD4;
   --ink:#1A1A1A; --muted:#6B6B6B; --ok:#2E7D52; --warn:#8F3D21;
@@ -85,11 +87,7 @@ td.r,th.r{text-align:right}
 a.link{color:var(--navy);font-size:.85rem}
 .foot{margin-top:18px;display:flex;gap:10px}
 .foot button{flex:1}
-@media (prefers-color-scheme: dark){
-  :root{--bg:#14161A;--card:#1C1F25;--line:#2E333C;--ink:#ECEAE6;--muted:#9A9A9A;--cream:#242830;--navy:#1F2A44}
-  .item,.motivos button,.chips button,.pad button,input,select{background:var(--card);color:var(--ink)}
-  .tabs button.on{background:var(--card)}
-}
+
 </style>
 </head>
 <body>
