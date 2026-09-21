@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FARDA · Desperdicios</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗑️</text></svg>">
+<style>
+:root{
+  --navy:#1F2A44; --navy-2:#2B3A5C; --rust:#B5532C; --rust-2:#C9663C;
+  --cream:#F5EFE3; --bg:#F7F5F1; --card:#FFFFFF; --line:#E2DDD4;
+  --ink:#1A1A1A; --muted:#6B6B6B; --ok:#2E7D52; --warn:#8F3D21;
+  --pad:16px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  background:var(--bg); color:var(--ink); font-size:16px; line-height:1.45;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.wrap{max-width:560px;margin:0 auto;padding:0 var(--pad) 40px}
+header{
+  background:var(--navy); color:#fff; padding:14px var(--pad);
+  padding-top:calc(14px + env(safe-area-inset-top));
+  display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:50
+}
+header h1{font-size:1rem;margin:0;font-weight:700;letter-spacing:.02em;flex:1}
+header .who{font-size:.75rem;opacity:.75}
+header button{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:8px;padding:6px 10px;font-size:.75rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:14px}
+h2{font-size:.95rem;margin:0 0 10px;color:var(--navy)}
+.muted{color:var(--muted)}
+.small{font-size:.8rem}
+.row{display:flex;gap:10px;align-items:center}
+.between{display:flex;justify-content:space-between;align-items:center;gap:10px}
+button{font-family:inherit;font-size:1rem;cursor:pointer;border:none;background:none;color:inherit}
+.btn{background:var(--navy);color:#fff;border-radius:12px;padding:14px 18px;font-weight:600;width:100%;display:block}
+.btn:active{background:var(--navy-2)}
+.btn.rust{background:var(--rust)} .btn.rust:active{background:var(--rust-2)}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.btn.lg{font-size:1.1rem;padding:18px}
+.btn[disabled]{opacity:.4}
+input,select{font-family:inherit;font-size:1rem;width:100%;padding:13px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--ink)}
+input:focus,select:focus{outline:2px solid var(--navy);outline-offset:-1px}
+.kpi{display:flex;gap:10px;margin-top:14px}
+.kpi>div{flex:1;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.kpi .n{font-size:1.5rem;font-weight:700;color:var(--navy);line-height:1.15}
+.kpi .l{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+.tabs{display:flex;gap:6px;background:var(--cream);padding:4px;border-radius:12px;margin-bottom:12px}
+.tabs button{flex:1;padding:10px 6px;border-radius:9px;font-size:.85rem;font-weight:600;color:var(--muted)}
+.tabs button.on{background:#fff;color:var(--navy);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.list{margin-top:10px;max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.item{width:100%;text-align:left;padding:13px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;margin-bottom:8px;display:block}
+.item:active{background:var(--cream)}
+.item b{display:block;font-weight:600;font-size:.95rem}
+.item .sub{font-size:.75rem;color:var(--muted);margin-top:2px}
+.motivos{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.motivos button{padding:15px 10px;border:1px solid var(--line);border-radius:12px;background:#fff;font-size:.85rem;font-weight:600;line-height:1.25;text-align:center}
+.motivos button:active,.motivos button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips button{padding:11px 14px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:.85rem;font-weight:600}
+.chips button.on{background:var(--rust);color:#fff;border-color:var(--rust)}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.pad button{padding:18px 0;border-radius:12px;background:#fff;border:1px solid var(--line);font-size:1.35rem;font-weight:600}
+.pad button:active{background:var(--cream)}
+.pad .wide{grid-column:span 2}
+.display{font-size:2.6rem;font-weight:700;text-align:center;color:var(--navy);padding:14px 0;letter-spacing:-.02em}
+.display small{display:block;font-size:.85rem;font-weight:500;color:var(--muted);letter-spacing:0}
+.step{font-size:.72rem;color:var(--rust);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:6px}
+.resumen{background:var(--cream);border-radius:12px;padding:14px;margin:12px 0}
+.resumen div{display:flex;justify-content:space-between;padding:4px 0;font-size:.9rem}
+.resumen div b{font-weight:600;text-align:right}
+.msg{padding:12px 14px;border-radius:12px;margin-top:12px;font-size:.88rem}
+.msg.ok{background:#E6F4EC;color:var(--ok)}
+.msg.err{background:#FBE6DF;color:var(--warn)}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th{text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:6px 4px;border-bottom:1px solid var(--line)}
+td{padding:9px 4px;border-bottom:1px solid #F0EDE7;vertical-align:top}
+td.r,th.r{text-align:right}
+.bar{height:6px;background:var(--cream);border-radius:999px;overflow:hidden;margin-top:5px}
+.bar i{display:block;height:100%;background:var(--rust)}
+.center{text-align:center}
+.hide{display:none!important}
+a.link{color:var(--navy);font-size:.85rem}
+.foot{margin-top:18px;display:flex;gap:10px}
+.foot button{flex:1}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#14161A;--card:#1C1F25;--line:#2E333C;--ink:#ECEAE6;--muted:#9A9A9A;--cream:#242830;--navy:#1F2A44}
+  .item,.motivos button,.chips button,.pad button,input,select{background:var(--card);color:var(--ink)}
+  .tabs button.on{background:var(--card)}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>FARDA · Desperdicios</h1>
+  <span class="who" id="who"></span>
+  <button onclick="logout()" id="btnOut" class="hide">Salir</button>
+</header>
+
+<div class="wrap" id="app"></div>
+
+<script src="./farda-stock-core.js"></script>
+<script>
+/* ============================================================
+   Estado
+   ============================================================ */
+const MOTIVOS = [
+  'Vencido',
+  'Mal estado al recibir',
+  'Roto o derramado',
+  'Error de cocina',
+  'Devolución de cliente',
+  'Prueba o degustación',
+  'Despunte de preparación',
+  'Merma de producción',
+  'Rotura de vajilla',
+  'Faltante sin explicación',
+  'Otro'
+];
+/* motivos que NO son pérdida evitable: se reportan aparte */
+const MOTIVOS_NORMALES = ['Despunte de preparación', 'Merma de producción'];
+
+const S = {
+  user: null,
+  variantes: [],
+  platos: [],
+  depositos: [],
+  insumos: {},
+  stock: {},
+  mermasHoy: [],
+  vista: 'home',
+  // wizard
+  paso: 1,
+  tipo: 'insumo',
+  item: null,
+  cantidad: '',
+  motivo: null,
+  deposito: null,
+  nota: '',
+  busca: '',
+  guardando: false,
+  // reporte
+  desde: '', hasta: '', mermasRep: []
+};
+
+/* ============================================================
+   Carga
+   ============================================================ */
+async function cargar() {
+  const [vars, plats, deps, ps, movs] = await Promise.all([
+    sb('stock_variantes?select=id,insumo_nombre,nombre,marca,presentacion,unidad_conversion,deposito_id,activo&limit=2000'),
+    sb('stock_platos?select=id,nombre,categoria,costo,precio&activo=is.true&order=nombre&limit=500'),
+    sb('stock_depositos?select=id,nombre&order=id'),
+    sb('pricing_state?select=insumos&id=eq.1'),
+    sb('stock_movimientos?select=variante_id,deposito_id,tipo,cantidad,anulado&limit=10000')
+  ]);
+  S.variantes = vars.filter(v => v.activo !== false);
+  S.platos = plats;
+  S.depositos = deps;
+  S.insumos = (ps[0] && ps[0].insumos) || {};
+  S.stock = calcularStock(movs);
+  await cargarMermasHoy();
+}
+
+async function cargarMermasHoy() {
+  const d = hoy();
+  S.mermasHoy = await sb('stock_mermas?select=*&anulado=is.false&fecha=gte.' + d + 'T00:00:00&order=fecha.desc');
+}
+
+/* ============================================================
+   Helpers de ítem
+   ============================================================ */
+function itemsDelTipo() {
+  if (S.tipo === 'plato') {
+    return S.platos.map(p => ({
+      key: 'p' + p.id, plato_id: p.id, nombre: p.nombre,
+      sub: p.categoria || '', costo: p.costo, unidad: 'porción', variante_id: null
+    }));
+  }
+  const quiereProd = S.tipo === 'produccion';
+  return S.variantes
+    .filter(v => esProduccion(v) === quiereProd)
+    .map(v => ({
+      key: 'v' + v.id, variante_id: v.id, plato_id: null,
+      nombre: v.nombre || v.insumo_nombre,
+      sub: [v.marca, v.presentacion].filter(Boolean).join(' · '),
+      costo: costoVariante(v, S.insumos),
+      unidad: unidadVariante(v, S.insumos),
+      deposito_id: v.deposito_id
+    }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+}
+
+function filtrados() {
+  const q = norm(S.busca).trim();
+  const all = itemsDelTipo();
+  if (!q) return all.slice(0, 80);
+  return all.filter(i => norm(i.nombre).includes(q) || norm(i.sub).includes(q)).slice(0, 80);
+}
+
+const costoTotal = () => {
+  const c = S.item && S.item.costo;
+  const q = parseFloat(S.cantidad);
+  if (!c || !q) return null;
+  return c * q;
+};
+
+/* ============================================================
+   Vistas
+   ============================================================ */
+function render() {
+  const app = document.getElementById('app');
+  document.getElementById('who').textContent = S.user ? S.user.nombre : '';
+  document.getElementById('btnOut').classList.toggle('hide', !S.user);
+  if (!S.user) { app.innerHTML = viewLogin(); return; }
+  if (S.vista === 'nuevo') app.innerHTML = viewWizard();
+  else if (S.vista === 'reporte') app.innerHTML = viewReporte();
+  else app.innerHTML = viewHome();
+}
+
+function viewLogin() {
+  return `
+  <div class="card" style="margin-top:28px">
+    <h2>Ingresá tu PIN</h2>
+    <p class="muted small" style="margin-top:-4px">El mismo que usás en la app de stock.</p>
+    <input id="pin" type="password" inputmode="numeric" placeholder="PIN" autocomplete="off"
+           onkeydown="if(event.key==='Enter')hacerLogin()">
+    <div id="loginMsg"></div>
+    <button class="btn" style="margin-top:12px" onclick="hacerLogin()">Entrar</button>
+  </div>`;
+}
+
+function viewHome() {
+  const total = S.mermasHoy.reduce((a, m) => a + (Number(m.costo_total) || 0), 0);
+  const evitable = S.mermasHoy
+    .filter(m => !MOTIVOS_NORMALES.includes(m.motivo))
+    .reduce((a, m) => a + (Number(m.costo_total) || 0), 0);
+
+  const filas = S.mermasHoy.length ? S.mermasHoy.map(m => `
+    <tr>
+      <td>
+        <b>${esc(m.item_nombre)}</b>
+        <div class="small muted">${esc(m.motivo)}${m.nota ? ' · ' + esc(m.nota) : ''}</div>
+      </td>
+      <td class="r">${num(m.cantidad)} ${esc(m.unidad || '')}</td>
+      <td class="r">${m.costo_total ? money(m.costo_total) : '<span class="muted">—</span>'}</td>
+    </tr>`).join('')
+    : `<tr><td colspan="3" class="muted center" style="padding:20px">Todavía no se cargó nada hoy.</td></tr>`;
+
+  return `
+  <div class="kpi">
+    <div><div class="n">${money(total)}</div><div class="l">Tirado hoy</div></div>
+    <div><div class="n">${money(evitable)}</div><div class="l">Evitable</div></div>
+  </div>
+
+  <button class="btn rust lg" style="margin-top:14px" onclick="abrirNuevo()">Cargar desperdicio</button>
+
+  <div class="card">
+    <div class="between"><h2 style="margin:0">Lo de hoy</h2>
+      <span class="small muted">${S.mermasHoy.length} carga${S.mermasHoy.length === 1 ? '' : 's'}</span></div>
+    <table style="margin-top:8px">
+      <thead><tr><th>Qué</th><th class="r">Cant.</th><th class="r">Costo</th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+  </div>
+
+  <button class="btn ghost" style="margin-top:12px" onclick="abrirReporte()">Ver reporte por período</button>
+  <p class="small muted center" style="margin-top:16px">
+    <a class="link" href="./index.html">← Volver a la app de stock</a>
+  </p>`;
+}
+
+/* ---------- wizard ---------- */
+function viewWizard() {
+  if (S.paso === 1) return pasoQue();
+  if (S.paso === 2) return pasoCuanto();
+  if (S.paso === 3) return pasoPorQue();
+  if (S.paso === 4) return pasoDonde();
+  return pasoConfirmar();
+}
+
+function pasoQue() {
+  const items = filtrados();
+  const lista = items.length ? items.map(i => `
+    <button class="item" onclick='elegirItem(${JSON.stringify(i.key)})'>
+      <b>${esc(i.nombre)}</b>
+      <span class="sub">${esc(i.sub)}${i.costo ? ' · ' + money2(i.costo) + '/' + esc(i.unidad) : ' · <sin costo>'}</span>
+    </button>`).join('')
+    : `<p class="muted small center" style="padding:20px">Nada con ese nombre.</p>`;
+
+  return `
+  <div class="card">
+    <div class="step">Paso 1 de 5</div>
+    <h2>¿Qué se tiró?</h2>
+    <div class="tabs">
+      <button class="${S.tipo === 'insumo' ? 'on' : ''}" onclick="setTipo('insumo')">Insumo</button>
+      <button class="${S.tipo === 'produccion' ? 'on' : ''}" onclick="setTipo('produccion')">Producción</button>
+      <button class="${S.tipo === 'plato' ? 'on' : ''}" onclick="setTipo('plato')">Plato</button>
+    </div>
+    <input id="busca" placeholder="Buscar…" value="${esc(S.busca)}" oninput="S.busca=this.value;renderLista()" autocomplete="off">
+    <div class="list" id="lista">${lista}</div>
+  </div>
+  <button class="btn ghost" style="margin-top:12px" onclick="volverHome()">Cancelar</button>`;
+}
+
+function renderLista() {
+  const items = filtrados();
+  document.getElementById('lista').innerHTML = items.length ? items.map(i => `
+    <button class="item" onclick='elegirItem(${JSON.stringify(i.key)})'>
+      <b>${esc(i.nombre)}</b>
+      <span class="sub">${esc(i.sub)}${i.costo ? ' · ' + money2(i.costo) + '/' + esc(i.unidad) : ''}</span>
+    </button>`).join('')
+    : `<p class="muted small center" style="padding:20px">Nada con ese nombre.</p>`;
+}
+
+function pasoCuanto() {
+  const teclas = ['1','2','3','4','5','6','7','8','9','.','0','←'];
+  return `
+  <div class="card">
+    <div class="step">Paso 2 de 5</div>
+    <h2>${esc(S.item.nombre)}</h2>
+    <p class="small muted" style="margin-top:-6px">${esc(S.item.sub)}</p>
+    <div class="display">${S.cantidad || '0'}<small>${esc(S.item.unidad)}</small></div>
+    <div class="pad">
+      ${teclas.map(t => `<button onclick="tecla('${t}')">${t}</button>`).join('')}
+    </div>
+    <div class="foot">
+      <button class="btn ghost" onclick="S.paso=1;render()">Atrás</button>
+      <button class="btn" ${parseFloat(S.cantidad) > 0 ? '' : 'disabled'} onclick="S.paso=3;render()">Seguir</button>
+    </div>
+  </div>`;
+}
+
+function pasoPorQue() {
+  return `
+  <div class="card">
+    <div class="step">Paso 3 de 5</div>
+    <h2>¿Por qué se tiró?</h2>
+    <div class="motivos">
+      ${MOTIVOS.map(m => `<button class="${S.motivo === m ? 'on' : ''}" onclick="elegirMotivo('${m.replace(/'/g, "\\'")}')">${m}</button>`).join('')}
+    </div>
+    <button class="btn ghost" style="margin-top:14px" onclick="S.paso=2;render()">Atrás</button>
+  </div>`;
+}
+
+function pasoDonde() {
+  if (S.tipo === 'plato') { S.paso = 5; return pasoConfirmar(); }
+  const sug = S.item.deposito_id;
+  return `
+  <div class="card">
+    <div class="step">Paso 4 de 5</div>
+    <h2>¿De dónde salió?</h2>
+    <p class="small muted" style="margin-top:-6px">De acá se va a descontar el stock.</p>
+    <div class="chips">
+      ${S.depositos.map(d => `<button class="${S.deposito === d.id ? 'on' : ''}" onclick="S.deposito=${d.id};render()">${esc(d.nombre)}${d.id === sug ? ' ★' : ''}</button>`).join('')}
+    </div>
+    <div class="foot">
+      <button class="btn ghost" onclick="S.paso=3;render()">Atrás</button>
+      <button class="btn" ${S.deposito ? '' : 'disabled'} onclick="S.paso=5;render()">Seguir</button>
+    </div>
+  </div>`;
+}
+
+function pasoConfirmar() {
+  const ct = costoTotal();
+  const dep = S.depositos.find(d => d.id === S.deposito);
+  const teorico = (S.tipo !== 'plato' && S.item.variante_id && S.deposito)
+    ? stockDe(S.stock, S.item.variante_id, S.deposito) : null;
+  const q = parseFloat(S.cantidad);
+  const alerta = (teorico !== null && q > teorico)
+    ? `<div class="msg err">Ojo: en ${esc(dep ? dep.nombre : '')} el sistema tiene ${num(teorico)} ${esc(S.item.unidad)}. Vas a dejar el stock en negativo.</div>` : '';
+
+  return `
+  <div class="card">
+    <div class="step">Paso 5 de 5</div>
+    <h2>Confirmá</h2>
+    <div class="resumen">
+      <div><span class="muted">Qué</span><b>${esc(S.item.nombre)}</b></div>
+      <div><span class="muted">Cuánto</span><b>${num(q)} ${esc(S.item.unidad)}</b></div>
+      <div><span class="muted">Motivo</span><b>${esc(S.motivo)}</b></div>
+      ${dep ? `<div><span class="muted">Dónde</span><b>${esc(dep.nombre)}</b></div>` : ''}
+      <div><span class="muted">Costo</span><b>${ct ? money2(ct) : 'sin costo cargado'}</b></div>
+    </div>
+    ${alerta}
+    <input placeholder="Nota (opcional)" value="${esc(S.nota)}" oninput="S.nota=this.value" autocomplete="off">
+    ${S.tipo === 'plato' ? `<p class="small muted" style="margin-top:10px">Los platos se registran valorizados, pero no descuentan insumos del stock hasta que carguemos las recetas.</p>` : ''}
+    <div id="wizMsg"></div>
+    <div class="foot">
+      <button class="btn ghost" onclick="S.paso=${S.tipo === 'plato' ? 3 : 4};render()">Atrás</button>
+      <button class="btn rust" id="btnGuardar" onclick="guardar()">Guardar</button>
+    </div>
+  </div>`;
+}
+
+/* ---------- reporte ---------- */
+function viewReporte() {
+  const porMotivo = {}, porItem = {};
+  let total = 0, evitable = 0;
+  S.mermasRep.forEach(m => {
+    const c = Number(m.costo_total) || 0;
+    total += c;
+    if (!MOTIVOS_NORMALES.includes(m.motivo)) evitable += c;
+    porMotivo[m.motivo] = (porMotivo[m.motivo] || 0) + c;
+    porItem[m.item_nombre] = (porItem[m.item_nombre] || 0) + c;
+  });
+  const max = Math.max(1, ...Object.values(porMotivo));
+  const filasM = Object.entries(porMotivo).sort((a, b) => b[1] - a[1]).map(([k, v]) => `
+    <tr><td>${esc(k)}<div class="bar"><i style="width:${(v / max * 100).toFixed(0)}%"></i></div></td>
+    <td class="r">${money(v)}</td></tr>`).join('') || `<tr><td colspan="2" class="muted center" style="padding:18px">Sin datos en el período.</td></tr>`;
+  const filasI = Object.entries(porItem).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([k, v]) => `
+    <tr><td>${esc(k)}</td><td class="r">${money(v)}</td></tr>`).join('') || '';
+
+  return `
+  <div class="card">
+    <h2>Período</h2>
+    <div class="row">
+      <input type="date" value="${S.desde}" onchange="S.desde=this.value;traerReporte()">
+      <input type="date" value="${S.hasta}" onchange="S.hasta=this.value;traerReporte()">
+    </div>
+  </div>
+  <div class="kpi">
+    <div><div class="n">${money(total)}</div><div class="l">Total tirado</div></div>
+    <div><div class="n">${money(evitable)}</div><div class="l">Evitable</div></div>
+  </div>
+  <div class="card">
+    <h2>Por motivo</h2>
+    <table><tbody>${filasM}</tbody></table>
+  </div>
+  <div class="card">
+    <h2>Los que más pesan</h2>
+    <table><tbody>${filasI}</tbody></table>
+  </div>
+  <button class="btn ghost" style="margin-top:12px" onclick="volverHome()">Volver</button>`;
+}
+
+/* ============================================================
+   Acciones
+   ============================================================ */
+async function hacerLogin() {
+  const el = document.getElementById('pin');
+  const msg = document.getElementById('loginMsg');
+  try {
+    S.user = await loginConPin(el.value.trim());
+    msg.innerHTML = '';
+    await cargar();
+    render();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
+  }
+}
+
+function abrirNuevo() {
+  S.vista = 'nuevo'; S.paso = 1; S.tipo = 'insumo'; S.item = null;
+  S.cantidad = ''; S.motivo = null; S.deposito = null; S.nota = ''; S.busca = '';
+  render();
+}
+function volverHome() { S.vista = 'home'; render(); }
+function setTipo(t) { S.tipo = t; S.busca = ''; render(); }
+
+function elegirItem(key) {
+  S.item = itemsDelTipo().find(i => i.key === key);
+  S.deposito = S.item.deposito_id || null;
+  S.paso = 2;
+  render();
+}
+function tecla(t) {
+  if (t === '←') S.cantidad = S.cantidad.slice(0, -1);
+  else if (t === '.') { if (!S.cantidad.includes('.')) S.cantidad += S.cantidad ? '.' : '0.'; }
+  else S.cantidad += t;
+  render();
+}
+function elegirMotivo(m) {
+  S.motivo = m;
+  S.paso = (S.tipo === 'plato') ? 5 : 4;
+  render();
+}
+
+async function guardar() {
+  if (S.guardando) return;
+  S.guardando = true;
+  const btn = document.getElementById('btnGuardar');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  const msg = document.getElementById('wizMsg');
+  try {
+    const q = parseFloat(S.cantidad);
+    const ct = costoTotal();
+    const fila = {
+      tipo_item: S.tipo,
+      variante_id: S.item.variante_id || null,
+      plato_id: S.item.plato_id || null,
+      item_nombre: S.item.nombre,
+      cantidad: q,
+      unidad: S.item.unidad,
+      costo_unitario: S.item.costo || null,
+      costo_total: ct,
+      motivo: S.motivo,
+      deposito_id: S.deposito || null,
+      usuario_id: S.user.id,
+      nota: S.nota || null,
+      descuenta_stock: S.tipo !== 'plato'
+    };
+    await sb('stock_mermas', { method: 'POST', body: JSON.stringify(fila) });
+
+    /* el insumo y la producción sí bajan del stock */
+    if (fila.descuenta_stock && fila.variante_id && fila.deposito_id) {
+      await sb('stock_movimientos', {
+        method: 'POST',
+        body: JSON.stringify({
+          variante_id: fila.variante_id,
+          deposito_id: fila.deposito_id,
+          tipo: 'salida',
+          cantidad: q,
+          usuario_id: S.user.id,
+          motivo: 'Merma: ' + S.motivo,
+          costo_unitario: S.item.costo || null,
+          comprobante: 'Desperdicio'
+        })
+      });
+    }
+    await cargar();
+    S.vista = 'home';
+    render();
+    const app = document.getElementById('app');
+    app.insertAdjacentHTML('afterbegin',
+      `<div class="msg ok">Cargado: ${esc(S.item.nombre)}${ct ? ' · ' + money2(ct) : ''}</div>`);
+  } catch (e) {
+    if (msg) msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+  } finally {
+    S.guardando = false;
+  }
+}
+
+function abrirReporte() {
+  const d = new Date(); d.setDate(d.getDate() - 30);
+  S.desde = d.toLocaleDateString('sv-SE');
+  S.hasta = hoy();
+  S.vista = 'reporte';
+  render();
+  traerReporte();
+}
+async function traerReporte() {
+  S.mermasRep = await sb('stock_mermas?select=*&anulado=is.false&fecha=gte.' + S.desde + 'T00:00:00&fecha=lte.' + S.hasta + 'T23:59:59&order=fecha.desc&limit=5000');
+  render();
+}
+
+/* ============================================================
+   Arranque
+   ============================================================ */
+(async function init() {
+  S.user = getUser();
+  render();
+  if (S.user) {
+    try { await cargar(); render(); }
+    catch (e) {
+      document.getElementById('app').innerHTML = `<div class="msg err">No pude cargar los datos: ${esc(e.message)}</div>`;
+    }
+  }
+})();
+</script>
+</body>
+</html>
