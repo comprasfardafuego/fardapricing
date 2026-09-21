@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#8C2F16">
+<title>FARDA · Desperdicios</title>
+<style>
+:root{
+  --brasa:#8C2F16; --tinta:#1A1A1A; --gris:#6B6560;
+  --fondo:#FAF8F6; --carta:#FFFFFF; --linea:#E4E0DA; --suave:#F2F0ED;
+  --ok:#2F6B3A; --alerta:#9C6500; --mal:#9C0006;
+  --r:14px; --sombra:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --brasa:#E2724F; --tinta:#F2EFEC; --gris:#A39C95;
+    --fondo:#151311; --carta:#1F1C1A; --linea:#332F2B; --suave:#262321;
+    --ok:#7FBF8C; --alerta:#E0B25C; --mal:#F09A92;
+    --sombra:0 1px 3px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"]{
+  --brasa:#E2724F; --tinta:#F2EFEC; --gris:#A39C95;
+  --fondo:#151311; --carta:#1F1C1A; --linea:#332F2B; --suave:#262321;
+  --ok:#7FBF8C; --alerta:#E0B25C; --mal:#F09A92;
+  --sombra:0 1px 3px rgba(0,0,0,.4);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--fondo); color:var(--tinta);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  font-size:16px; line-height:1.45;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.wrap{max-width:560px;margin:0 auto;padding:0 16px}
+.oculto{display:none !important}
+
+/* --- cabecera --- */
+header{
+  position:sticky;top:0;z-index:20;background:var(--fondo);
+  border-bottom:1px solid var(--linea);
+  padding:calc(env(safe-area-inset-top) + 10px) 0 10px;
+}
+.hd{display:flex;align-items:center;gap:10px}
+.marca{font-weight:800;letter-spacing:.14em;color:var(--brasa);font-size:15px}
+.hd .quien{margin-left:auto;font-size:13px;color:var(--gris);text-align:right;line-height:1.2}
+.hd .quien b{display:block;color:var(--tinta);font-size:14px}
+.salir{background:none;border:none;color:var(--gris);font-size:12px;text-decoration:underline;padding:4px 0;cursor:pointer}
+
+/* --- pestañas --- */
+nav{display:flex;gap:6px;padding:10px 0 0}
+nav button{
+  flex:1;padding:11px 8px;border:1px solid var(--linea);background:var(--carta);
+  color:var(--gris);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;
+  font-family:inherit;
+}
+nav button[aria-selected="true"]{background:var(--brasa);color:#fff;border-color:var(--brasa)}
+
+main{padding:16px 0 90px}
+.card{background:var(--carta);border:1px solid var(--linea);border-radius:var(--r);
+  padding:14px;margin-bottom:12px;box-shadow:var(--sombra)}
+label{display:block;font-size:13px;font-weight:700;color:var(--gris);margin:0 0 6px}
+input,select,textarea,button{font-family:inherit;font-size:16px}
+input[type=text],input[type=number],input[type=search],textarea,select{
+  width:100%;padding:13px 12px;border:1px solid var(--linea);border-radius:11px;
+  background:var(--fondo);color:var(--tinta);
+}
+input:focus,textarea:focus,select:focus{outline:2px solid var(--brasa);outline-offset:1px}
+textarea{min-height:64px;resize:vertical}
+
+/* --- chips --- */
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{
+  padding:10px 13px;border:1px solid var(--linea);border-radius:999px;background:var(--fondo);
+  color:var(--tinta);font-size:14px;cursor:pointer;min-height:44px;display:flex;align-items:center;
+}
+.chip[aria-pressed="true"]{background:var(--brasa);color:#fff;border-color:var(--brasa);font-weight:600}
+
+/* --- buscador de insumo --- */
+.lista{max-height:230px;overflow:auto;border:1px solid var(--linea);border-radius:11px;margin-top:8px}
+.lista button{
+  display:block;width:100%;text-align:left;padding:12px;background:var(--carta);border:none;
+  border-bottom:1px solid var(--linea);color:var(--tinta);cursor:pointer;font-size:15px;
+}
+.lista button:last-child{border-bottom:none}
+.lista .sub{display:block;font-size:12px;color:var(--gris);margin-top:2px}
+.elegido{display:flex;align-items:center;gap:10px;padding:12px;background:var(--suave);
+  border-radius:11px;border:1px solid var(--linea)}
+.elegido .nom{font-weight:700;flex:1}
+.elegido .x{background:none;border:none;color:var(--gris);font-size:22px;cursor:pointer;padding:0 6px}
+
+/* --- cantidad --- */
+.cant{display:flex;gap:8px;align-items:stretch}
+.cant input{flex:1;font-size:26px;font-weight:700;text-align:center;padding:14px 8px}
+.cant .um{display:flex;align-items:center;padding:0 16px;background:var(--suave);
+  border:1px solid var(--linea);border-radius:11px;font-weight:700;color:var(--gris)}
+.rapidos{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.rapidos button{flex:1;min-width:58px;padding:9px 4px;border:1px solid var(--linea);
+  background:var(--fondo);color:var(--tinta);border-radius:9px;font-size:14px;cursor:pointer}
+
+/* --- plata --- */
+.plata{display:flex;align-items:baseline;justify-content:space-between;
+  padding:14px;background:var(--suave);border-radius:11px;border:1px solid var(--linea)}
+.plata span{font-size:13px;color:var(--gris);font-weight:700}
+.plata b{font-size:26px;color:var(--brasa)}
+
+/* --- botones --- */
+.primario{
+  width:100%;padding:17px;background:var(--brasa);color:#fff;border:none;border-radius:13px;
+  font-size:17px;font-weight:700;cursor:pointer;
+}
+.primario:disabled{opacity:.4}
+.secundario{width:100%;padding:13px;background:var(--carta);color:var(--tinta);
+  border:1px solid var(--linea);border-radius:11px;font-size:15px;cursor:pointer}
+
+/* --- foto --- */
+.foto{display:flex;gap:10px;align-items:center}
+.foto label.btn{flex:1;margin:0;padding:13px;border:1px dashed var(--linea);border-radius:11px;
+  text-align:center;color:var(--gris);font-weight:600;cursor:pointer;font-size:14px}
+.foto img{width:64px;height:64px;object-fit:cover;border-radius:10px;border:1px solid var(--linea)}
+
+/* --- teclado PIN --- */
+.pinbox{max-width:320px;margin:8vh auto 0;text-align:center}
+.pinbox h1{font-size:20px;margin:0 0 4px}
+.pinbox p{color:var(--gris);font-size:14px;margin:0 0 22px}
+.puntos{display:flex;gap:12px;justify-content:center;margin-bottom:26px}
+.puntos i{width:14px;height:14px;border-radius:50%;border:2px solid var(--linea);display:block}
+.puntos i.on{background:var(--brasa);border-color:var(--brasa)}
+.teclas{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.teclas button{padding:19px 0;font-size:23px;font-weight:600;background:var(--carta);
+  border:1px solid var(--linea);border-radius:13px;color:var(--tinta);cursor:pointer}
+.teclas button.vacia{background:none;border:none}
+
+/* --- listas de registros --- */
+.reg{display:flex;gap:11px;padding:12px 0;border-bottom:1px solid var(--linea);align-items:flex-start}
+.reg:last-child{border-bottom:none}
+.reg .cuerpo{flex:1;min-width:0}
+.reg .t{font-weight:700;font-size:15px}
+.reg .m{font-size:13px;color:var(--gris);margin-top:2px}
+.reg .p{font-weight:700;color:var(--brasa);white-space:nowrap;font-size:15px}
+.reg.anulado{opacity:.45}
+.reg.anulado .t{text-decoration:line-through}
+.reg img{width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--linea)}
+
+/* --- totales --- */
+.tot{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.tot div{background:var(--carta);border:1px solid var(--linea);border-radius:var(--r);padding:13px}
+.tot span{display:block;font-size:12px;color:var(--gris);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.tot b{display:block;font-size:22px;margin-top:3px;color:var(--brasa)}
+.barra{display:flex;align-items:center;gap:9px;padding:7px 0;font-size:14px}
+.barra .n{flex:0 0 38%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.barra .b{flex:1;height:9px;background:var(--suave);border-radius:5px;overflow:hidden}
+.barra .b i{display:block;height:100%;background:var(--brasa);border-radius:5px}
+.barra .v{flex:0 0 auto;font-variant-numeric:tabular-nums;color:var(--gris);font-size:13px}
+
+h2{font-size:15px;margin:0 0 10px;color:var(--gris);text-transform:uppercase;letter-spacing:.05em}
+.vacio{color:var(--gris);font-size:14px;text-align:center;padding:26px 0}
+
+/* --- aviso --- */
+#aviso{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;z-index:60;
+  background:var(--tinta);color:var(--fondo);padding:13px 20px;border-radius:12px;
+  font-size:15px;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.25);max-width:92vw;text-align:center}
+#aviso.mal{background:var(--mal);color:#fff}
+.cargando{color:var(--gris);font-size:14px;text-align:center;padding:26px 0}
+</style>
+</head>
+<body>
+
+<div id="pantallaPin">
+  <div class="wrap pinbox">
+    <div class="marca" style="margin-bottom:26px">F A R D A</div>
+    <h1>Control de desperdicios</h1>
+    <p>Ingresá tu PIN</p>
+    <div class="puntos" id="puntos"><i></i><i></i><i></i><i></i></div>
+    <div class="teclas" id="teclas"></div>
+  </div>
+</div>
+
+<div id="pantallaApp" class="oculto">
+  <header>
+    <div class="wrap">
+      <div class="hd">
+        <div class="marca">F A R D A</div>
+        <div class="quien"><b id="miNombre"></b><span id="miSector"></span>
+          <button class="salir" id="btnSalir">salir</button></div>
+      </div>
+      <nav role="tablist">
+        <button role="tab" id="tabCargar"  aria-selected="true">Cargar</button>
+        <button role="tab" id="tabHoy"     aria-selected="false">Hoy</button>
+        <button role="tab" id="tabResumen" aria-selected="false">Resumen</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- CARGAR -->
+    <section id="vistaCargar">
+      <div class="card">
+        <label for="buscar">Qué se tira</label>
+        <div id="cajaBuscar">
+          <input type="search" id="buscar" placeholder="Escribí el nombre…" autocomplete="off" enterkeyhint="search">
+          <div class="lista oculto" id="resultados"></div>
+        </div>
+        <div class="elegido oculto" id="elegido">
+          <div class="nom" id="elegidoNom"></div>
+          <button class="x" id="elegidoX" aria-label="Cambiar">×</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <label for="cantidad">Cuánto</label>
+        <div class="cant">
+          <input type="number" id="cantidad" inputmode="decimal" step="0.01" min="0" placeholder="0">
+          <div class="um" id="unidad">—</div>
+        </div>
+        <div class="rapidos" id="rapidos"></div>
+      </div>
+
+      <div class="card">
+        <div class="plata"><span>Plata que se tira</span><b id="plata">$0</b></div>
+      </div>
+
+      <div class="card">
+        <label>Por qué</label>
+        <div class="chips" id="motivos"></div>
+      </div>
+
+      <div class="card">
+        <label>Quién lo tira</label>
+        <div class="chips" id="sectores"></div>
+      </div>
+
+      <div class="card">
+        <label>Foto (opcional)</label>
+        <div class="foto">
+          <label class="btn" for="foto" id="fotoTxt">Sacar o elegir foto</label>
+          <input type="file" id="foto" accept="image/*" capture="environment" class="oculto">
+          <img id="fotoPrev" class="oculto" alt="">
+        </div>
+      </div>
+
+      <div class="card">
+        <label for="nota">Nota (opcional)</label>
+        <textarea id="nota" placeholder="Algo que sirva para entenderlo después"></textarea>
+      </div>
+
+      <button class="primario" id="btnGuardar" disabled>Registrar</button>
+    </section>
+
+    <!-- HOY -->
+    <section id="vistaHoy" class="oculto">
+      <div class="tot">
+        <div><span>Hoy</span><b id="totHoy">$0</b></div>
+        <div><span>Registros</span><b id="cantHoy">0</b></div>
+      </div>
+      <div class="card"><h2>Cargado hoy</h2><div id="listaHoy"><div class="cargando">Cargando…</div></div></div>
+      <button class="secundario" id="btnRefrescar">Actualizar</button>
+    </section>
+
+    <!-- RESUMEN -->
+    <section id="vistaResumen" class="oculto">
+      <div class="tot">
+        <div><span>Este mes</span><b id="totMes">$0</b></div>
+        <div><span>Últimos 7 días</span><b id="totSem">$0</b></div>
+      </div>
+      <div class="card"><h2>Por motivo</h2><div id="porMotivo"></div></div>
+      <div class="card"><h2>Por sector</h2><div id="porSector"></div></div>
+      <div class="card"><h2>Los 10 que más cuestan</h2><div id="topInsumos"></div></div>
+      <div class="card"><h2>Últimos registros</h2><div id="listaTodos"></div></div>
+    </section>
+  </main>
+</div>
+
+<div id="aviso" class="oculto"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const INSUMOS_BASE=[["Aceite de Girasol","LT",2686.8,"Depósito de secos"],["Aceite de Oliva","LT",12190.0,"Depósito de secos"],["Acelga","KG",2200.0,"Cámara de verdulería"],["Aceto Balsamico","LT",7218.0,"Depósito de secos"],["Aji Jalapeño Rojo","KG",8000.0,"Cámara de verdulería"],["Aji Molido","KG",7027.0,"Depósito de secos"],["Ajies Vinagreros","KG",6560.0,"Cámara de verdulería"],["Ajo","KG",11500.0,"Cámara de verdulería"],["Ajo en Polvo","KG",4000.0,"Depósito de secos"],["Albahaca","KG",37250.0,"Cámara de verdulería"],["Alcaparras","KG",25000.0,"Depósito de secos"],["Anchoas","KG",70000.0,"Depósito de secos"],["Asado Banderita","KG",20350.0,"Cámara de lácteos y carnes"],["Avellana","KG",18000.0,"Depósito de secos"],["Azucar","KG",984.0,"Depósito de secos"],["Azucar Impalpable","KG",1200.0,"Depósito de secos"],["Bife de Chorizo","KG",28600.0,"Cámara de lácteos y carnes"],["Boniato","KG",6112.5,"Cámara de verdulería"],["Cacao en Polvo","KG",12000.0,"Depósito de secos"],["Café","KG",14000.0,"Depósito de secos"],["Cebolla","KG",1200.0,"Cámara de verdulería"],["Cebolla Morada","KG",1490.0,"Cámara de verdulería"],["Cebolla de Verdeo","KG",5280.0,"Cámara de verdulería"],["Queso Cheddar Ingles","KG",70000.0,"Cámara de lácteos y carnes"],["Choclo Amarillo en Grano","KG",5500.0,"Depósito de secos"],["Chocolate Semi Amargo","KG",15000.0,"Depósito de secos"],["Chorizo","KG",9900.0,"Cámara de lácteos y carnes"],["Ciboulette","KG",2250.0,"Cámara de verdulería"],["Cilantro","KG",2250.0,"Cámara de verdulería"],["Comino","KG",6000.0,"Depósito de secos"],["Crema de Leche","LT",7831.2,"Cámara de lácteos y carnes"],["Dulce de Leche","KG",3316.8,"Depósito de secos"],["Dulce de Leche Repostero","KG",3316.8,"Depósito de secos"],["Eneldo","KG",2250.0,"Cámara de verdulería"],["Entraña","KG",29700.0,"Cámara de lácteos y carnes"],["Escarola","KG",3000.0,"Cámara de verdulería"],["Espinaca","KG",4500.0,"Cámara de verdulería"],["Extracto de Malta Líquido","KG",7000.0,"Depósito de secos"],["Extracto de Tomate","KG",3500.0,"Depósito de secos"],["Fecula de Maiz","KG",1800.0,"Depósito de secos"],["Grasa Vacuna","KG",3000.0,"Cámara de lácteos y carnes"],["Harina 000","KG",700.0,"Depósito de secos"],["Harina 0000","KG",890.0,"Depósito de secos"],["Huevo","UNIDAD",220.0,"Cámara de lácteos y carnes"],["Jamón Crudo Importado Bellota","KG",130000.0,"Cámara de lácteos y carnes"],["Jamón Crudo Nacional","KG",30000.0,"Cámara de lácteos y carnes"],["Langostinos Enteros","KG",13580.0,"Cámara negativa (freezer)"],["Laurel","KG",8000.0,"Depósito de secos"],["Leche","LT",1383.65,"Cámara de lácteos y carnes"],["Leche en Polvo","KG",8000.0,"Depósito de secos"],["Lechuga Morada","KG",2900.0,"Cámara de verdulería"],["Lechuga Verde","KG",2900.0,"Cámara de verdulería"],["Levadura Fresca","KG",3500.0,"Cámara de lácteos y carnes"],["Licor Amarula","LT",35422.0,"Depósito de secos"],["Limon","KG",2300.0,"Cámara de verdulería"],["Lomo de Vaca","KG",31900.0,"Cámara de lácteos y carnes"],["Mani","KG",5000.0,"Depósito de secos"],["Manteca","KG",6000.0,"Cámara de lácteos y carnes"],["Matambre de Cerdo","KG",10890.0,"Cámara de lácteos y carnes"],["Mejillones","KG",11200.0,"Cámara negativa (freezer)"],["Menta","KG",3790.0,"Cámara de verdulería"],["Miel","KG",15000.0,"Depósito de secos"],["Mollejas","KG",26400.0,"Cámara de lácteos y carnes"],["Morcilla","KG",8250.0,"Cámara de lácteos y carnes"],["Morron Amarillo","KG",3200.0,"Cámara de verdulería"],["Morron Rojo","KG",3900.0,"Cámara de verdulería"],["Morron Verde","KG",2300.0,"Cámara de verdulería"],["Mostaza Dijon","KG",22000.0,"Depósito de secos"],["Mostaza en Grano","KG",4000.0,"Depósito de secos"],["Naranja","KG",1950.0,"Cámara de verdulería"],["Nueces","KG",18924.0,"Depósito de secos"],["Nuez Moscada","KG",20000.0,"Depósito de secos"],["Ojo de Bife","KG",29700.0,"Cámara de lácteos y carnes"],["Oregano","KG",5000.0,"Depósito de secos"],["Pan Sobrante","KG",0.01,"Producción propia — se elabora, no se recibe"],["Panko","KG",6000.0,"Depósito de secos"],["Papa Blanca","KG",2490.0,"Cámara de verdulería"],["Patamuslo Pollo","KG",5290.0,"Cámara de lácteos y carnes"],["Pepino","KG",1900.0,"Cámara de verdulería"],["Perejil","KG",3900.0,"Cámara de verdulería"],["Pimenton","KG",7076.0,"Depósito de secos"],["Pimienta Negra","KG",18000.0,"Depósito de secos"],["Polvo de Hornear","KG",4000.0,"Depósito de secos"],["Pomodoro","KG",3500.0,"Depósito de secos"],["Provenzal","KG",7500.0,"Depósito de secos"],["Pure de Tomate","KG",2800.0,"Depósito de secos"],["Queso Azul","KG",14368.82,"Cámara de lácteos y carnes"],["Queso Crema","KG",7500.0,"Cámara de lácteos y carnes"],["Queso Marcarpone","KG",21693.0,"Cámara de lácteos y carnes"],["Queso Mozzarella","KG",8140.0,"Cámara de lácteos y carnes"],["Queso Provoleta","KG",20201.0,"Cámara de lácteos y carnes"],["Queso Provolone","KG",23389.0,"Cámara de lácteos y carnes"],["Queso Sbrinz","KG",30998.0,"Cámara de lácteos y carnes"],["Queso Semiduro","KG",18000.0,"Cámara de lácteos y carnes"],["Remolacha","KG",2000.0,"Cámara de verdulería"],["Ricota","KG",7000.0,"Cámara de lácteos y carnes"],["Rucula","KG",3250.0,"Cámara de verdulería"],["Sal Fina","KG",825.0,"Depósito de secos"],["Salsa de Ostras","KG",29904.0,"Depósito de secos"],["Salsa de Soja","LT",8000.0,"Depósito de secos"],["Salsa Worcestershire","LT",14000.0,"Depósito de secos"],["Salvia","KG",15000.0,"Cámara de verdulería"],["Semilla de Hinojo","KG",9000.0,"Depósito de secos"],["Semolin","KG",768.0,"Depósito de secos"],["Seta de Cardo","KG",19652.0,"Cámara de verdulería"],["Stracciatella","KG",26963.0,"Cámara de lácteos y carnes"],["Suprema de Pollo","KG",9900.0,"Cámara de lácteos y carnes"],["Tapa de Empanada","UNIDAD",149.83,"Depósito de secos"],["Tomillo","KG",3790.0,"Cámara de verdulería"],["Trucha Curada Ahumada","KG",29200.0,"Cámara negativa (freezer)"],["Trucha Patagonica","KG",19500.0,"Cámara negativa (freezer)"],["Vainillas","KG",14568.0,"Depósito de secos"],["Ventana de Asado (Costillar)","KG",29700.0,"Cámara de lácteos y carnes"],["Vinagre de Vino Tinto","LT",5890.0,"Depósito de secos"],["Vino Blanco","LT",7690.0,"Depósito de secos"],["Librito de Grasa","KG",9863.0,"Cámara de lácteos y carnes"],["Romero","KG",15000.0,"Cámara de verdulería"],["Huevada para Milanesa","KG",4063.0,"Producción propia — se elabora, no se recibe"],["Espinaca en Polvo","KG",7896.0,"Depósito de secos"],["Agua","LT",0.01,"Depósito de secos"],["Vinagre Alcohol","LT",4963.0,"Depósito de secos"],["Cebolla en Polvo","KG",8625.0,"Depósito de secos"],["Desecho Langostino","KG",0.01,"Producción propia — se elabora, no se recibe"],["Zanahoria","KG",1900.0,"Cámara de verdulería"],["Apio","KG",2190.0,"Cámara de verdulería"],["Puerro","KG",5280.0,"Cámara de verdulería"],["Verdeo","KG",5280.0,"Cámara de verdulería"],["Chips de Ajo","KG",5750.0,"Producción propia — se elabora, no se recibe"],["Ensalada de Remolacha X6","UNIDAD",1301.16,"Producción propia — se elabora, no se recibe"],["Humita Gratinada X8","UNIDAD",2232.28,"Producción propia — se elabora, no se recibe"],["Espinaca a la Crema X4","UNIDAD",3748.81,"Producción propia — se elabora, no se recibe"],["Papas Fritas 3coccion X5","UNIDAD",1337.96,"Producción propia — se elabora, no se recibe"],["Papa Rosti X4","UNIDAD",2212.36,"Producción propia — se elabora, no se recibe"],["Pure de Papa X5","UNIDAD",922.17,"Producción propia — se elabora, no se recibe"],["Masa Panqueque Unidad","UNIDAD",41.3,"Producción propia — se elabora, no se recibe"],["Licor Triple Sec","LT",9884.28,"Depósito de secos"],["Arandanos","KG",32520.0,"Cámara de verdulería"],["Esencia de Vainilla","LT",4535.53,"Depósito de secos"],["Quinotos","KG",5800.0,"Cámara de verdulería"],["Bicarbonato","KG",14678.0,"Depósito de secos"],["Clavo de Olor","KG",46589.0,"Depósito de secos"],["Canela en Rama","KG",63890.0,"Depósito de secos"],["Avellanas Peladas","KG",51300.0,"Depósito de secos"],["Queso Crema Crematto","KG",10251.64,"Cámara de lácteos y carnes"],["Pasta de Pistacho","KG",61471.0,"Depósito de secos"],["Torta Vasca Pistacho Porcion","UNIDAD",6156.48,"Producción propia — se elabora, no se recibe"],["Agar Agar","KG",72892.56,"Depósito de secos"],["Dulce Boniato Porcion","UNIDAD",1294.79,"Producción propia — se elabora, no se recibe"],["Cafe Espresso Molido","KG",65984.0,"Depósito de secos"],["Cafe Espresso Litro","LT",4948.81,"Producción propia — se elabora, no se recibe"],["Crema de Tiramisu","UNIDAD",2363.82,"Producción propia — se elabora, no se recibe"],["Cacao Amargo","KG",35357.0,"Depósito de secos"],["Tapa Alfajor Chocolate Unidad","UNIDAD",365.2,"Producción propia — se elabora, no se recibe"],["Relleno Alfajor Limon Porcion","UNIDAD",685.22,"Producción propia — se elabora, no se recibe"],["Extracto de Malta","KG",6165.0,"Depósito de secos"],["Fecula de Mandioca","KG",3223.0,"Depósito de secos"],["Manteca Ahumada Porcion","UNIDAD",150.0,"Producción propia — se elabora, no se recibe"],["Alioli Kilo","KG",2722.31,"Producción propia — se elabora, no se recibe"],["Croutons Kilo","KG",687.93,"Producción propia — se elabora, no se recibe"],["Pollo Asado Caesar Kilo","KG",10990.38,"Producción propia — se elabora, no se recibe"],["Aderezo Caesar Kilo","KG",16780.15,"Producción propia — se elabora, no se recibe"],["Liquido de Gobierno","LT",2694.8,"Producción propia — se elabora, no se recibe"],["Cebolla Encurtida Kilo","KG",4006.1,"Producción propia — se elabora, no se recibe"],["Praline de Avellana Kilo","KG",20399.58,"Producción propia — se elabora, no se recibe"],["Morrones Asados Kilo","KG",4198.23,"Producción propia — se elabora, no se recibe"],["Marinada Matambrito Litro","LT",1590.65,"Producción propia — se elabora, no se recibe"],["Bisquet Kilo","KG",3370.34,"Producción propia — se elabora, no se recibe"],["Reduccion de Naranja Litro","LT",2953.66,"Producción propia — se elabora, no se recibe"],["Reduccion de Arandano Litro","LT",5555.68,"Producción propia — se elabora, no se recibe"],["Crema Batida Kilo","KG",8111.02,"Producción propia — se elabora, no se recibe"],["Chimichurri de Hierbas Litro","LT",9055.27,"Producción propia — se elabora, no se recibe"],["Salsa Criolla Kilo","KG",6333.0,"Producción propia — se elabora, no se recibe"],["Hielo","KG",0.01,"Producción propia — se elabora, no se recibe"],["Pesto de Albahaca Kilo","KG",20061.5,"Producción propia — se elabora, no se recibe"],["Pomodoro Kilo","KG",7429.75,"Producción propia — se elabora, no se recibe"],["Masa Pasta Simple Kilo","KG",1061.0,"Producción propia — se elabora, no se recibe"],["Masa de Espinaca Kilo","KG",4930.23,"Producción propia — se elabora, no se recibe"],["Pasta Rellena Espinaca Porcion","KG",1510.6,"Producción propia — se elabora, no se recibe"],["Buñuelo Acelga Porcion","UNIDAD",847.95,"Producción propia — se elabora, no se recibe"],["Relleno Empanada de Carne","UNIDAD",1340.92,"Producción propia — se elabora, no se recibe"],["Tapa Hojaldre Empanada","UNIDAD",244.0,"Depósito de secos"],["Relleno Empanada de Humita","UNIDAD",650.62,"Producción propia — se elabora, no se recibe"],["Demiglace de Cebolla","KG",4601.9,"Producción propia — se elabora, no se recibe"],["Vinagreta de Mostaza","KG",5709.25,"Producción propia — se elabora, no se recibe"],["Salsa Criolla","KG",0,"Producción propia — se elabora, no se recibe"],["Pan de Campo Unidad","UNIDAD",446.12,"Producción propia — se elabora, no se recibe"],["Gnocchi Kilo","KG",3624.79,"Producción propia — se elabora, no se recibe"],["Pure de Boniato Kilo","KG",5488.9,"Producción propia — se elabora, no se recibe"]];
+</script>
+<script>
+/* ==========================================================================
+   FARDA · Control de desperdicios
+   CONFIGURACIÓN — pegá acá los dos datos de tu proyecto de Supabase.
+   Están en Supabase → Project Settings → API.
+   Son los mismos que ya usa la app de stock.
+   ========================================================================== */
+const SUPABASE_URL      = "https://snwuddryxaehunxbyflp.supabase.co";      // ya completado
+const SUPABASE_ANON_KEY = "sb_publishable_prm4_Iq9xVmX9aPRC5aurA_gWicE2KX";
+/* ========================================================================== */
+
+const MOTIVOS = ["Vencido","Mal estado al recibir","Se echó a perder","Error de cocción",
+                 "Sobrante de servicio","Se cayó","Devolución de cliente","Rotura","Otro"];
+const SECTORES = ["Parrilla","Fríos","Pastelería","Depósito","Bar","Salón"];
+
+let sb = null, falla = "";
+try{
+  if(/^PEGAR_ACA/.test(SUPABASE_URL) || /^PEGAR_ACA/.test(SUPABASE_ANON_KEY)){
+    falla = "Falta completar SUPABASE_URL y SUPABASE_ANON_KEY arriba de todo en este archivo.";
+  } else if(!window.supabase || !window.supabase.createClient){
+    falla = "No se pudo cargar la librería de Supabase. Revisá la conexión a internet.";
+  } else {
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+}catch(e){
+  falla = "La URL o la clave de Supabase no son válidas.";
+}
+const $  = id => document.getElementById(id);
+const plata = n => "$" + Math.round(n||0).toLocaleString("es-AR");
+
+let sesion   = null;              // {pin, nombre, sector, admin}
+let insumos  = INSUMOS_BASE.map(x => ({n:x[0], u:x[1], c:x[2], d:x[3]}));
+let elegido  = null, motivo = null, sector = null, fotoFile = null;
+let registros = [];
+
+/* ---------- avisos ---------- */
+let avisoT;
+function aviso(txt, mal){
+  const a = $("aviso");
+  a.textContent = txt; a.className = mal ? "mal" : "";
+  clearTimeout(avisoT); avisoT = setTimeout(()=>a.classList.add("oculto"), 3200);
+}
+
+/* ---------- PIN ---------- */
+let pin = "";
+function pintarPin(){
+  document.querySelectorAll("#puntos i").forEach((p,i)=>p.classList.toggle("on", i < pin.length));
+}
+function armarTeclado(){
+  const t = $("teclas");
+  ["1","2","3","4","5","6","7","8","9","","0","←"].forEach(k=>{
+    const b = document.createElement("button");
+    b.textContent = k;
+    if(!k){ b.className = "vacia"; b.disabled = true; }
+    b.onclick = () => {
+      if(k === "←") pin = pin.slice(0,-1);
+      else if(k && pin.length < 4) pin += k;
+      pintarPin();
+      if(pin.length === 4) entrar();
+    };
+    t.appendChild(b);
+  });
+}
+async function entrar(){
+  try{
+    const {data, error} = await sb.rpc("merma_login", {p_pin: pin});
+    if(error) throw error;
+    if(!data || !data.length){ aviso("PIN incorrecto", true); pin=""; pintarPin(); return; }
+    sesion = {pin, nombre:data[0].nombre, sector:data[0].sector, admin:!!data[0].es_admin};
+    try{ localStorage.setItem("merma_pin", pin); }catch(e){}
+    abrirApp();
+  }catch(e){
+    aviso("No se pudo conectar", true); pin=""; pintarPin();
+    console.error(e);
+  }
+}
+function abrirApp(){
+  $("pantallaPin").classList.add("oculto");
+  $("pantallaApp").classList.remove("oculto");
+  $("miNombre").textContent = sesion.nombre;
+  $("miSector").textContent = sesion.sector || "";
+  $("tabResumen").classList.toggle("oculto", !sesion.admin);
+  sector = SECTORES.includes(sesion.sector) ? sesion.sector : null;
+  pintarChips();
+  cargarInsumosVivos();
+}
+$("btnSalir").onclick = () => {
+  try{ localStorage.removeItem("merma_pin"); }catch(e){}
+  location.reload();
+};
+
+/* ---------- insumos: primero los de la planilla embebida, después los vivos ---------- */
+async function cargarInsumosVivos(){
+  try{
+    const {data, error} = await sb.from("pricing_state").select("*").limit(1);
+    if(error || !data || !data[0]) return;
+    let obj = null;
+    for(const v of Object.values(data[0])){
+      if(v && typeof v === "object"){
+        if(v.insumos && typeof v.insumos === "object") { obj = v.insumos; break; }
+      }
+    }
+    if(!obj && data[0].insumos && typeof data[0].insumos === "object") obj = data[0].insumos;
+    if(!obj) return;
+    const previos = new Map(insumos.map(i => [i.n.toUpperCase(), i]));
+    const vivos = Object.entries(obj).map(([nombre, v]) => {
+      const p = previos.get(nombre.toUpperCase());
+      return {
+        n: p ? p.n : lindo(nombre),
+        u: (v && v.unidad) || (p && p.u) || "KG",
+        c: Number((v && v.costo) || (p && p.c) || 0),
+        d: p ? p.d : ""
+      };
+    });
+    if(vivos.length > 20){ insumos = vivos.sort((a,b)=>a.n.localeCompare(b.n,"es")); }
+  }catch(e){ /* nos quedamos con la lista embebida */ }
+}
+const MENORES = new Set(["de","del","la","el","en","y","a","con","para","al","los","las"]);
+function lindo(s){
+  return s.toLowerCase().split(/\s+/).map((w,i)=>
+    (i>0 && MENORES.has(w)) ? w : w.charAt(0).toUpperCase()+w.slice(1)).join(" ");
+}
+
+/* ---------- buscador ---------- */
+function normal(s){ return s.normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase(); }
+$("buscar").addEventListener("input", e=>{
+  const q = normal(e.target.value.trim());
+  const cont = $("resultados");
+  if(q.length < 2){ cont.classList.add("oculto"); cont.innerHTML=""; return; }
+  const hits = insumos
+    .map(i => {
+      const t = normal(i.n);
+      let r = -1;
+      if(t.startsWith(q)) r = 0;
+      else if(new RegExp("(^|\\s)" + q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).test(t)) r = 1;
+      else if(t.includes(q)) r = 2;
+      return {i, r};
+    })
+    .filter(x => x.r >= 0)
+    .sort((a,b) => a.r - b.r || a.i.n.localeCompare(b.i.n,"es"))
+    .slice(0,30)
+    .map(x => x.i);
+  cont.innerHTML = "";
+  if(!hits.length){
+    cont.innerHTML = '<div class="vacio">Nada con ese nombre</div>';
+  } else {
+    hits.forEach(i=>{
+      const b = document.createElement("button");
+      b.innerHTML = '<span></span><span class="sub"></span>';
+      b.children[0].textContent = i.n;
+      b.children[1].textContent = plata(i.c) + " por " + i.u + (i.d ? " · " + i.d : "");
+      b.onclick = ()=>elegir(i);
+      cont.appendChild(b);
+    });
+  }
+  cont.classList.remove("oculto");
+});
+function elegir(i){
+  elegido = i;
+  $("cajaBuscar").classList.add("oculto");
+  $("elegido").classList.remove("oculto");
+  $("elegidoNom").textContent = i.n;
+  $("unidad").textContent = i.u;
+  pintarRapidos();
+  recalcular();
+  $("cantidad").focus();
+}
+$("elegidoX").onclick = ()=>{
+  elegido = null;
+  $("cajaBuscar").classList.remove("oculto");
+  $("elegido").classList.add("oculto");
+  $("buscar").value = ""; $("resultados").classList.add("oculto");
+  $("unidad").textContent = "—"; $("rapidos").innerHTML = "";
+  recalcular();
+};
+
+/* ---------- cantidad ---------- */
+function pintarRapidos(){
+  const u = elegido ? elegido.u : "KG";
+  const vals = u === "UNIDAD" ? [1,2,3,5,10] : [0.1,0.25,0.5,1,2];
+  const cont = $("rapidos"); cont.innerHTML = "";
+  vals.forEach(v=>{
+    const b = document.createElement("button");
+    b.textContent = "+" + String(v).replace(".", ",");
+    b.onclick = ()=>{
+      const act = parseFloat($("cantidad").value) || 0;
+      $("cantidad").value = Math.round((act + v) * 1000) / 1000;
+      recalcular();
+    };
+    cont.appendChild(b);
+  });
+}
+$("cantidad").addEventListener("input", recalcular);
+function recalcular(){
+  const cant = parseFloat($("cantidad").value) || 0;
+  $("plata").textContent = plata(elegido ? cant * elegido.c : 0);
+  $("btnGuardar").disabled = !(elegido && cant > 0 && motivo && sector);
+}
+
+/* ---------- chips ---------- */
+function pintarChips(){
+  const m = $("motivos"); m.innerHTML = "";
+  MOTIVOS.forEach(x=>{
+    const b = document.createElement("button");
+    b.className = "chip"; b.type = "button"; b.textContent = x;
+    b.setAttribute("aria-pressed", String(motivo === x));
+    b.onclick = ()=>{ motivo = x; pintarChips(); recalcular(); };
+    m.appendChild(b);
+  });
+  const s = $("sectores"); s.innerHTML = "";
+  SECTORES.forEach(x=>{
+    const b = document.createElement("button");
+    b.className = "chip"; b.type = "button"; b.textContent = x;
+    b.setAttribute("aria-pressed", String(sector === x));
+    b.onclick = ()=>{ sector = x; pintarChips(); recalcular(); };
+    s.appendChild(b);
+  });
+}
+
+/* ---------- foto ---------- */
+$("foto").addEventListener("change", e=>{
+  const f = e.target.files && e.target.files[0];
+  if(!f) return;
+  fotoFile = f;
+  $("fotoTxt").textContent = "Cambiar foto";
+  const img = $("fotoPrev");
+  img.src = URL.createObjectURL(f);
+  img.classList.remove("oculto");
+});
+async function achicar(file){
+  try{
+    const bmp = await createImageBitmap(file);
+    const max = 1280;
+    const esc = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * esc); c.height = Math.round(bmp.height * esc);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.75));
+    return blob || file;
+  }catch(e){ return file; }
+}
+async function subirFoto(){
+  if(!fotoFile) return null;
+  const chico = await achicar(fotoFile);
+  const nombre = Date.now() + "-" + Math.random().toString(36).slice(2,8) + ".jpg";
+  const {error} = await sb.storage.from("merma-fotos").upload(nombre, chico, {contentType:"image/jpeg"});
+  if(error){ console.error(error); return null; }
+  return sb.storage.from("merma-fotos").getPublicUrl(nombre).data.publicUrl;
+}
+
+/* ---------- guardar ---------- */
+$("btnGuardar").onclick = async ()=>{
+  const btn = $("btnGuardar");
+  const cant = parseFloat($("cantidad").value) || 0;
+  if(!(elegido && cant > 0 && motivo && sector)) return;
+  btn.disabled = true; btn.textContent = "Guardando…";
+  try{
+    const url = await subirFoto();
+    const {error} = await sb.rpc("merma_registrar", {
+      p_pin: sesion.pin, p_insumo: elegido.n, p_unidad: elegido.u,
+      p_cantidad: cant, p_costo: elegido.c, p_motivo: motivo,
+      p_sector: sector, p_deposito: elegido.d || null,
+      p_foto: url, p_nota: $("nota").value.trim() || null
+    });
+    if(error) throw error;
+    aviso("Registrado · " + plata(cant * elegido.c));
+    limpiar();
+    traer();
+  }catch(e){
+    console.error(e); aviso("No se pudo guardar", true);
+  }finally{
+    btn.textContent = "Registrar"; recalcular();
+  }
+};
+function limpiar(){
+  $("elegidoX").click();
+  $("cantidad").value = ""; $("nota").value = "";
+  motivo = null; fotoFile = null;
+  $("foto").value = ""; $("fotoPrev").classList.add("oculto");
+  $("fotoTxt").textContent = "Sacar o elegir foto";
+  pintarChips(); recalcular();
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+
+/* ---------- traer datos ---------- */
+async function traer(){
+  try{
+    const {data, error} = await sb.rpc("merma_listar", {p_pin: sesion.pin});
+    if(error) throw error;
+    registros = data || [];
+    pintarHoy(); pintarResumen();
+  }catch(e){
+    console.error(e);
+    $("listaHoy").innerHTML = '<div class="vacio">No se pudo traer la información</div>';
+  }
+}
+const hoyStr = () => new Date().toLocaleDateString("en-CA", {timeZone:"America/Argentina/Buenos_Aires"});
+const vivos  = () => registros.filter(r => !r.anulado);
+
+function filaRegistro(r, conAnular){
+  const d = document.createElement("div");
+  d.className = "reg" + (r.anulado ? " anulado" : "");
+  const hora = new Date(r.creado_en).toLocaleTimeString("es-AR",
+    {hour:"2-digit", minute:"2-digit", timeZone:"America/Argentina/Buenos_Aires"});
+  if(r.foto_url){
+    const im = document.createElement("img"); im.src = r.foto_url; im.alt = ""; im.loading = "lazy";
+    d.appendChild(im);
+  }
+  const c = document.createElement("div"); c.className = "cuerpo";
+  const t = document.createElement("div"); t.className = "t";
+  t.textContent = r.insumo + " · " + Number(r.cantidad).toLocaleString("es-AR") + " " + r.unidad;
+  const m = document.createElement("div"); m.className = "m";
+  m.textContent = r.motivo + " · " + r.sector + " · " + r.usuario + " · " + hora;
+  c.appendChild(t); c.appendChild(m);
+  if(r.nota){ const n = document.createElement("div"); n.className = "m"; n.textContent = r.nota; c.appendChild(n); }
+  if(conAnular && !r.anulado){
+    const a = document.createElement("button");
+    a.className = "salir"; a.textContent = "anular";
+    a.onclick = async ()=>{
+      if(!confirm("¿Anular este registro?")) return;
+      const {error} = await sb.rpc("merma_anular", {p_pin: sesion.pin, p_id: r.id});
+      if(error){ aviso("No se pudo anular", true); return; }
+      aviso("Anulado"); traer();
+    };
+    c.appendChild(a);
+  }
+  const p = document.createElement("div"); p.className = "p"; p.textContent = plata(r.costo_total);
+  d.appendChild(c); d.appendChild(p);
+  return d;
+}
+
+function pintarHoy(){
+  const h = hoyStr();
+  const mios = vivos().filter(r => r.fecha === h);
+  $("totHoy").textContent  = plata(mios.reduce((a,r)=>a + Number(r.costo_total||0), 0));
+  $("cantHoy").textContent = mios.length;
+  const cont = $("listaHoy"); cont.innerHTML = "";
+  const todosHoy = registros.filter(r => r.fecha === h);
+  if(!todosHoy.length){ cont.innerHTML = '<div class="vacio">Todavía no se cargó nada hoy</div>'; return; }
+  todosHoy.forEach(r => cont.appendChild(filaRegistro(r, sesion.admin)));
+}
+
+function barras(cont, pares){
+  cont.innerHTML = "";
+  if(!pares.length){ cont.innerHTML = '<div class="vacio">Sin datos</div>'; return; }
+  const max = Math.max(...pares.map(p=>p[1])) || 1;
+  pares.forEach(([nom, val])=>{
+    const f = document.createElement("div"); f.className = "barra";
+    const n = document.createElement("div"); n.className = "n"; n.textContent = nom; n.title = nom;
+    const b = document.createElement("div"); b.className = "b";
+    const i = document.createElement("i"); i.style.width = (val/max*100) + "%";
+    b.appendChild(i);
+    const v = document.createElement("div"); v.className = "v"; v.textContent = plata(val);
+    f.appendChild(n); f.appendChild(b); f.appendChild(v);
+    cont.appendChild(f);
+  });
+}
+function agrupar(rows, campo){
+  const m = new Map();
+  rows.forEach(r => m.set(r[campo], (m.get(r[campo])||0) + Number(r.costo_total||0)));
+  return [...m.entries()].sort((a,b)=>b[1]-a[1]);
+}
+function pintarResumen(){
+  if(!sesion.admin) return;
+  const hoy = new Date();
+  const mes = hoyStr().slice(0,7);
+  const hace7 = new Date(hoy.getTime() - 6*86400000).toLocaleDateString("en-CA",
+    {timeZone:"America/Argentina/Buenos_Aires"});
+  const delMes = vivos().filter(r => String(r.fecha).slice(0,7) === mes);
+  const delaSem = vivos().filter(r => r.fecha >= hace7);
+  $("totMes").textContent = plata(delMes.reduce((a,r)=>a+Number(r.costo_total||0),0));
+  $("totSem").textContent = plata(delaSem.reduce((a,r)=>a+Number(r.costo_total||0),0));
+  barras($("porMotivo"), agrupar(delMes, "motivo"));
+  barras($("porSector"), agrupar(delMes, "sector"));
+  barras($("topInsumos"), agrupar(delMes, "insumo").slice(0,10));
+  const cont = $("listaTodos"); cont.innerHTML = "";
+  if(!registros.length){ cont.innerHTML = '<div class="vacio">Sin registros</div>'; return; }
+  registros.slice(0,40).forEach(r => cont.appendChild(filaRegistro(r, true)));
+}
+
+/* ---------- pestañas ---------- */
+const vistas = {tabCargar:"vistaCargar", tabHoy:"vistaHoy", tabResumen:"vistaResumen"};
+Object.keys(vistas).forEach(id=>{
+  $(id).onclick = ()=>{
+    Object.keys(vistas).forEach(o=>{
+      $(o).setAttribute("aria-selected", String(o === id));
+      $(vistas[o]).classList.toggle("oculto", o !== id);
+    });
+    if(id !== "tabCargar") traer();
+  };
+});
+$("btnRefrescar").onclick = traer;
+
+/* ---------- arranque ---------- */
+armarTeclado(); pintarChips(); pintarRapidos();
+if(falla){
+  const caja = document.querySelector(".pinbox");
+  const d = document.createElement("div");
+  d.className = "card";
+  d.style.marginTop = "22px"; d.style.textAlign = "left"; d.style.borderColor = "var(--mal)";
+  d.innerHTML = '<b style="color:var(--mal)">No está configurado todavía</b>';
+  const p2 = document.createElement("p");
+  p2.style.margin = "8px 0 0"; p2.style.fontSize = "14px"; p2.textContent = falla;
+  d.appendChild(p2);
+  caja.appendChild(d);
+  document.getElementById("teclas").querySelectorAll("button").forEach(b => b.disabled = true);
+} else {
+  let guardado = null;
+  try{ guardado = localStorage.getItem("merma_pin"); }catch(e){}
+  if(guardado && guardado.length === 4){ pin = guardado; pintarPin(); entrar(); }
+}
+</script>
+</body>
+</html>
