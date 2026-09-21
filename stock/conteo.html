@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FARDA · Conteo</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+<style>
+:root{
+  --navy:#1F2A44; --navy-2:#2B3A5C; --rust:#B5532C; --rust-2:#C9663C;
+  --cream:#F5EFE3; --bg:#F7F5F1; --card:#FFFFFF; --line:#E2DDD4;
+  --ink:#1A1A1A; --muted:#6B6B6B; --ok:#2E7D52; --warn:#8F3D21;
+  --pad:16px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  background:var(--bg);color:var(--ink);font-size:16px;line-height:1.45;
+  padding-bottom:env(safe-area-inset-bottom)}
+.wrap{max-width:560px;margin:0 auto;padding:0 var(--pad) 40px}
+header{background:var(--navy);color:#fff;padding:14px var(--pad);
+  padding-top:calc(14px + env(safe-area-inset-top));
+  display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:50}
+header h1{font-size:1rem;margin:0;font-weight:700;flex:1}
+header .who{font-size:.75rem;opacity:.75}
+header button{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:8px;padding:6px 10px;font-size:.75rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:14px}
+h2{font-size:.95rem;margin:0 0 10px;color:var(--navy)}
+.muted{color:var(--muted)} .small{font-size:.8rem}
+.row{display:flex;gap:10px;align-items:center}
+.between{display:flex;justify-content:space-between;align-items:center;gap:10px}
+button{font-family:inherit;font-size:1rem;cursor:pointer;border:none;background:none;color:inherit}
+.btn{background:var(--navy);color:#fff;border-radius:12px;padding:14px 18px;font-weight:600;width:100%;display:block}
+.btn:active{background:var(--navy-2)}
+.btn.rust{background:var(--rust)} .btn.rust:active{background:var(--rust-2)}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.btn.lg{font-size:1.1rem;padding:18px}
+.btn[disabled]{opacity:.4}
+input,select{font-family:inherit;font-size:1rem;width:100%;padding:13px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--ink)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips button{padding:11px 14px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:.85rem;font-weight:600}
+.chips button.on{background:var(--rust);color:#fff;border-color:var(--rust)}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.pad button{padding:17px 0;border-radius:12px;background:#fff;border:1px solid var(--line);font-size:1.3rem;font-weight:600}
+.pad button:active{background:var(--cream)}
+.display{font-size:3rem;font-weight:700;text-align:center;color:var(--navy);padding:8px 0 2px;letter-spacing:-.02em;min-height:64px}
+.display small{display:block;font-size:.85rem;font-weight:500;color:var(--muted);letter-spacing:0}
+.prog{display:flex;align-items:center;gap:10px;margin-top:4px}
+.prog .bar{flex:1;height:8px;background:var(--cream);border-radius:999px;overflow:hidden}
+.prog .bar i{display:block;height:100%;background:var(--rust);transition:width .2s}
+.prog span{font-size:.75rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.nombre{font-size:1.5rem;font-weight:700;line-height:1.2;color:var(--navy);margin:2px 0}
+.subn{font-size:.85rem;color:var(--muted)}
+.foot{margin-top:12px;display:flex;gap:10px}
+.foot button{flex:1}
+.item{width:100%;text-align:left;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fff;margin-bottom:8px;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.item b{font-weight:600;font-size:.92rem;display:block}
+.item .sub{font-size:.74rem;color:var(--muted)}
+.item .val{font-weight:700;color:var(--ok);font-variant-numeric:tabular-nums;white-space:nowrap}
+.item.pend .val{color:var(--muted);font-weight:500}
+.list{margin-top:10px}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th{text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:6px 4px;border-bottom:1px solid var(--line)}
+td{padding:9px 4px;border-bottom:1px solid #F0EDE7;vertical-align:top}
+td.r,th.r{text-align:right}
+.neg{color:var(--warn);font-weight:700}
+.pos{color:var(--ok);font-weight:700}
+.msg{padding:12px 14px;border-radius:12px;margin-top:12px;font-size:.88rem}
+.msg.ok{background:#E6F4EC;color:var(--ok)}
+.msg.err{background:#FBE6DF;color:var(--warn)}
+.msg.info{background:var(--cream);color:var(--navy)}
+.kpi{display:flex;gap:10px;margin-top:14px}
+.kpi>div{flex:1;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.kpi .n{font-size:1.4rem;font-weight:700;color:var(--navy);line-height:1.15}
+.kpi .l{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.center{text-align:center} .hide{display:none!important}
+a.link{color:var(--navy);font-size:.85rem}
+select.mini{padding:7px 9px;font-size:.8rem;border-radius:9px;width:auto}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#14161A;--card:#1C1F25;--line:#2E333C;--ink:#ECEAE6;--muted:#9A9A9A;--cream:#242830}
+  .item,.chips button,.pad button,input,select{background:var(--card);color:var(--ink)}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="tit">FARDA · Conteo</h1>
+  <span class="who" id="who"></span>
+  <button onclick="logout()" id="btnOut" class="hide">Salir</button>
+</header>
+
+<div class="wrap" id="app"></div>
+
+<script src="./farda-stock-core.js"></script>
+<script>
+const MOTIVOS_DIF = [
+  'Merma no cargada','Rotura o derrame','Error de carga de factura',
+  'Error del conteo anterior','Transferencia no registrada','Consumo de personal',
+  'Faltante sin explicación','Otro'
+];
+
+const S = {
+  user:null, variantes:[], depositos:[], insumos:{}, stock:{},
+  sesiones:[], sesion:null, items:{},      // variante_id -> fila de stock_conteo_items
+  vista:'home', modo:'foco', idx:0, buffer:'', busca:'',
+  guardando:false, cerrando:false, motivosDif:{}, msg:''
+};
+
+/* ---------------- carga ---------------- */
+async function cargarBase(){
+  const [vars,deps,ps,movs,ses] = await Promise.all([
+    sb('stock_variantes?select=id,insumo_nombre,nombre,marca,presentacion,unidad_conversion,deposito_id,activo,orden_conteo&limit=2000'),
+    sb('stock_depositos?select=id,nombre&order=id'),
+    sb('pricing_state?select=insumos&id=eq.1'),
+    sb('stock_movimientos?select=variante_id,deposito_id,tipo,cantidad,anulado&limit=10000'),
+    sb('stock_conteo_sesiones?select=*&estado=eq.abierta&order=id.desc')
+  ]);
+  S.variantes = vars.filter(v=>v.activo!==false);
+  S.depositos = deps;
+  S.insumos = (ps[0]&&ps[0].insumos)||{};
+  S.stock = calcularStock(movs);
+  S.sesiones = ses;
+}
+
+async function abrirSesion(s){
+  S.sesion = s;
+  const its = await sb('stock_conteo_items?select=*&sesion_id=eq.'+s.id);
+  S.items = {};
+  its.forEach(i=>S.items[i.variante_id]=i);
+  S.idx = 0;
+  const lista = listaVariantes();
+  const pend = lista.findIndex(v=>!S.items[v.id]);
+  S.idx = pend >= 0 ? pend : 0;
+  S.buffer = '';
+  S.vista = 'contando';
+  render();
+}
+
+/* variantes del depósito de la sesión, en orden físico y después alfabético */
+function listaVariantes(){
+  if(!S.sesion) return [];
+  return S.variantes
+    .filter(v=>v.deposito_id===S.sesion.deposito_id)
+    .sort((a,b)=>{
+      const oa = a.orden_conteo==null?99999:a.orden_conteo;
+      const ob = b.orden_conteo==null?99999:b.orden_conteo;
+      if(oa!==ob) return oa-ob;
+      return (a.nombre||a.insumo_nombre).localeCompare(b.nombre||b.insumo_nombre,'es');
+    });
+}
+const contados = () => Object.keys(S.items).length;
+
+/* ---------------- render ---------------- */
+function render(){
+  const app=document.getElementById('app');
+  document.getElementById('who').textContent = S.user?S.user.nombre:'';
+  document.getElementById('btnOut').classList.toggle('hide', !S.user);
+  if(!S.user){ app.innerHTML = viewLogin(); return; }
+  if(S.vista==='contando') app.innerHTML = (S.modo==='foco')?viewFoco():viewLista();
+  else if(S.vista==='cierre') app.innerHTML = viewCierre();
+  else app.innerHTML = viewHome();
+  const m=document.getElementById('msgSlot');
+  if(m&&S.msg){ m.innerHTML=S.msg; S.msg=''; }
+}
+
+function viewLogin(){
+  return `<div class="card" style="margin-top:28px">
+    <h2>Ingresá tu PIN</h2>
+    <p class="muted small" style="margin-top:-4px">El mismo que usás en la app de stock.</p>
+    <input id="pin" type="password" inputmode="numeric" placeholder="PIN" autocomplete="off"
+      onkeydown="if(event.key==='Enter')hacerLogin()">
+    <div id="loginMsg"></div>
+    <button class="btn" style="margin-top:12px" onclick="hacerLogin()">Entrar</button>
+  </div>`;
+}
+
+function viewHome(){
+  const abiertas = S.sesiones.map(s=>{
+    const d=S.depositos.find(x=>x.id===s.deposito_id);
+    return `<button class="item" onclick="continuar(${s.id})">
+      <span><b>${esc(d?d.nombre:'?')}</b><span class="sub">Empezado ${esc(s.fecha)} · sin cerrar</span></span>
+      <span class="val">Seguir →</span></button>`;
+  }).join('');
+
+  return `<div id="msgSlot"></div>
+  ${S.sesiones.length?`<div class="card"><h2>Conteos sin cerrar</h2><div class="list">${abiertas}</div></div>`:''}
+  <div class="card">
+    <h2>Empezar un conteo</h2>
+    <p class="small muted" style="margin-top:-6px">Se cuenta a ciegas: no vas a ver el stock del sistema hasta cerrar.</p>
+    <div class="chips" style="margin-top:10px">
+      ${S.depositos.map(d=>{
+        const n=S.variantes.filter(v=>v.deposito_id===d.id).length;
+        return `<button onclick="nuevaSesion(${d.id})" ${n?'':'disabled style="opacity:.35"'}>${esc(d.nombre)} <span class="muted">(${n})</span></button>`;
+      }).join('')}
+    </div>
+  </div>
+  <p class="small muted center" style="margin-top:16px">
+    <a class="link" href="./index.html">← Volver a la app de stock</a> &nbsp;·&nbsp;
+    <a class="link" href="./desperdicios.html">Desperdicios →</a>
+  </p>`;
+}
+
+function viewFoco(){
+  const lista=listaVariantes();
+  const v=lista[S.idx];
+  const dep=S.depositos.find(d=>d.id===S.sesion.deposito_id);
+  if(!v) return viewLista();
+  const ya=S.items[v.id];
+  const pct=lista.length?Math.round(contados()/lista.length*100):0;
+  const teclas=['1','2','3','4','5','6','7','8','9','.','0','←'];
+
+  return `<div id="msgSlot"></div>
+  <div class="card">
+    <div class="between">
+      <span class="small muted">${esc(dep?dep.nombre:'')}</span>
+      <button class="small" style="color:var(--navy);font-weight:600" onclick="S.modo='lista';render()">Ver lista</button>
+    </div>
+    <div class="prog">
+      <div class="bar"><i style="width:${pct}%"></i></div>
+      <span>${contados()}/${lista.length}</span>
+    </div>
+
+    <div style="margin-top:16px">
+      <div class="nombre">${esc(v.nombre||v.insumo_nombre)}</div>
+      <div class="subn">${esc([v.marca,v.presentacion].filter(Boolean).join(' · ')||unidadVariante(v,S.insumos))}</div>
+    </div>
+
+    <div class="display">${S.buffer!==''?S.buffer:(ya?num(ya.cantidad_contada):'—')}
+      <small>${esc(unidadVariante(v,S.insumos))}${ya&&S.buffer===''?' · ya contado':''}</small></div>
+
+    <div class="pad">${teclas.map(t=>`<button onclick="tecla('${t}')">${t}</button>`).join('')}</div>
+
+    <div class="foot">
+      <button class="btn ghost" onclick="mover(-1)">‹ Atrás</button>
+      <button class="btn rust" onclick="guardarItem()">${S.buffer===''&&!ya?'No hay (0)':'Guardar y seguir'}</button>
+    </div>
+    <button class="btn ghost" style="margin-top:8px" onclick="mover(1)">Saltear por ahora ›</button>
+  </div>
+
+  <button class="btn" style="margin-top:12px;background:var(--ok)" onclick="irCierre()">Cerrar el conteo</button>
+  <button class="btn ghost" style="margin-top:8px" onclick="S.vista='home';S.sesion=null;render()">Dejarlo para después</button>`;
+}
+
+function viewLista(){
+  const lista=listaVariantes();
+  const dep=S.depositos.find(d=>d.id===S.sesion.deposito_id);
+  const q=norm(S.busca).trim();
+  const vis=q?lista.filter(v=>norm(v.nombre||v.insumo_nombre).includes(q)):lista;
+  const filas=vis.map(v=>{
+    const it=S.items[v.id];
+    const i=lista.indexOf(v);
+    return `<button class="item ${it?'':'pend'}" onclick="irA(${i})">
+      <span><b>${esc(v.nombre||v.insumo_nombre)}</b>
+      <span class="sub">${esc([v.marca,v.presentacion].filter(Boolean).join(' · '))}</span></span>
+      <span class="val">${it?num(it.cantidad_contada)+' '+esc(unidadVariante(v,S.insumos)):'pendiente'}</span></button>`;
+  }).join('');
+
+  return `<div id="msgSlot"></div>
+  <div class="card">
+    <div class="between">
+      <h2 style="margin:0">${esc(dep?dep.nombre:'')} · ${contados()}/${lista.length}</h2>
+      <button class="small" style="color:var(--navy);font-weight:600" onclick="S.modo='foco';render()">Modo foco</button>
+    </div>
+    <input placeholder="Buscar…" value="${esc(S.busca)}" oninput="S.busca=this.value;render()" style="margin-top:10px" autocomplete="off">
+    <div class="list">${filas||'<p class="muted small center" style="padding:18px">Nada con ese nombre.</p>'}</div>
+  </div>
+  <button class="btn" style="margin-top:12px;background:var(--ok)" onclick="irCierre()">Cerrar el conteo</button>
+  <button class="btn ghost" style="margin-top:8px" onclick="S.vista='home';S.sesion=null;render()">Dejarlo para después</button>`;
+}
+
+function viewCierre(){
+  const lista=listaVariantes();
+  const difs=[];
+  let valorContado=0;
+  lista.forEach(v=>{
+    const it=S.items[v.id]; if(!it) return;
+    const costo=costoVariante(v,S.insumos)||0;
+    const teo=Number(it.cantidad_teorica)||0;
+    const con=Number(it.cantidad_contada)||0;
+    valorContado+=con*costo;
+    const d=con-teo;
+    if(Math.abs(d)>0.0001) difs.push({v,it,teo,con,d,costo,imp:d*costo});
+  });
+  difs.sort((a,b)=>Math.abs(b.imp)-Math.abs(a.imp));
+  const pend=lista.length-contados();
+  const neto=difs.reduce((a,b)=>a+b.imp,0);
+
+  const filas=difs.map(x=>`
+    <tr>
+      <td><b>${esc(x.v.nombre||x.v.insumo_nombre)}</b>
+        <div class="small muted">sistema ${num(x.teo)} · contado ${num(x.con)}</div>
+        <select class="mini" style="margin-top:5px" onchange="S.motivosDif[${x.v.id}]=this.value">
+          <option value="">— motivo —</option>
+          ${MOTIVOS_DIF.map(m=>`<option ${S.motivosDif[x.v.id]===m?'selected':''}>${m}</option>`).join('')}
+        </select>
+      </td>
+      <td class="r ${x.d<0?'neg':'pos'}">${x.d>0?'+':''}${num(x.d)}</td>
+      <td class="r ${x.d<0?'neg':'pos'}">${x.imp?money(x.imp):'—'}</td>
+    </tr>`).join('') || `<tr><td colspan="3" class="center muted" style="padding:20px">Sin diferencias. Cuadró todo.</td></tr>`;
+
+  return `<div id="msgSlot"></div>
+  <div class="kpi">
+    <div><div class="n">${difs.length}</div><div class="l">Diferencias</div></div>
+    <div><div class="n ${neto<0?'neg':''}">${money(neto)}</div><div class="l">Impacto neto</div></div>
+  </div>
+  ${pend?`<div class="msg info">Quedan ${pend} ítem${pend===1?'':'s'} sin contar. Si cerrás así, esos no se tocan: el sistema les deja el stock que ya tenía.</div>`:''}
+  <div class="card">
+    <h2>Diferencias, de mayor a menor</h2>
+    <table><thead><tr><th>Ítem</th><th class="r">Dif.</th><th class="r">$</th></tr></thead><tbody>${filas}</tbody></table>
+  </div>
+  <div class="card">
+    <div class="between"><span class="muted small">Valor de lo contado</span><b>${money(valorContado)}</b></div>
+  </div>
+  <div id="cierreMsg"></div>
+  <button class="btn rust lg" style="margin-top:12px" id="btnCerrar" onclick="confirmarCierre()">Aplicar ajustes y cerrar</button>
+  <button class="btn ghost" style="margin-top:8px" onclick="S.vista='contando';render()">Volver al conteo</button>`;
+}
+
+/* ---------------- acciones ---------------- */
+async function hacerLogin(){
+  const el=document.getElementById('pin'), msg=document.getElementById('loginMsg');
+  try{
+    S.user=await loginConPin(el.value.trim());
+    msg.innerHTML=''; await cargarBase(); render();
+  }catch(e){ msg.innerHTML=`<div class="msg err">${esc(e.message)}</div>`; }
+}
+
+async function nuevaSesion(depId){
+  const r=await sb('stock_conteo_sesiones',{method:'POST',body:JSON.stringify({
+    deposito_id:depId, fecha:hoy(), tipo:'completo', estado:'abierta', usuario_id:S.user.id
+  })});
+  S.sesiones.unshift(r[0]);
+  await abrirSesion(r[0]);
+}
+async function continuar(id){ await abrirSesion(S.sesiones.find(s=>s.id===id)); }
+
+function tecla(t){
+  if(t==='←') S.buffer=S.buffer.slice(0,-1);
+  else if(t==='.'){ if(!S.buffer.includes('.')) S.buffer += S.buffer?'.':'0.'; }
+  else S.buffer+=t;
+  render();
+}
+function irA(i){ S.idx=i; S.buffer=''; S.modo='foco'; render(); }
+function mover(d){
+  const lista=listaVariantes();
+  S.idx=Math.max(0,Math.min(lista.length-1,S.idx+d));
+  S.buffer=''; render();
+}
+
+/* guarda el ítem al toque: si se corta la luz, no se pierde nada */
+async function guardarItem(){
+  if(S.guardando) return;
+  const lista=listaVariantes(); const v=lista[S.idx];
+  const val = S.buffer===''?0:parseFloat(S.buffer);
+  if(isNaN(val)) return;
+  S.guardando=true;
+  try{
+    const teo = stockDe(S.stock, v.id, S.sesion.deposito_id);
+    const fila={
+      sesion_id:S.sesion.id, variante_id:v.id,
+      cantidad_contada:val, cantidad_teorica:teo,
+      costo_unitario:costoVariante(v,S.insumos),
+      usuario_id:S.user.id, contado_en:new Date().toISOString()
+    };
+    const r=await sb('stock_conteo_items?on_conflict=sesion_id,variante_id',{
+      method:'POST', body:JSON.stringify(fila),
+      prefer:'resolution=merge-duplicates,return=representation'
+    });
+    S.items[v.id]=(r&&r[0])||fila;
+    S.buffer='';
+    const sig=lista.findIndex((x,i)=>i>S.idx && !S.items[x.id]);
+    S.idx = sig>=0 ? sig : Math.min(S.idx+1, lista.length-1);
+    render();
+  }catch(e){
+    S.msg=`<div class="msg err">No se pudo guardar: ${esc(e.message)}</div>`;
+    render();
+  }finally{ S.guardando=false; }
+}
+
+function irCierre(){ S.vista='cierre'; render(); }
+
+async function confirmarCierre(){
+  if(S.cerrando) return;
+  S.cerrando=true;
+  const btn=document.getElementById('btnCerrar');
+  if(btn){ btn.disabled=true; btn.textContent='Aplicando…'; }
+  try{
+    const lista=listaVariantes();
+    const movs=[];
+    lista.forEach(v=>{
+      const it=S.items[v.id]; if(!it) return;
+      const d=(Number(it.cantidad_contada)||0)-(Number(it.cantidad_teorica)||0);
+      if(Math.abs(d)<=0.0001) return;
+      movs.push({
+        variante_id:v.id, deposito_id:S.sesion.deposito_id,
+        tipo: d>0?'entrada':'salida', cantidad:Math.abs(d),
+        usuario_id:S.user.id, conteo_sesion_id:S.sesion.id,
+        motivo:'Ajuste por conteo'+(S.motivosDif[v.id]?': '+S.motivosDif[v.id]:''),
+        costo_unitario:costoVariante(v,S.insumos),
+        comprobante:'Conteo #'+S.sesion.id
+      });
+    });
+    if(movs.length) await sb('stock_movimientos',{method:'POST',body:JSON.stringify(movs)});
+    /* guarda el motivo elegido en cada línea del conteo */
+    for(const vid of Object.keys(S.motivosDif)){
+      if(!S.motivosDif[vid]||!S.items[vid]) continue;
+      await sb('stock_conteo_items?id=eq.'+S.items[vid].id,{method:'PATCH',
+        body:JSON.stringify({motivo_diferencia:S.motivosDif[vid]})});
+    }
+    await sb('stock_conteo_sesiones?id=eq.'+S.sesion.id,{method:'PATCH',
+      body:JSON.stringify({estado:'cerrada', cerrado_en:new Date().toISOString()})});
+
+    S.msg=`<div class="msg ok">Conteo cerrado. ${movs.length} ajuste${movs.length===1?'':'s'} aplicado${movs.length===1?'':'s'}.</div>`;
+    S.sesion=null; S.items={}; S.motivosDif={}; S.vista='home';
+    await cargarBase(); render();
+  }catch(e){
+    const m=document.getElementById('cierreMsg');
+    if(m) m.innerHTML=`<div class="msg err">${esc(e.message)}</div>`;
+    if(btn){ btn.disabled=false; btn.textContent='Aplicar ajustes y cerrar'; }
+  }finally{ S.cerrando=false; }
+}
+
+/* ---------------- arranque ---------------- */
+(async function init(){
+  S.user=getUser(); render();
+  if(S.user){
+    try{ await cargarBase(); render(); }
+    catch(e){ document.getElementById('app').innerHTML=`<div class="msg err">No pude cargar los datos: ${esc(e.message)}</div>`; }
+  }
+})();
+</script>
+</body>
+</html>
