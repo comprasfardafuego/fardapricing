@@ -1044,12 +1044,23 @@ function renderDetail(nm, type) {
     </tr>`;
   }
 
-  const fc = venta ? tc / venta : null;
-  let summary = `<div class="cost-summary"><div><div class="cost-item-label">Costo total</div><div class="cost-item-value teal">${fmt(tc)}</div></div>`;
-  summary += `<div><div class="cost-item-label">IVA contenido</div><div class="cost-item-value" style="color:var(--text-sec);">${fmt(ivaTotal)}</div></div>`;
-  summary += `<div><div class="cost-item-label">Total c/IVA</div><div class="cost-item-value">${fmt(tc + ivaTotal)}</div></div>`;
-  if (venta != null) summary += `<div><div class="cost-item-label">Precio venta</div><div class="cost-item-value">${fmt(venta)}</div></div>`;
-  if (fc != null) summary += `<div><div class="cost-item-label">Food Cost</div><div class="cost-item-value">${fcBadge(fc)}</div></div>`;
+  const ivaVentaPct = (competencia && competencia.ivaVentas != null) ? competencia.ivaVentas : 21;
+  const ventaNeta = venta != null ? venta / (1 + ivaVentaPct / 100) : null;
+  const costoBruto = tc + ivaTotal;
+  const fcNeto = ventaNeta ? tc / ventaNeta : null;
+  const fcBruto = venta ? costoBruto / venta : null;
+  const grpTitle = (t) => `<div style="width:100%;font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text-sec);text-transform:uppercase;margin-bottom:-12px;">${t}</div>`;
+  let summary = `<div class="cost-summary">`;
+  summary += grpTitle('Sin IVA');
+  summary += `<div><div class="cost-item-label">Costo s/IVA</div><div class="cost-item-value teal">${fmt(tc)}</div></div>`;
+  if (venta != null) summary += `<div><div class="cost-item-label">Venta s/IVA (${ivaVentaPct}%)</div><div class="cost-item-value">${fmt(ventaNeta)}</div></div>`;
+  if (fcNeto != null) summary += `<div><div class="cost-item-label">Food Cost s/IVA</div><div class="cost-item-value">${fcBadge(fcNeto)}</div></div>`;
+  summary += `</div><div class="cost-summary">`;
+  summary += grpTitle('Con IVA');
+  summary += `<div><div class="cost-item-label">Costo c/IVA</div><div class="cost-item-value">${fmt(costoBruto)}</div></div>`;
+  if (venta != null) summary += `<div><div class="cost-item-label">Venta c/IVA</div><div class="cost-item-value">${fmt(venta)}</div></div>`;
+  if (fcBruto != null) summary += `<div><div class="cost-item-label">Food Cost c/IVA</div><div class="cost-item-value">${fcBadge(fcBruto)}</div></div>`;
+  summary += `<div><div class="cost-item-label">IVA contenido en costo</div><div class="cost-item-value" style="color:var(--text-sec);">${fmt(ivaTotal)}</div></div>`;
   if (type === 'prod' && prodRinde[nm] && prodRinde[nm].cantidad > 0) {
     summary += `<div><div class="cost-item-label">Costo por 1 ${prodRinde[nm].unidad}</div><div class="cost-item-value teal">${fmt(tc / prodRinde[nm].cantidad)}</div></div>`;
   }
