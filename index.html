@@ -1594,6 +1594,7 @@ function applyState(state) {
   nombreOverrides = state.nombreOverrides || {};
   competencia = state.competencia && state.competencia.locations ? state.competencia : { locations: ['Local A', 'Local B', 'Local C', 'Local D'], urls: ['', '', '', ''], prices: {} };
   if (!competencia.urls) competencia.urls = ['', '', '', ''];
+  if (competencia.ivaVentas == null) competencia.ivaVentas = 21;
   produccionesExtra.forEach(nm => { if (!prodMapCI[normName(nm)]) prodMapCI[normName(nm)] = nm; });
   produccionesDeleted.forEach(nm => removeProdFromMap(nm));
   insumoDatalistHTML = null;
@@ -1979,13 +1980,19 @@ function renderComparativa() {
       <button class="btn" style="padding:8px 14px;font-size:12px;" onclick="agregarLocalComparativa()">+ Agregar local</button>
     </div>`;
   }
-  h += `</div></div>`;
+  h += `</div>
+    <div style="margin-top:12px;display:flex;align-items:center;gap:8px;">
+      <label style="font-size:12px;color:var(--text-sec);">IVA aplicado para calcular precios sin IVA (mismo % para FARDA y todos los locales):</label>
+      <input class="ins-input" style="width:70px;" type="number" step="0.5" value="${competencia.ivaVentas}" ${isViewer?'disabled':''} onchange="setIvaComparativa(this.value)">
+      <span style="font-size:12px;color:var(--text-sec);">%</span>
+    </div>
+  </div>`;
 
-  h += `<div class="table-container"><table><thead><tr><th>Plato</th><th class="right">FARDA</th>`;
+  h += `<div class="table-container"><table><thead><tr><th>Plato</th><th class="right">FARDA<br><span style="font-weight:400;font-size:10px;color:var(--text-sec);">bruto / neto</span></th>`;
   competencia.locations.forEach((loc, idx) => {
     const nombreLocal = cap(loc || ('Local ' + (idx+1)));
     const url = competencia.urls[idx];
-    h += `<th class="right">${url ? `<a href="${url}" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:underline;">${nombreLocal} ↗</a>` : nombreLocal}</th>`;
+    h += `<th class="right">${url ? `<a href="${url}" target="_blank" rel="noopener" style="color:var(--teal);text-decoration:underline;">${nombreLocal} ↗</a>` : nombreLocal}<br><span style="font-weight:400;font-size:10px;color:var(--text-sec);">bruto / neto</span></th>`;
   });
   h += `<th class="right">Diferencia prom.</th><th class="right">Simular / Actualizar precio</th></tr></thead><tbody>`;
 
@@ -1996,12 +2003,15 @@ function renderComparativa() {
       const p = getPlatoMeta(nm);
       if (!p) return;
       const preciosComp = (competencia.prices[nm] || []);
-      h += `<tr><td class="td-name">${nm}</td><td class="td-num">${fmt(p.venta)}</td>`;
+      const ivaFactor = 1 + (competencia.ivaVentas || 0) / 100;
+      const netoFarda = p.venta != null ? p.venta / ivaFactor : null;
+      h += `<tr><td class="td-name">${nm}</td><td class="td-num">${fmt(p.venta)}${netoFarda != null ? `<br><span style="font-size:10px;color:var(--text-sec);font-weight:400;">s/IVA ${fmt(netoFarda)}</span>` : ''}</td>`;
       let sumDiff = 0, countDiff = 0;
       competencia.locations.forEach((loc, idx) => {
         const val = preciosComp[idx];
         if (val != null && p.venta) { sumDiff += (p.venta - val) / val; countDiff++; }
-        h += `<td class="td-num"><input class="sim-input" style="width:100px;" type="number" value="${val != null ? val : ''}" placeholder="—" ${isViewer?'disabled':''} onchange="setPrecioComparativa('${nm.replace(/'/g,"\\'")}', ${idx}, this.value)"></td>`;
+        const netoVal = val != null ? val / ivaFactor : null;
+        h += `<td class="td-num"><input class="sim-input" style="width:100px;" type="number" value="${val != null ? val : ''}" placeholder="—" ${isViewer?'disabled':''} onchange="setPrecioComparativa('${nm.replace(/'/g,"\\'")}', ${idx}, this.value)">${netoVal != null ? `<div style="font-size:10px;color:var(--text-sec);">s/IVA ${fmt(netoVal)}</div>` : ''}</td>`;
       });
       const diffPct = countDiff ? Math.round((sumDiff / countDiff) * 1000) / 10 : null;
       const diffColor = diffPct == null ? 'var(--text-ter)' : (diffPct > 0 ? 'var(--red)' : 'var(--green)');
@@ -2034,6 +2044,14 @@ function updateSimCompDiff(inp) {
 function renombrarLocalComparativa(idx, valor) {
   if (blockIfViewer()) return;
   competencia.locations[idx] = valor;
+  saveStateDebounced();
+  renderComparativa();
+}
+
+function setIvaComparativa(valor) {
+  if (blockIfViewer()) return;
+  const v = parseFloat(valor);
+  competencia.ivaVentas = isNaN(v) ? 21 : v;
   saveStateDebounced();
   renderComparativa();
 }
@@ -2077,5 +2095,7 @@ function setPrecioComparativa(nombre, idx, valor) {
   renderComparativa();
 }
 </script>
+</body>
+</html>
 </body>
 </html>
